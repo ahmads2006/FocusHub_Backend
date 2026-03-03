@@ -20,6 +20,7 @@
         "spatie/laravel-medialibrary": "^11.21",
         "spatie/laravel-permission": "^7.2",
         "spatie/laravel-tags": "^4.11",
+        "trycourier/courier": "^5.1",
         "zanysoft/laravel-zip": "^3.0"
     },
     "require-dev": {
