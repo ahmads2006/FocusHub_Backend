@@ -7,6 +7,9 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Password;
 use Illuminate\View\View;
+use Illuminate\Support\Facades\Log;
+use Courier\Client;
+use App\Models\User;
 
 class PasswordResetLinkController extends Controller
 {
@@ -29,16 +32,38 @@ class PasswordResetLinkController extends Controller
             'email' => ['required', 'email'],
         ]);
 
-        // We will send the password reset link to this user. Once we have attempted
-        // to send the link, we will examine the response then see the message we
-        // need to show to the user. Finally, we'll send out a proper response.
-        $status = Password::sendResetLink(
-            $request->only('email')
-        );
+        // Find the user
+        $user = User::where('email', $request->email)->first();
 
-        return $status == Password::RESET_LINK_SENT
-                    ? back()->with('status', __($status))
-                    : back()->withInput($request->only('email'))
-                        ->withErrors(['email' => __($status)]);
+        if (!$user) {
+            return back()->withInput($request->only('email'))
+                        ->withErrors(['email' => __('passwords.user')]);
+        }
+
+        // Generate a 6-digit code
+        $resetCode = (string) rand(100000, 999999);
+
+        // Store the code and email in the session
+        session([
+            'reset_password_code' => $resetCode,
+            'reset_password_email' => $user->email,
+        ]);
+
+        Log::info("Generated Password Reset Code for {$user->email}: {$resetCode}");
+
+        // Send the code via Laravel Mail (Resend)
+        try {
+            \Illuminate\Support\Facades\Mail::raw("مرحباً {$user->name}، رمز استعادة كلمة المرور الخاص بك هو: {$resetCode}", function ($message) use ($user) {
+                $message->to($user->email)
+                        ->subject('رمز استعادة كلمة المرور');
+            });
+            Log::info("Password Reset Code sent to: {$user->email}");
+        } catch (\Exception $e) {
+            Log::error("Password Reset Email Error: " . $e->getMessage());
+            return back()->withInput($request->only('email'))
+                        ->withErrors(['email' => 'حدث خطأ أثناء إرسال البريد الإلكتروني. الرجاء المحاولة مرة أخرى.']);
+        }
+
+        return redirect()->route('password.verify.code');
     }
 }

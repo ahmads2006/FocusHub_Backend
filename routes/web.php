@@ -41,35 +41,56 @@ require __DIR__.'/auth.php';
 
 
 
-    
+Route::get('/verify-code', function () {
+    return view('auth.verify-code');
+})->name('verify.code');
 
+Route::post('/verify-code', function (Illuminate\Http\Request $request) {
+    $request->validate(['code' => 'required|numeric']);
 
-// مسار تجريبي لإرسال رمز التحقق عبر Courier
+    if ($request->code == session('verification_code')) {
+        $userId = session('temp_user_id');
+        if ($userId && $user = \App\Models\User::find($userId)) {
+            Auth::login($user);
+            session()->forget(['verification_code', 'temp_user_id']);
+            return redirect()->route('dashboard');
+        }
+    }
+
+    return back()->withErrors(['code' => 'الرمز غير صحيح أو انتهت صلاحية الجلسة.']);
+})->name('verify.code.post');
+
 Route::get('/test-courier', function () {
     try {
-        // 1. الاتصال بـ Courier باستخدام المفتاح الموجود في .env
-       $courier = new Client(env('COURIER_AUTH_TOKEN'));
+        // يمكنك مراجعة الكود المرسل في ملف storage/logs/laravel.log
+        // تأكد من وجود المستخدم وتخزين معرفه في الجلسة ليعمل منطق التحقق
+        $user = \App\Models\User::where('email', 'hrobahmad9@gmail.com')->firstOrFail();
+        
+        \Illuminate\Support\Facades\Log::info("Attempting to send Courier email to: " . $user->email);
 
-        // 2. توليد رمز تحقق عشوائي
+        $courier = new Client(env('COURIER_AUTH_TOKEN'));
         $verificationCode = (string) rand(100000, 999999);
 
-        // 3. إرسال الإشعار مع البيانات
-        $result = $courier->send->message([
-            'to' => [
-                'email' => 'hrobahmad9@gmail.com',
-            ],
-            'template' => 'DT14H2T7T44X4DGFSWX8J1DC', // الـ ID الخاص بك من الصورة
+        session([
+            'verification_code' => $verificationCode,
+            'temp_user_id' => $user->id,
+        ]);
+
+        $response = $courier->send->message([
+            'to' => ['email' => $user->email],
+            'template' => 'DT14H2T7T44X4DGFSWX8J1DC',
             'data' => [
-                'recipientName' => 'Ahmad',
-                'project_name' => 'FocusHub',
-                'verification_code' => $verificationCode, // الرمز الذي نريد التحقق منه
+                'verification_code' => $verificationCode,
             ],
         ]);
 
-        return "تم إرسال الرمز ($verificationCode) إلى لوحة تحكم Courier بنجاح! <br> رقم الطلب: " . $result->requestID;
+        \Illuminate\Support\Facades\Log::info("Courier Response: " . json_encode($response));
+
+        return redirect()->route('verify.code');
 
     } catch (\Exception $e) {
-        return "حدث خطأ أثناء الاتصال بـ Courier: " . $e->getMessage();
+        \Illuminate\Support\Facades\Log::error("Courier Catch Error: " . $e->getMessage());
+        return "خطأ: " . $e->getMessage();
     }
 });
 

@@ -20,7 +20,35 @@ class NewPasswordController extends Controller
      */
     public function create(Request $request): View
     {
+        if (!session('reset_password_email')) {
+            return redirect()->route('password.request');
+        }
         return view('auth.reset-password', ['request' => $request]);
+    }
+
+    /**
+     * Display the code verification view.
+     */
+    public function createCode(): View
+    {
+        if (!session('reset_password_email')) {
+            return redirect()->route('password.request');
+        }
+        return view('auth.verify-reset-code');
+    }
+
+    /**
+     * Verify the 6-digit code.
+     */
+    public function verifyCode(Request $request): RedirectResponse
+    {
+        $request->validate(['code' => 'required|numeric']);
+
+        if ($request->code == session('reset_password_code')) {
+            return redirect()->route('password.reset', ['token' => 'verified_by_code']); // Dummy token to satisfy default views
+        }
+
+        return back()->withErrors(['code' => __('الرمز غير صحيح.')]);
     }
 
     /**
@@ -31,32 +59,29 @@ class NewPasswordController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $request->validate([
-            'token' => ['required'],
-            'email' => ['required', 'email'],
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
         ]);
 
-        // Here we will attempt to reset the user's password. If it is successful we
-        // will update the password on an actual user model and persist it to the
-        // database. Otherwise we will parse the error and return the response.
-        $status = Password::reset(
-            $request->only('email', 'password', 'password_confirmation', 'token'),
-            function (User $user) use ($request) {
-                $user->forceFill([
-                    'password' => Hash::make($request->password),
-                    'remember_token' => Str::random(60),
-                ])->save();
+        $email = session('reset_password_email');
+        if (!$email) {
+            return redirect()->route('password.request')->withErrors(['email' => __('Session expired. Please request a new code.')]);
+        }
 
-                event(new PasswordReset($user));
-            }
-        );
+        $user = User::where('email', $email)->first();
 
-        // If the password was successfully reset, we will redirect the user back to
-        // the application's home authenticated view. If there is an error we can
-        // redirect them back to where they came from with their error message.
-        return $status == Password::PASSWORD_RESET
-                    ? redirect()->route('login')->with('status', __($status))
-                    : back()->withInput($request->only('email'))
-                        ->withErrors(['email' => __($status)]);
+        if ($user) {
+            $user->forceFill([
+                'password' => Hash::make($request->password),
+                'remember_token' => Str::random(60),
+            ])->save();
+
+            event(new PasswordReset($user));
+
+            session()->forget(['reset_password_code', 'reset_password_email']);
+
+            return redirect()->route('login')->with('status', __('passwords.reset'));
+        }
+
+        return back()->withErrors(['email' => __('passwords.user')]);
     }
 }

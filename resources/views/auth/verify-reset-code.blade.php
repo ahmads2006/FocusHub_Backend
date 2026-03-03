@@ -3,7 +3,7 @@
         {{ __('الرجاء إدخال رمز التحقق المكون من 6 أرقام والذي أرسلناه إلى بريدك الإلكتروني.') }}
     </div>
 
-    <form method="POST" action="{{ route('verify.code.post') }}">
+    <form method="POST" action="{{ route('password.verify.code.post') }}">
         @csrf
         <div>
             <x-input-label for="code" :value="__('رمز التحقق')" />

@@ -38,6 +38,11 @@
                     {{ __('Forgot your password?') }}
                 </a>
             @endif
+            <a href="{{ route('register') }}"
+                style="margin-left: 10px; background-color: #000; color: #fff; padding: 6px 14px; border-radius: 6px; text-decoration: none; font-size: 14px; display: inline-block; margin-right: 10px; margin-left: 10px; margin-top: 10px; margin-bottom: 10px; cursor: pointer;">
+
+                {{ __('Register') }}
+            </a>
 
             <x-primary-button class="ms-3">
                 {{ __('Log in') }}

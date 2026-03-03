@@ -12,6 +12,7 @@ use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Courier\Client; // استدعاء مكتبة كوريير
 
 class User extends Authenticatable implements HasMedia
 {
@@ -57,4 +58,5 @@ class User extends Authenticatable implements HasMedia
                     ->withPivot('role')
                     ->withTimestamps();
     }
+
 }
