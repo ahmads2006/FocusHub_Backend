@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Auth\Events\Registered;
+use Spatie\Permission\Models\Role;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -41,6 +42,11 @@ class RegisteredUserController extends Controller
             'password' => Hash::make($request->password),
             'is_verified' => false,
         ]);
+
+        $userRole = Role::firstOrCreate(
+            ['name' => 'user', 'guard_name' => config('auth.defaults.guard', 'web')]
+        );
+        $user->assignRole($userRole);
 
         event(new Registered($user));
 

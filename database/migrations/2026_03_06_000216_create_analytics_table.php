@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('analytics', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->foreignUuid('photo_id')->constrained()->cascadeOnDelete();
+            $table->foreignUuid('image_id')->constrained('images')->cascadeOnDelete();
             $table->foreignUuid('user_id')->nullable()->constrained()->nullOnDelete();
             $table->enum('type', ['view', 'download']);
             $table->string('ip_address', 45)->nullable();

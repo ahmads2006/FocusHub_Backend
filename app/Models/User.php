@@ -13,8 +13,9 @@ use Spatie\MediaLibrary\InteractsWithMedia;
 use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Tags\HasTags;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use App\Mail\VerificationCodeMail;
 use Illuminate\Support\Facades\Mail;
 
@@ -22,6 +23,13 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasFactory, Notifiable, HasUuids, HasRoles, InteractsWithMedia, LogsActivity, HasTags;
+
+    protected static function booted(): void
+    {
+        static::created(function (User $user) {
+            $user->userStatus()->create([]);
+        });
+    }
 
     public function hasVerifiedEmail()
     {
@@ -50,15 +58,18 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
         'password',
         'profile_picture',
         'bio',
-        'google2fa_secret',
         'verification_code',
         'is_verified',
+        'role',
     ];
+
+    protected $with = ['userStatus'];
 
     protected $hidden = [
         'password',
         'remember_token',
-        'google2fa_secret',
+        'verification_code',
+        
     ];
 
     protected function casts(): array
@@ -67,7 +78,28 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_verified' => 'boolean',
+            'role' => 'string',
         ];
+    }
+
+    public function userStatus(): HasOne
+    {
+        return $this->hasOne(UserStatus::class);
+    }
+
+    public function getIsBannedAttribute(): bool
+    {
+        return $this->userStatus?->is_banned ?? false;
+    }
+
+    public function getIsShadowHiddenAttribute(): bool
+    {
+        return $this->userStatus?->is_shadow_hidden ?? false;
+    }
+
+    public function getBannedAtAttribute(): ?\Carbon\Carbon
+    {
+        return $this->userStatus?->banned_at;
     }
 
     /**

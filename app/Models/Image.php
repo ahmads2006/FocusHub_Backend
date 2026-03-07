@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Scopes\ShadowPrivacyScope;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -17,6 +18,11 @@ use Spatie\Activitylog\LogOptions;
 class Image extends Model implements HasMedia
 {
     use HasFactory, HasUuids, InteractsWithMedia, HasTags, LogsActivity;
+
+    protected static function booted(): void
+    {
+        static::addGlobalScope(new ShadowPrivacyScope);
+    }
 
     public function getActivitylogOptions(): LogOptions
     {

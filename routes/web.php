@@ -4,6 +4,9 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\Auth\VerifyCodeController;
 use App\Http\Controllers\ImageController;
+use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
+use App\Http\Controllers\Admin\UserController as AdminUserController;
+use App\Http\Controllers\Admin\RoleController as AdminRoleController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\NotificationController;
@@ -15,7 +18,7 @@ use App\Http\Controllers\DashboardController;
 // ────────────────────────────────────────────────
 // Dashboard
 // ────────────────────────────────────────────────
-Route::get('/', [DashboardController::class, 'index'])->middleware(['auth', 'check.verified'])->name('dashboard');
+Route::get('/', [DashboardController::class, 'index'])->middleware(['auth', 'check.verified', 'check.banned'])->name('dashboard');
 
 // ────────────────────────────────────────────────
 // Guest routes
@@ -34,7 +37,7 @@ Route::post('/verify-code', [VerifyCodeController::class, 'verify'])->name('veri
 // ────────────────────────────────────────────────
 // Authenticated + verified routes
 // ────────────────────────────────────────────────
-Route::middleware(['auth', 'check.verified'])->group(function () {
+Route::middleware(['auth', 'check.verified', 'check.banned'])->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
@@ -51,6 +54,20 @@ Route::middleware(['auth', 'check.verified'])->group(function () {
     Route::post('/manage-albums', [ImageController::class, 'storeAlbum'])->name('albums.test.store');
 
     Route::get('/gallery', [ImageController::class, 'gallery'])->name('gallery.index');
+});
+
+// ─── لوحة الإدارة (super-admin only) ─────────────────────────────
+Route::middleware(['auth', 'check.verified', 'ProtectAdminPanel'])->prefix('admin')->name('admin.')->group(function () {
+    Route::get('/', [AdminDashboardController::class, 'index'])->name('dashboard');
+    Route::get('/users', [AdminDashboardController::class, 'users'])->name('users.index');
+    Route::get('/roles', [AdminRoleController::class, 'index'])->name('roles.index');
+    Route::post('/roles', [AdminRoleController::class, 'store'])->name('roles.store');
+    Route::delete('/roles/{role}', [AdminRoleController::class, 'destroy'])->name('roles.destroy');
+    Route::get('/activities', [AdminDashboardController::class, 'activities'])->name('activities.index');
+    Route::post('/users/{user}/ban', [AdminUserController::class, 'ban'])->name('users.ban');
+    Route::post('/users/{user}/unban', [AdminUserController::class, 'unban'])->name('users.unban');
+    Route::post('/users/{user}/shadow', [AdminUserController::class, 'toggleShadow'])->name('users.shadow');
+    Route::post('/users/{user}/role', [AdminUserController::class, 'updateRole'])->name('users.role');
 });
 
 // ────────────────────────────────────────────────

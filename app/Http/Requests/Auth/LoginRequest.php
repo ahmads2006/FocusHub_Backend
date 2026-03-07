@@ -49,6 +49,14 @@ class LoginRequest extends FormRequest
             ]);
         }
 
+        $user = Auth::user();
+        if ($user && ($user->is_banned || ($user->userStatus?->is_deleted ?? false))) {
+            Auth::logout();
+            throw ValidationException::withMessages([
+                'email' => __('Your account has been banned or deactivated. Please contact support.'),
+            ]);
+        }
+
         RateLimiter::clear($this->throttleKey());
     }
 

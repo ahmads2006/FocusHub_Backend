@@ -169,6 +169,13 @@
                    class="nav-link {{ request()->routeIs('activities.index') ? 'active' : '' }}">
                     سجل النشاطات
                 </a>
+                @if(Auth::user()->hasRole('super-admin'))
+                    <a href="{{ route('admin.dashboard') }}"
+                       class="nav-link {{ request()->routeIs('admin.*') ? 'active' : '' }}"
+                       style="color: #d4a853;">
+                        لوحة الإدارة
+                    </a>
+                @endif
             </div>
 
             <!-- User section (desktop) -->
@@ -225,6 +232,9 @@
         <a href="{{ route('images.test.index') }}" class="mobile-link {{ request()->routeIs('images.test.*') ? 'active' : '' }}">إدارة الصور</a>
         <a href="{{ route('gallery.index') }}" class="mobile-link {{ request()->routeIs('gallery.index') ? 'active' : '' }}">المعرض العام</a>
         <a href="{{ route('activities.index') }}" class="mobile-link {{ request()->routeIs('activities.index') ? 'active' : '' }}">سجل النشاطات</a>
+        @if(Auth::user()->hasRole('super-admin'))
+            <a href="{{ route('admin.dashboard') }}" class="mobile-link {{ request()->routeIs('admin.*') ? 'active' : '' }}" style="color: #d4a853;">لوحة الإدارة</a>
+        @endif
 
         <div class="mobile-user-block">
             <div class="mobile-user-name">{{ Auth::user()->name }}</div>
