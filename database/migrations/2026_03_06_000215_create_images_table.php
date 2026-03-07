@@ -6,25 +6,46 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    /**
+     * Run the migrations.
+     */
     public function up(): void
     {
-        Schema::create('photos', function (Blueprint $table) {
+        Schema::create('images', function (Blueprint $table) {
+        
             $table->uuid('id')->primary();
+
             $table->foreignUuid('user_id')->constrained()->cascadeOnDelete();
-            $table->foreignUuid('album_id')->nullable()->constrained()->nullOnDelete();
+
+            $table->foreignUuid('album_id')->nullable()->constrained('albums')->nullOnDelete();
+
+            $table->string('filename');
+            $table->string('path');
+            $table->unsignedBigInteger('size');
+
             $table->string('title')->nullable();
+
             $table->text('description')->nullable();
+
             $table->enum('privacy', ['public', 'private'])->default('public');
+
             $table->json('exif_data')->nullable();
+
             $table->boolean('is_comparison')->default(false);
+
             $table->unsignedInteger('views_count')->default(0);
+
             $table->unsignedInteger('downloads_count')->default(0);
+
             $table->timestamps();
         });
     }
 
+    /**
+     * Reverse the migrations.
+     */
     public function down(): void
     {
-        Schema::dropIfExists('photos');
+        Schema::dropIfExists('images');
     }
 };

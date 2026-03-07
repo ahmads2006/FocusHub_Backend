@@ -11,16 +11,16 @@ class Analytics extends Model
     use HasUuids;
 
     protected $fillable = [
-        'photo_id',
+        'image_id', // Changed from photo_id
         'user_id',
         'type',
         'ip_address',
         'user_agent',
     ];
 
-    public function photo(): BelongsTo
+    public function image(): BelongsTo
     {
-        return $this->belongsTo(Photo::class);
+        return $this->belongsTo(Image::class);
     }
 
     public function user(): BelongsTo

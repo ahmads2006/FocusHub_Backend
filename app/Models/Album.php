@@ -11,10 +11,20 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
+use Spatie\Activitylog\Traits\LogsActivity;
+use Spatie\Activitylog\LogOptions;
 
 class Album extends Model implements HasMedia
 {
-    use HasFactory, HasUuids, InteractsWithMedia;
+    use HasFactory, HasUuids, InteractsWithMedia, LogsActivity;
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logAll()
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs();
+    }
 
     protected $fillable = [
         'user_id',
@@ -35,11 +45,6 @@ class Album extends Model implements HasMedia
         return $this->belongsTo(User::class);
     }
 
-    public function photos(): HasMany
-    {
-        return $this->hasMany(Photo::class);
-    }
-
     public function collaborators(): BelongsToMany
     {
         return $this->belongsToMany(User::class)
@@ -50,5 +55,10 @@ class Album extends Model implements HasMedia
     public function sharedLinks(): MorphMany
     {
         return $this->morphMany(SharedLink::class, 'shareable');
+    }
+
+    public function images(): HasMany
+    {
+        return $this->hasMany(Image::class);
     }
 }

@@ -8,8 +8,10 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Password;
 use Illuminate\View\View;
 use Illuminate\Support\Facades\Log;
-use Courier\Client;
+use Illuminate\Support\Facades\Mail;
+use App\Mail\VerificationCodeMail;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 
 class PasswordResetLinkController extends Controller
 {
@@ -43,20 +45,23 @@ class PasswordResetLinkController extends Controller
         // Generate a 6-digit code
         $resetCode = (string) rand(100000, 999999);
 
-        // Store the code and email in the session
-        session([
-            'reset_password_code' => $resetCode,
-            'reset_password_email' => $user->email,
-        ]);
+        // تخزين الرمز في قاعدة البيانات (في جدول password_reset_tokens) لترتبط الميزة بالداتابيز
+        DB::table('password_reset_tokens')->updateOrInsert(
+            ['email' => $user->email],
+            [
+                'token' => $resetCode,
+                'created_at' => now(),
+            ]
+        );
+
+        // Store email in session to know who is being reset
+        session(['reset_password_email' => $user->email]);
 
         Log::info("Generated Password Reset Code for {$user->email}: {$resetCode}");
 
-        // Send the code via Laravel Mail (Resend)
+        // إرسال الرمز عبر HTML email باستخدام VerificationCodeMail
         try {
-            \Illuminate\Support\Facades\Mail::raw("مرحباً {$user->name}، رمز استعادة كلمة المرور الخاص بك هو: {$resetCode}", function ($message) use ($user) {
-                $message->to($user->email)
-                        ->subject('رمز استعادة كلمة المرور');
-            });
+            Mail::to($user->email)->send(new VerificationCodeMail($resetCode, $user->name));
             Log::info("Password Reset Code sent to: {$user->email}");
         } catch (\Exception $e) {
             Log::error("Password Reset Email Error: " . $e->getMessage());

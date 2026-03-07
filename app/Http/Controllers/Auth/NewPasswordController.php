@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules;
 use Illuminate\View\View;
+use Illuminate\Support\Facades\DB;
 
 class NewPasswordController extends Controller
 {
@@ -44,8 +45,16 @@ class NewPasswordController extends Controller
     {
         $request->validate(['code' => 'required|numeric']);
 
-        if ($request->code == session('reset_password_code')) {
-            return redirect()->route('password.reset', ['token' => 'verified_by_code']); // Dummy token to satisfy default views
+        $email = session('reset_password_email');
+        
+        $resetData = DB::table('password_reset_tokens')
+            ->where('email', $email)
+            ->where('token', $request->code)
+            ->first();
+
+        if ($resetData) {
+            // التحقق من أن الكود لم تنتهِ صلاحيته (اختياري، مثلاً بعد ساعة)
+            return redirect()->route('password.reset', ['token' => 'verified_by_code']); 
         }
 
         return back()->withErrors(['code' => __('الرمز غير صحيح.')]);
@@ -77,7 +86,9 @@ class NewPasswordController extends Controller
 
             event(new PasswordReset($user));
 
-            session()->forget(['reset_password_code', 'reset_password_email']);
+            // حذف الرمز من قاعدة البيانات بعد نجاح العملية
+            DB::table('password_reset_tokens')->where('email', $email)->delete();
+            session()->forget(['reset_password_email']);
 
             return redirect()->route('login')->with('status', __('passwords.reset'));
         }
