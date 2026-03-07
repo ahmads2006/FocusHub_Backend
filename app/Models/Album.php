@@ -36,19 +36,34 @@ class Album extends Model implements HasMedia
         'user_id',
         'title',
         'description',
-        'is_private',
+        'privacy',
         'is_collaborative',
         'cover_image',
     ];
 
     protected $casts = [
-        'is_private' => 'boolean',
+        'privacy' => 'string',
         'is_collaborative' => 'boolean',
     ];
 
+    public function getIsPrivateAttribute(): bool
+    {
+        return $this->privacy === 'private';
+    }
+
+    public function owner(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'user_id');
+    }
+
     public function user(): BelongsTo
     {
-        return $this->belongsTo(User::class);
+        return $this->owner();
+    }
+
+    public function photos(): HasMany
+    {
+        return $this->hasMany(Image::class);
     }
 
     public function collaborators(): BelongsToMany
@@ -66,5 +81,24 @@ class Album extends Model implements HasMedia
     public function images(): HasMany
     {
         return $this->hasMany(Image::class);
+    }
+
+    // Scopes
+    public function scopePublic($query)
+    {
+        return $query->where('privacy', 'public');
+    }
+
+    public function scopeOwnedBy($query, User $user)
+    {
+        return $query->where('user_id', $user->id);
+    }
+
+    public function scopeCollaborative($query, User $user)
+    {
+        return $query->where('is_collaborative', true)
+                     ->whereHas('collaborators', function ($q) use ($user) {
+                         $q->where('user_id', $user->id);
+                     });
     }
 }

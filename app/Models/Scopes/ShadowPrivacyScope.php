@@ -22,7 +22,7 @@ class ShadowPrivacyScope implements Scope
         }
 
         $userColumn = $model->getTable() === 'albums' || $model->getTable() === 'images'
-            ? 'user_id'
+            ? $model->getTable() . '.user_id'
             : null;
 
         if (!$userColumn) {

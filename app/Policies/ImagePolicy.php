@@ -22,6 +22,22 @@ class ImagePolicy
 
     public function delete(User $user, Image $image): bool
     {
-        return $user->id === $image->user_id;
+        // Owner of the image can delete
+        if ($user->id === $image->user_id) {
+            return true;
+        }
+
+        // Owner of the album can delete any image in it
+        if ($image->album && $user->id === $image->album->user_id) {
+            return true;
+        }
+
+        // Admin collaborator of the album can delete any image in it
+        if ($image->album) {
+            $collaborator = $image->album->collaborators()->where('user_id', $user->id)->first();
+            return $collaborator && $collaborator->pivot->role === 'admin';
+        }
+
+        return false;
     }
 }

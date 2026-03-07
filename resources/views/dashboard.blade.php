@@ -262,6 +262,37 @@
 
                 </div>
 
+                <!-- Quick Actions Grid -->
+                <div style="margin-bottom: 32px;">
+                    <p style="font-size: 11px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: #4a5270; margin-bottom: 16px;">الوصول السريع</p>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px;">
+                        <a href="{{ route('images.test.index') }}" class="stat-card" style="padding: 20px; text-align: center; text-decoration: none;">
+                            <div style="font-size: 24px; margin-bottom: 8px;">📤</div>
+                            <div style="font-size: 13px; font-weight: 700; color: #f1f3f9;">رفع صور</div>
+                        </a>
+                        <a href="{{ route('gallery.index') }}" class="stat-card" style="padding: 20px; text-align: center; text-decoration: none;">
+                            <div style="font-size: 24px; margin-bottom: 8px;">🖼</div>
+                            <div style="font-size: 13px; font-weight: 700; color: #f1f3f9;">المعرض</div>
+                        </a>
+                        <a href="{{ route('tasks.index') }}" class="stat-card" style="padding: 20px; text-align: center; text-decoration: none;">
+                            <div style="font-size: 24px; margin-bottom: 8px;">✅</div>
+                            <div style="font-size: 13px; font-weight: 700; color: #f1f3f9;">المهام</div>
+                        </a>
+                        <a href="{{ route('timer.index') }}" class="stat-card" style="padding: 20px; text-align: center; text-decoration: none;">
+                            <div style="font-size: 24px; margin-bottom: 8px;">⏱️</div>
+                            <div style="font-size: 13px; font-weight: 700; color: #f1f3f9;">الموقت</div>
+                        </a>
+                        <a href="{{ route('notifications.index') }}" class="stat-card" style="padding: 20px; text-align: center; text-decoration: none;">
+                            <div style="font-size: 24px; margin-bottom: 8px;">🔔</div>
+                            <div style="font-size: 13px; font-weight: 700; color: #f1f3f9;">التنبيهات</div>
+                        </a>
+                        <a href="{{ route('profile.edit') }}" class="stat-card" style="padding: 20px; text-align: center; text-decoration: none;">
+                            <div style="font-size: 24px; margin-bottom: 8px;">⚙️</div>
+                            <div style="font-size: 13px; font-weight: 700; color: #f1f3f9;">الإعدادات</div>
+                        </a>
+                    </div>
+                </div>
+
                 <!-- Profile card -->
                 <div class="profile-card" style="margin-bottom: 24px;">
                     @if(Auth::user()->avatar)

@@ -22,9 +22,12 @@ class ImageController extends Controller
      */
     public function manage()
     {
-        $images = Auth::user()->images()->latest()->get();
-        $albums = Auth::user()->albums()->latest()->get();
-        return view('images.index', compact('images', 'albums'));
+        $user = Auth::user();
+        $images = $user->images()->latest()->get();
+        $ownedAlbums = $user->ownedAlbums()->latest()->get();
+        $sharedAlbums = $user->collaborativeAlbums()->latest()->get();
+        
+        return view('images.index', compact('images', 'ownedAlbums', 'sharedAlbums'));
     }
 
     /**
@@ -38,6 +41,13 @@ class ImageController extends Controller
             'album_id' => 'nullable|exists:albums,id',
             'title' => 'nullable|string|max:255',
         ]);
+
+        if ($request->filled('album_id')) {
+            $album = Album::findOrFail($request->album_id);
+            if (Auth::user()->cannot('uploadPhoto', $album)) {
+                return back()->withErrors(['album_id' => 'ليس لديك صلاحية لإضافة صور لهذا الألبوم.']);
+            }
+        }
 
         $image = $this->imageService->upload($request->file('image'), $request->all(), Auth::id());
 
@@ -54,9 +64,7 @@ class ImageController extends Controller
      */
     public function destroy(Image $image)
     {
-        if ($image->user_id !== Auth::id()) {
-            abort(403);
-        }
+        $this->authorize('delete', $image);
 
         $this->imageService->delete($image);
 
@@ -70,12 +78,12 @@ class ImageController extends Controller
     {
         $validated = $request->validate([
             'title' => 'required|string|max:255',
-            'is_private' => 'boolean',
+            'privacy' => 'nullable|in:public,private,hidden',
         ]);
 
-        Auth::user()->albums()->create([
+        Auth::user()->ownedAlbums()->create([
             'title' => $validated['title'],
-            'is_private' => $request->has('is_private'),
+            'privacy' => $request->has('is_private') ? 'private' : ($validated['privacy'] ?? 'public'),
         ]);
 
         return back()->with('success', 'تم إنشاء الألبوم بنجاح!');

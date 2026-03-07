@@ -71,4 +71,17 @@ class PasswordResetLinkController extends Controller
 
         return redirect()->route('password.verify.code');
     }
+
+    public function resend(Request $request): RedirectResponse
+    {
+        $email = session('reset_password_email');
+
+        if (!$email) {
+            return redirect()->route('password.request')
+                ->withErrors(['email' => 'انتهت صلاحية الجلسة. يرجى طلب رمز جديد.']);
+        }
+
+        $request->merge(['email' => $email]);
+        return $this->store($request);
+    }
 }

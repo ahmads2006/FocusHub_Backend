@@ -11,7 +11,7 @@ class AlbumController extends Controller
 {
     public function index()
     {
-        $albums = Album::where('is_private', false)
+        $albums = Album::where('privacy', 'public')
             ->orWhere('user_id', Auth::id())
             ->latest()
             ->get();
@@ -24,18 +24,18 @@ class AlbumController extends Controller
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'is_private' => 'boolean',
+            'privacy' => 'nullable|in:public,private,hidden',
             'is_collaborative' => 'boolean',
         ]);
 
-        $album = Auth::user()->albums()->create($validated);
+        $album = Auth::user()->ownedAlbums()->create($validated);
 
         return response()->json($album, 201);
     }
 
     public function show(Album $album)
     {
-        if ($album->is_private && Auth::id() !== $album->user_id) {
+        if ($album->privacy !== 'public' && Auth::id() !== $album->user_id && !$album->collaborators->contains(Auth::id())) {
             abort(403);
         }
 
@@ -51,7 +51,7 @@ class AlbumController extends Controller
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'is_private' => 'boolean',
+            'privacy' => 'nullable|in:public,private,hidden',
             'is_collaborative' => 'boolean',
         ]);
 

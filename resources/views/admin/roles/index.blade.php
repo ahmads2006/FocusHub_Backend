@@ -63,7 +63,7 @@
                                         <td style="font-weight: 600; color: #f1f3f9;">{{ $r->name }}</td>
                                         <td style="color: #8891aa;">{{ $r->users_count }}</td>
                                         <td>
-                                            @if(!in_array($r->name, ['super-admin', 'user']))
+                                            @if(!in_array($r->name, ['super_admin', 'user']))
                                                 <form method="POST" action="{{ route('admin.roles.destroy', $r) }}" style="display: inline;" onsubmit="return confirm('حذف هذا الدور؟ المستخدمون الحاليون سيُزال منهم هذا الدور.')">
                                                     @csrf
                                                     @method('DELETE')
@@ -92,7 +92,7 @@
                     <p style="font-size: 12px; font-weight: 600; color: #4a5270; margin: 0 0 8px 0;">ترقية مستخدم من قاعدة البيانات</p>
                     <p style="font-size: 13px; color: #8891aa; margin: 0 0 12px 0;">استخدم الأمر التالي لترقية مستخدم لأي دور:</p>
                     <code style="display: block; background: #0d0f14; padding: 12px 16px; border-radius: 8px; font-size: 12px; color: #34d399; direction: ltr; text-align: left;">
-                        php artisan user:promote البريد@example.com super-admin
+                        php artisan user:promote البريد@example.com super_admin
                     </code>
                 </div>
             </div>

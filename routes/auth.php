@@ -30,6 +30,9 @@ Route::middleware('guest')->group(function () {
         ->name('password.reset');
 
 
+    Route::post('verify-reset-code/resend', [PasswordResetLinkController::class, 'resend'])
+        ->name('password.resend.code');
+
     Route::post('reset-password', [NewPasswordController::class, 'store'])
         ->name('password.store');
 });

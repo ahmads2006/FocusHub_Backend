@@ -14,6 +14,7 @@ use App\Http\Controllers\TaskController;
 use App\Http\Controllers\TimerController;
 use App\Http\Controllers\ActivityController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\AlbumController;
 
 // ────────────────────────────────────────────────
 // Dashboard
@@ -45,7 +46,7 @@ Route::middleware(['auth', 'check.verified', 'check.banned'])->group(function ()
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
     Route::get('/tasks', [TaskController::class, 'index'])->name('tasks.index');
     Route::get('/timer', [TimerController::class, 'index'])->name('timer.index');
-    Route::get('/activities', [ActivityController::class, 'index'])->name('activities.index');
+    Route::get('/activities', [ActivityController::class, 'index'])->middleware('permission:view-activity-logs')->name('activities.index');
 
     // إدارة الصور والألبومات (Consolidated)
     Route::get('/manage-images', [ImageController::class, 'manage'])->name('images.test.index');
@@ -54,6 +55,11 @@ Route::middleware(['auth', 'check.verified', 'check.banned'])->group(function ()
     Route::post('/manage-albums', [ImageController::class, 'storeAlbum'])->name('albums.test.store');
 
     Route::get('/gallery', [ImageController::class, 'gallery'])->name('gallery.index');
+
+    // Album Collaboration & Management
+    Route::get('/albums/{album}', [AlbumController::class, 'show'])->name('albums.show');
+    Route::post('/albums/{album}/collaborators', [AlbumController::class, 'addCollaborator'])->name('albums.collaborators.add');
+    Route::delete('/albums/{album}/collaborators/{user}', [AlbumController::class, 'removeCollaborator'])->name('albums.collaborators.remove');
 });
 
 // ─── لوحة الإدارة (super-admin only) ─────────────────────────────
@@ -77,5 +83,11 @@ Route::get('/logout', function () {
     Auth::logout();
     return redirect()->route('login');
 })->name('logout');
+
+// ─── Shared Links (Public Access with Token) ─────────────────────
+Route::middleware(\App\Http\Middleware\ValidateSharedLink::class)->group(function () {
+    Route::get('/s/{token}', [App\Http\Controllers\SharedLinkController::class, 'show'])->name('shared.link.show');
+    Route::post('/s/{token}/verify', [App\Http\Controllers\SharedLinkController::class, 'verifyPassword'])->name('shared.link.verify');
+});
 
 require __DIR__.'/auth.php';

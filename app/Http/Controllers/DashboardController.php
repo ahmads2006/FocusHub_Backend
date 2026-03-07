@@ -15,7 +15,7 @@ class DashboardController extends Controller
         
         $stats = [
             'total_images' => $user->images()->count(),
-            'total_albums' => $user->albums()->count(),
+            'total_albums' => $user->ownedAlbums()->count(),
             'recent_activities' => Activity::where('causer_id', $user->id)->latest()->take(5)->get(),
         ];
 

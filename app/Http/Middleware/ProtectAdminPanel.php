@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use Closure;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -15,12 +16,11 @@ class ProtectAdminPanel
      */
     public function handle(Request $request, Closure $next): Response
     {
-        // Check that the user is logged in and their rank in the database is super_admin
-        if (auth()->check() && auth()->user()->role === 'super_admin') {
+        // Check that the user is logged in and has the admin access permission
+        if (Auth::check() && (Auth::user()->role === 'super_admin' || Auth::user()->can('access-admin-dashboard'))) {
             return $next($request);
         }
-
-        // If they try to log in as a regular user (even if their name is super admin), ban them immediately
-        abort(403, 'Sorry, your assigned rank in the database does not allow you to access this page.');
+ 
+        abort(403, 'عذراً، الرتبة المخصصة لك في قاعدة البيانات لا تسمح لك بالوصول لهذه الصفحة.');
     }
 }

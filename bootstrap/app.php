@@ -21,6 +21,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'verified' => \App\Http\Middleware\EnsureEmailIsVerified::class,
             'check.verified' => \App\Http\Middleware\CheckVerified::class,
             'check.banned' => \App\Http\Middleware\EnsureUserNotBanned::class,
+            'ProtectAdminPanel' => \App\Http\Middleware\ProtectAdminPanel::class,
             'role' => \Spatie\Permission\Middleware\RoleMiddleware::class,
             'permission' => \Spatie\Permission\Middleware\PermissionMiddleware::class,
             'role_or_permission' => \Spatie\Permission\Middleware\RoleOrPermissionMiddleware::class,

@@ -165,17 +165,31 @@
                    class="nav-link {{ request()->routeIs('gallery.index') ? 'active' : '' }}">
                     المعرض العام
                 </a>
-                <a href="{{ route('activities.index') }}"
-                   class="nav-link {{ request()->routeIs('activities.index') ? 'active' : '' }}">
-                    سجل النشاطات
+                @can('view-activity-logs')
+                    <a href="{{ route('activities.index') }}"
+                       class="nav-link {{ request()->routeIs('activities.index') ? 'active' : '' }}">
+                        سجل النشاطات
+                    </a>
+                @endcan
+                <a href="{{ route('tasks.index') }}"
+                   class="nav-link {{ request()->routeIs('tasks.index') ? 'active' : '' }}">
+                    المهام
                 </a>
-                @if(Auth::user()->hasRole('super-admin'))
+                <a href="{{ route('timer.index') }}"
+                   class="nav-link {{ request()->routeIs('timer.index') ? 'active' : '' }}">
+                    المؤقت
+                </a>
+                <a href="{{ route('notifications.index') }}"
+                   class="nav-link {{ request()->routeIs('notifications.index') ? 'active' : '' }}">
+                    التنبيهات
+                </a>
+                @can('access-admin-dashboard')
                     <a href="{{ route('admin.dashboard') }}"
                        class="nav-link {{ request()->routeIs('admin.*') ? 'active' : '' }}"
                        style="color: #d4a853;">
                         لوحة الإدارة
                     </a>
-                @endif
+                @endcan
             </div>
 
             <!-- User section (desktop) -->
@@ -231,10 +245,15 @@
         <a href="{{ route('dashboard') }}" class="mobile-link {{ request()->routeIs('dashboard') ? 'active' : '' }}">لوحة التحكم</a>
         <a href="{{ route('images.test.index') }}" class="mobile-link {{ request()->routeIs('images.test.*') ? 'active' : '' }}">إدارة الصور</a>
         <a href="{{ route('gallery.index') }}" class="mobile-link {{ request()->routeIs('gallery.index') ? 'active' : '' }}">المعرض العام</a>
-        <a href="{{ route('activities.index') }}" class="mobile-link {{ request()->routeIs('activities.index') ? 'active' : '' }}">سجل النشاطات</a>
-        @if(Auth::user()->hasRole('super-admin'))
+        @can('view-activity-logs')
+            <a href="{{ route('activities.index') }}" class="mobile-link {{ request()->routeIs('activities.index') ? 'active' : '' }}">سجل النشاطات</a>
+        @endcan
+        <a href="{{ route('tasks.index') }}" class="mobile-link {{ request()->routeIs('tasks.index') ? 'active' : '' }}">المهام</a>
+        <a href="{{ route('timer.index') }}" class="mobile-link {{ request()->routeIs('timer.index') ? 'active' : '' }}">المؤقت</a>
+        <a href="{{ route('notifications.index') }}" class="mobile-link {{ request()->routeIs('notifications.index') ? 'active' : '' }}">التنبيهات</a>
+        @can('access-admin-dashboard')
             <a href="{{ route('admin.dashboard') }}" class="mobile-link {{ request()->routeIs('admin.*') ? 'active' : '' }}" style="color: #d4a853;">لوحة الإدارة</a>
-        @endif
+        @endcan
 
         <div class="mobile-user-block">
             <div class="mobile-user-name">{{ Auth::user()->name }}</div>

@@ -325,9 +325,13 @@
                                 <label class="form-label">عنوان الألبوم</label>
                                 <input type="text" name="title" required class="form-input" placeholder="اسم الألبوم...">
                             </div>
-                            <div class="checkbox-row">
-                                <input type="checkbox" name="is_private" id="is_private" value="1">
-                                <label for="is_private">ألبوم خاص (Private)</label>
+                            <div>
+                                <label class="form-label">الخصوصية</label>
+                                <select name="privacy" class="form-input">
+                                    <option value="public">عام (Public)</option>
+                                    <option value="private" selected>خاص (Private)</option>
+                                    <option value="hidden">مخفي (Hidden)</option>
+                                </select>
                             </div>
                             <button type="submit" class="btn-outline-gold">إنشاء الألبوم</button>
                         </form>
@@ -356,10 +360,17 @@
                                     <label class="form-label">الألبوم</label>
                                     <select name="album_id" class="form-input">
                                         <option value="">بدون ألبوم</option>
-                                        @foreach($albums as $album)
-                                            <option value="{{ $album->id }}">{{ $album->title }} — {{ $album->is_private ? 'خاص' : 'عام' }}</option>
+                                        @foreach($ownedAlbums as $album)
+                                            <option value="{{ $album->id }}">{{ $album->title }} — {{ $album->privacy === 'private' ? 'خاص' : ($album->privacy === 'public' ? 'عام' : 'مخفي') }}</option>
+                                        @endforeach
+                                        @foreach($sharedAlbums as $album)
+                                            <option value="{{ $album->id }}">{{ $album->title }} (مشترك)</option>
                                         @endforeach
                                     </select>
+                                </div>
+                                <div style="grid-column: span 2; display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 8px;">
+                                    <p style="font-size: 11px; color: #4a5270;">أو</p>
+                                    <a href="#" onclick="document.getElementById('album-list-section').scrollIntoView({behavior: 'smooth'}); return false;" style="font-size: 12px; color: #d4a853; text-decoration: underline; font-weight: 600;">إدارة الألبومات الحالية</a>
                                 </div>
                                 <div>
                                     <label class="form-label">الوسوم</label>
@@ -379,6 +390,57 @@
                     </div>
 
                 </div>
+
+                <!-- My Albums -->
+                <div id="album-list-section" class="panel" style="margin-bottom: 24px;">
+                    <p class="panel-title">ألبوماتي الخاصة</p>
+                    @if($ownedAlbums->isEmpty())
+                        <div class="empty-state">
+                            <div class="empty-state-icon">📁</div>
+                            <p>لا توجد ألبومات تملكها بعد.</p>
+                        </div>
+                    @else
+                        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px;">
+                            @foreach($ownedAlbums as $album)
+                                <div class="panel" style="padding: 18px; display: flex; flex-direction: column; gap: 12px; background: #0d0f14;">
+                                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                                        <h3 style="font-size: 15px; font-weight: 700; color: #f1f3f9;">{{ $album->title }}</h3>
+                                        <span class="privacy-badge {{ $album->privacy === 'public' ? 'privacy-public' : ($album->privacy === 'private' ? 'privacy-private' : '') }}" style="padding: 2px 6px; font-size: 8px;">
+                                            {{ $album->privacy === 'public' ? 'عام' : ($album->privacy === 'private' ? 'خاص' : 'مخفي') }}
+                                        </span>
+                                    </div>
+                                    <p style="font-size: 11px; color: #3d4460;">{{ $album->images->count() }} صورة</p>
+                                    <div style="margin-top: auto; display: flex; gap: 10px;">
+                                        <a href="{{ route('albums.show', $album) }}" class="btn-outline-gold" style="padding: 8px; font-size: 10px; text-align: center; text-decoration: none;">إدارة الألبوم</a>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    @endif
+                </div>
+
+                <!-- Shared Albums -->
+                @if($sharedAlbums->isNotEmpty())
+                <div class="panel" style="margin-bottom: 24px; border-color: #60a5fa33;">
+                    <p class="panel-title" style="color: #60a5fa;">ألبومات مشتركة معي</p>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px;">
+                        @foreach($sharedAlbums as $album)
+                            <div class="panel" style="padding: 18px; display: flex; flex-direction: column; gap: 12px; background: #0d0f14; border-color: #1a2c4a;">
+                                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                                    <h3 style="font-size: 15px; font-weight: 700; color: #f1f3f9;">{{ $album->title }}</h3>
+                                    <span style="font-size: 8px; background: #0a141f; color: #60a5fa; border: 1px solid #1a2c4a; padding: 2px 6px; border-radius: 5px; text-transform: uppercase; letter-spacing: 1px; font-weight: 700;">
+                                        {{ $album->pivot->role }}
+                                    </span>
+                                </div>
+                                <p style="font-size: 11px; color: #3d4460;">بواسطة: {{ $album->owner->name }} • {{ $album->images->count() }} صورة</p>
+                                <div style="margin-top: auto; display: flex; gap: 10px;">
+                                    <a href="{{ route('albums.show', $album) }}" class="btn-outline-gold" style="padding: 8px; font-size: 10px; text-align: center; text-decoration: none; border-color: #1a2c4a; color: #60a5fa;">عرض الألبوم</a>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+                @endif
 
                 <!-- My Gallery -->
                 <div class="panel" style="margin-bottom: 24px;">

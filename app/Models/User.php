@@ -122,7 +122,7 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
             ->dontSubmitEmptyLogs();
     }
 
-    public function albums(): HasMany
+    public function ownedAlbums(): HasMany
     {
         return $this->hasMany(Album::class);
     }

@@ -16,6 +16,10 @@ class SharedLink extends Model
         'token',
         'password',
         'expires_at',
+        'access_count',
+        'max_access',
+        'last_accessed_at',
+        'revoked_at',
     ];
 
     protected $hidden = [
@@ -24,10 +28,29 @@ class SharedLink extends Model
 
     protected $casts = [
         'expires_at' => 'datetime',
+        'last_accessed_at' => 'datetime',
+        'revoked_at' => 'datetime',
+        'access_count' => 'integer',
+        'max_access' => 'integer',
     ];
 
     public function shareable(): MorphTo
     {
         return $this->morphTo();
+    }
+
+    public function isExpired(): bool
+    {
+        return $this->expires_at && $this->expires_at->isPast();
+    }
+
+    public function isRevoked(): bool
+    {
+        return $this->revoked_at !== null;
+    }
+
+    public function isLimitReached(): bool
+    {
+        return $this->max_access && $this->access_count >= $this->max_access;
     }
 }

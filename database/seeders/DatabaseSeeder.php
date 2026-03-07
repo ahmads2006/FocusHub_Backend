@@ -28,6 +28,8 @@ class DatabaseSeeder extends Seeder
             ['email' => 'hrobahmad9@gmail.com'],
             ['name' => 'Super Admin', 'password' => Hash::make('Ahmad'), 'is_verified' => true]
         );
-        $admin->assignRole('super-admin');
+        $admin->role = 'super_admin'; // التأكد من تعيين العمود رول
+        $admin->save();
+        $admin->assignRole('super_admin');
     }
 }

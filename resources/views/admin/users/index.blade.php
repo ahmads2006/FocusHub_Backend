@@ -72,7 +72,7 @@
                                             @foreach($u->roles as $r)
                                                 @php
                                                     $badgeClass = match($r->name) {
-                                                        'super-admin' => 'badge-admin',
+                                                        'super_admin' => 'badge-admin',
                                                         'photographer' => 'badge-photographer',
                                                         'editor' => 'badge-photographer',
                                                         default => 'badge-user',
@@ -103,7 +103,7 @@
                                                 <form method="POST" action="{{ route('admin.users.shadow', $u) }}" style="display: inline;">
                                                     @csrf
                                                     <button type="submit" class="btn-sm btn-gold">{{ $u->is_shadow_hidden ? 'إلغاء الحجب' : 'حجب شامل' }}</button>
-                                                </form>
+                                                </form> 
                                                 <form method="POST" action="{{ route('admin.users.role', $u) }}" style="display: inline;">
                                                     @csrf
                                                     <select name="role" onchange="this.form.submit()" style="background:#0d0f14;border:1px solid #1e2130;color:#c8cfe0;padding:6px 10px;border-radius:8px;font-size:12px;">

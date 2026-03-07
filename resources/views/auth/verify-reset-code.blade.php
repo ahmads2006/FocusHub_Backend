@@ -11,10 +11,25 @@
             <x-input-error :messages="$errors->get('code')" class="mt-2" />
         </div>
 
-        <div class="flex items-center justify-end mt-4">
+        <div class="flex items-center justify-between mt-4">
             <x-primary-button>
                 {{ __('تحقق') }}
             </x-primary-button>
         </div>
     </form>
+
+    <div class="mt-6 flex items-center justify-center border-t border-gray-100 pt-4">
+        <form method="POST" action="{{ route('password.resend.code') }}">
+            @csrf
+            <button type="submit" class="text-sm text-blue-600 hover:text-blue-500 font-medium underline focus:outline-none transition ease-in-out duration-150">
+                {{ __('إعادة إرسال الرمز') }}
+            </button>
+        </form>
+    </div>
+
+    @if (session('status') == 'passwords.sent' || session('status') == 'passwords.reset')
+        <div class="mt-2 font-medium text-sm text-green-600 text-center">
+            {{ __('تم إرسال رمز جديد إلى بريدك الإلكتروني.') }}
+        </div>
+    @endif
 </x-guest-layout>
