@@ -28,10 +28,12 @@
                             </div>
                         </div>
                         
-                        <a href="{{ $photo->url }}" download class="btn" 
-                           style="background: #d4a853; color: #0d0f14; padding: 10px 24px; border-radius: 10px; font-weight: 700; text-decoration: none; transition: opacity 0.2s;">
-                            تحميل الصورة
-                        </a>
+                        @if($link->permission === 'download')
+                            <a href="{{ $photo->url }}" download class="btn" 
+                               style="background: #d4a853; color: #0d0f14; padding: 10px 24px; border-radius: 10px; font-weight: 700; text-decoration: none; transition: opacity 0.2s;">
+                                تحميل الصورة
+                            </a>
+                        @endif
                     </div>
                 </div>
             </div>

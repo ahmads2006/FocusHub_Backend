@@ -5,11 +5,64 @@ namespace App\Http\Controllers;
 use App\Models\Album;
 use App\Models\Image;
 use App\Models\SharedLink;
+use App\Services\SharedLinkService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 
 class SharedLinkController extends Controller
 {
+    protected $service;
+
+    public function __construct(SharedLinkService $service)
+    {
+        $this->service = $service;
+    }
+
+    public function generateShareOnceLink(Image $image)
+    {
+        if (\Illuminate\Support\Facades\Auth::id() !== $image->user_id) {
+            abort(403, 'غير مصرح لك بمشاركة هذه الصورة.');
+        }
+
+        $link = $this->service->generate($image, null, null, 1);
+        $url = $this->service->getFullUrl($link);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'تم إنشاء رابط التدمير الذاتي بنجاح!',
+            'url' => $url
+        ]);
+    }
+
+    public function generate(Request $request)
+    {
+        $request->validate([
+            'shareable_id' => 'required|string',
+            'shareable_type' => 'required|string|in:App\Models\Image,App\Models\Album',
+            'expires_in' => 'nullable|integer', // hours
+            'permission' => 'nullable|in:view,download',
+        ]);
+
+        $modelClass = $request->shareable_type;
+        $model = $modelClass::findOrFail($request->shareable_id);
+
+        if (\Illuminate\Support\Facades\Auth::id() !== $model->user_id) {
+            abort(403, 'غير مصرح لك بمشاركة هذا العنصر.');
+        }
+
+        $expiry = $request->expires_in ? now()->addHours($request->expires_in) : null;
+        $permission = $request->permission ?? 'view';
+
+        $link = $this->service->generate($model, $expiry, null, null, $permission);
+        $url = $this->service->getFullUrl($link);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'تم إنشاء رابط المشاركة بنجاح!',
+            'url' => $url
+        ]);
+    }
+
     public function show(Request $request, $token)
     {
         // Link is already validated and retrieved by middleware

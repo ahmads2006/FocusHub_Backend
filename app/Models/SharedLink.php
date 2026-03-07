@@ -15,6 +15,7 @@ class SharedLink extends Model
         'shareable_type',
         'token',
         'password',
+        'permission',
         'expires_at',
         'access_count',
         'max_access',

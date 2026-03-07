@@ -16,6 +16,12 @@
                         <div style="padding: 16px;">
                             <h3 style="font-size: 14px; font-weight: 600; margin-bottom: 4px;">{{ $photo->title }}</h3>
                             <p style="font-size: 12px; color: #8891aa;">{{ Str::limit($photo->description, 50) }}</p>
+                            
+                            @if($link->permission === 'download')
+                            <div style="margin-top: 12px; text-align: left;">
+                                <a href="{{ $photo->url }}" download class="btn" style="background: transparent; border: 1px solid #d4a853; color: #d4a853; padding: 4px 12px; border-radius: 6px; font-size: 11px; text-decoration: none; cursor: pointer;">تحميل الصورة</a>
+                            </div>
+                            @endif
                         </div>
                     </div>
                 @endforeach

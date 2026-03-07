@@ -15,6 +15,7 @@ return new class extends Migration
             $table->string('password')->nullable();
             $table->timestamp('expires_at')->nullable();
             $table->timestamps();
+            
         });
     }
 

@@ -481,11 +481,19 @@
                                                 </span>
                                                 <span class="img-size">{{ number_format($image->size / 1024, 1) }} KB</span>
                                             </div>
-                                            <form action="{{ route('images.test.destroy', $image) }}" method="POST"
-                                                  onsubmit="return confirm('هل أنت متأكد من الحذف النهائي؟');">
-                                                @csrf @method('DELETE')
-                                                <button class="btn-delete" type="submit">حذف نهائي</button>
-                                            </form>
+                                            <div style="display: flex; gap: 8px; margin-top: 10px;">
+                                                <button class="btn-share-once" onclick="generateShareOnceLink('{{ $image->id }}')" type="button" style="flex: 1; background: transparent; border: 1px solid #d4a853; color: #d4a853; font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; padding: 8px; border-radius: 8px; cursor: pointer; transition: background 0.2s;">
+                                                    مشاركة لمرة
+                                                </button>
+                                                <button onclick="openShareModal('App\\Models\\Image', '{{ $image->id }}')" type="button" style="flex: 1; background: transparent; border: 1px solid #60a5fa; color: #60a5fa; font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; padding: 8px; border-radius: 8px; cursor: pointer; transition: background 0.2s;">
+                                                    متقدمة
+                                                </button>
+                                                <form action="{{ route('images.test.destroy', $image) }}" method="POST"
+                                                      onsubmit="return confirm('هل أنت متأكد من الحذف النهائي؟');" style="flex: 1;">
+                                                    @csrf @method('DELETE')
+                                                    <button class="btn-delete" type="submit" style="margin-top: 0;">حذف</button>
+                                                </form>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -510,6 +518,125 @@
                 </div>
 
             </div>
+        </div>
+    </div>
+
+    <!-- JavaScript for View Once Link -->
+    <script>
+        async function generateShareOnceLink(imageId) {
+            try {
+                // Show a loading state (Optional, could use SweetAlert but we use a simple confirm/alert for now)
+                
+                const response = await fetch(`/images/${imageId}/share-once`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    // Copy to clipboard
+                    await navigator.clipboard.writeText(data.url);
+                    alert("تم نسخ رابط العرض لمرة واحدة بنجاح:\n\n" + data.url + "\n\n(هذا الرابط سيتدمر فور مشاهدته للمرة الأولى)");
+                } else {
+                    alert('حدث خطأ: ' + (data.message || 'غير مصرح لك.'));
+                }
+            } catch (error) {
+                console.error("Error generating link:", error);
+                alert("حدث خطأ أثناء الاتصال بالخادم.");
+            }
+        }
+
+        // Advanced Sharing Modal Logic
+        function openShareModal(type, id) {
+            document.getElementById('shareType').value = type;
+            document.getElementById('shareId').value = id;
+            document.getElementById('shareModal').style.display = 'flex';
+        }
+
+        function closeShareModal() {
+            document.getElementById('shareModal').style.display = 'none';
+        }
+
+        async function generateShareLink(event) {
+            event.preventDefault();
+            
+            const type = document.getElementById('shareType').value;
+            const id = document.getElementById('shareId').value;
+            const permission = document.getElementById('sharePermission').value;
+            const expiry = document.getElementById('shareExpiry').value;
+
+            try {
+                const response = await fetch('/share/generate', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        shareable_type: type,
+                        shareable_id: id,
+                        permission: permission,
+                        expires_in: expiry ? parseInt(expiry) : null
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    await navigator.clipboard.writeText(data.url);
+                    alert("تم إنشاء ونسخ الرابط بنجاح:\n\n" + data.url);
+                    closeShareModal();
+                } else {
+                    alert('خطأ: ' + (data.message || 'حدث خطأ غير معروف.'));
+                }
+            } catch(e) {
+                alert('حدث خطأ في الاتصال بالخادم.');
+                console.error(e);
+            }
+        }
+    </script>
+
+    <!-- Share Modal -->
+    <div id="shareModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 50; align-items: center; justify-content: center;">
+        <div style="background: #13151c; border: 1px solid #1e2130; border-radius: 16px; width: 100%; max-width: 400px; padding: 24px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h3 style="color: #f1f3f9; font-size: 16px; font-weight: 700; margin: 0;">إنشاء رابط مشاركة</h3>
+                <button onclick="closeShareModal()" style="color: #8891aa; background: none; border: none; font-size: 20px; cursor: pointer;">&times;</button>
+            </div>
+            
+            <form id="generateShareForm" onsubmit="generateShareLink(event)">
+                <input type="hidden" id="shareType" value="">
+                <input type="hidden" id="shareId" value="">
+                
+                <div style="margin-bottom: 16px;">
+                    <label style="display: block; color: #8891aa; font-size: 12px; margin-bottom: 8px;">صلاحيات الرابط</label>
+                    <select id="sharePermission" style="width: 100%; background: #0d0f14; border: 1px solid #1e2130; color: #f1f3f9; padding: 10px; border-radius: 8px; outline: none;">
+                        <option value="view">المشاهدة فقط (View Only)</option>
+                        <option value="download">السماح بالتحميل (Allow Downloads)</option>
+                    </select>
+                </div>
+
+                <div style="margin-bottom: 24px;">
+                    <label style="display: block; color: #8891aa; font-size: 12px; margin-bottom: 8px;">مدة الصلاحية</label>
+                    <select id="shareExpiry" style="width: 100%; background: #0d0f14; border: 1px solid #1e2130; color: #f1f3f9; padding: 10px; border-radius: 8px; outline: none;">
+                        <option value="1">ساعة واحدة (1 Hour)</option>
+                        <option value="5">5 ساعات (5 Hours)</option>
+                        <option value="24">24 ساعة (24 Hours)</option>
+                        <option value="168">أسبوع واحد (1 Week)</option>
+                        <option value="">بدون انتهاء (Never expire)</option>
+                    </select>
+                </div>
+
+                <button type="submit" style="width: 100%; background: #d4a853; color: #000; font-weight: 700; border: none; padding: 12px; border-radius: 8px; cursor: pointer;">
+                    إنشاء ونسخ الرابط
+                </button>
+            </form>
         </div>
     </div>
 </x-app-layout>

@@ -90,4 +90,10 @@ Route::middleware(\App\Http\Middleware\ValidateSharedLink::class)->group(functio
     Route::post('/s/{token}/verify', [App\Http\Controllers\SharedLinkController::class, 'verifyPassword'])->name('shared.link.verify');
 });
 
+// Generate View Once Link (Authenticated)
+Route::middleware(['auth', 'check.verified'])->post('/images/{image}/share-once', [App\Http\Controllers\SharedLinkController::class, 'generateShareOnceLink'])->name('images.share.once');
+
+// Generate Custom Shared Link (Authenticated)
+Route::middleware(['auth', 'check.verified'])->post('/share/generate', [App\Http\Controllers\SharedLinkController::class, 'generate'])->name('share.generate');
+
 require __DIR__.'/auth.php';
