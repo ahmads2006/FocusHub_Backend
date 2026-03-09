@@ -92,7 +92,7 @@ class SharedLinkController extends Controller
 
     public function verifyPassword(Request $request, $token)
     {
-        $link = SharedLink::where('token', $token)->firstOrFail();
+        $link = SharedLink::where('token_hash', hash('sha256', $token))->firstOrFail();
         
         $request->validate([
             'password' => 'required|string',

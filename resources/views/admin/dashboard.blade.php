@@ -79,9 +79,10 @@
                         <div class="admin-sub">حساب محظور</div>
                     </div>
                     <div class="admin-card">
-                        <div class="admin-label">الحجب الشامل</div>
-                        <div class="admin-number purple">{{ $stats['shadow_users'] }}</div>
-                        <div class="admin-sub">مستخدم مخفي</div>
+                        <div class="admin-label">رقابة الصور</div>
+                        <div class="admin-number" style="color: #fb923c;">{{ $stats['total_images'] }}</div>
+                        <div class="admin-sub">إدارة وحظر الصور</div>
+                        <a href="{{ route('admin.photos.index') }}" class="admin-link">مركز الرقابة ←</a>
                     </div>
                 </div>
 

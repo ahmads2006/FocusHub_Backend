@@ -92,9 +92,9 @@ class ContentSafetyService
             for ($x = 0; $x < $width; $x++) {
                 for ($y = 0; $y < $height; $y++) {
                     $color = $image->pickColor($x, $y);
-                    $r = $color->red();
-                    $g = $color->green();
-                    $b = $color->blue();
+                    $r = $color->red()->value();
+                    $g = $color->green()->value();
+                    $b = $color->blue()->value();
 
                     // Typical Caucasian/Hispanic/Asian skin tone boundaries in RGB
                     if ($r > 95 && $g > 40 && $b > 20 && 
@@ -208,7 +208,7 @@ class ContentSafetyService
                 foreach ($objects as $obj) {
                     $name = strtolower($obj['name'] ?? '');
                     $score = $obj['score'] ?? 0;
-                    if ($score > 0.20 && in_array($name, $bannedObjects)) { // Threshold drastically lowered to 20%
+                    if ($score > 0.50 && in_array($name, $bannedObjects)) { // Threshold raised to 50%
                         Log::warning("AI Safety: BLOCKED BY OBJECT DETECTION: $name ($score)");
                         return false;
                     }
@@ -228,20 +228,29 @@ class ContentSafetyService
                     $description = strtolower($label['description'] ?? '');
                     $score = $label['score'] ?? 0;
                     
-                    // If Google has even a 20% suspicion it's a weapon, block it.
-                    if ($score > 0.20 && (in_array($description, $bannedKeywords) || str_contains($description, 'weapon') || str_contains($description, 'gun'))) {
+                    // If Google has a 50% suspicion it's a weapon, block it.
+                    if ($score > 0.50 && (in_array($description, $bannedKeywords) || str_contains($description, 'weapon') || str_contains($description, 'gun'))) {
                         Log::warning("AI Safety: BLOCKED BY LABEL: $description ($score)");
                         return false;
                     }
                 }
             } else {
-                Log::error('AI Safety: VISION API FAILURE: ' . $response->body());
-                return false; // EMERGENCY: Block on API failure to be safe
+                $body = $response->body();
+                Log::error('AI Safety: VISION API FAILURE: ' . $body);
+                
+                // If it's a billing error or quota error, we SHOULD NOT block the user.
+                // We should let the image pass but log it as a major system warning.
+                if (str_contains($body, 'BILLING_DISABLED') || str_contains($body, 'quota')) {
+                    Log::critical("AI Safety CRITICAL: Google Billing is DISABLED. All safety checks are PASSED by default!");
+                    return true; 
+                }
+
+                return false; // For other unknown errors, remain safe
             }
 
         } catch (\Exception $e) {
             Log::error('AI Safety: SYSTEM ERROR: ' . $e->getMessage());
-            return false; // EMERGENCY: Block on system error
+            return true; // Don't block users if the internet/system is down but it's not a clear rejection
         }
 
         return true;

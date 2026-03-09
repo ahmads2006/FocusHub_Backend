@@ -61,6 +61,7 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
         'verification_code',
         'is_verified',
         'role',
+        'stay_logged_in',
     ];
 
     protected $with = ['userStatus'];
@@ -79,6 +80,7 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
             'password' => 'hashed',
             'is_verified' => 'boolean',
             'role' => 'string',
+            'stay_logged_in' => 'boolean',
         ];
     }
 

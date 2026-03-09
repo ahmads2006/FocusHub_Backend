@@ -333,6 +333,67 @@
 
             </div>
         </div>
-    </div>
 
+        @if(!Auth::user()->stay_logged_in)
+        <div id="timeout-modal" class="fixed inset-0 z-50 flex items-center justify-center hidden bg-black bg-opacity-80 backdrop-blur-sm">
+            <div class="bg-[#13151c] border border-[#d4a853] p-8 rounded-2xl w-full max-w-md text-center shadow-2xl">
+                <div class="text-4xl mb-4">⌛</div>
+                <h2 class="text-xl font-bold text-white mb-2">تنبيه أمني: الجلسة تنتهي قريباً</h2>
+                <p class="text-gray-400 mb-6">سيتم تسجيل خروجك بسبب الخمول خلال <span id="countdown-timer" class="text-gold font-bold text-lg">60</span> ثانية.</p>
+                <div class="flex gap-4">
+                    <button onclick="location.reload()" class="flex-1 bg-gold text-black font-extrabold py-3 border-none rounded-xl cursor-pointer hover:opacity-90">البقاء مسجلاً</button>
+                    <a href="{{ route('logout') }}" class="flex-1 bg-transparent text-red-400 font-bold py-3 border border-red-900/30 rounded-xl hover:bg-red-900/10">خروج الآن</a>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            (function() {
+                const timeoutMinutes = 10; // Default 10 minutes as requested
+                const timeoutMs = timeoutMinutes * 60 * 1000;
+                const warningMs = 60 * 1000; // Show warning 60 seconds before
+                
+                let lastActivity = Date.now();
+                const modal = document.getElementById('timeout-modal');
+                const timerSpan = document.getElementById('countdown-timer');
+                let countdownInterval;
+
+                // Simple activity tracker
+                window.addEventListener('mousemove', () => lastActivity = Date.now());
+                window.addEventListener('keydown', () => lastActivity = Date.now());
+
+                setInterval(() => {
+                    const idleTime = Date.now() - lastActivity;
+                    
+                    if (idleTime >= (timeoutMs - warningMs)) {
+                        if (modal.classList.contains('hidden')) {
+                            modal.classList.remove('hidden');
+                            startCountdown();
+                        }
+                    } else {
+                        if (!modal.classList.contains('hidden')) {
+                            modal.classList.add('hidden');
+                            clearInterval(countdownInterval);
+                        }
+                    }
+
+                    if (idleTime >= timeoutMs) {
+                        window.location.href = "{{ route('login') }}?timeout=true";
+                    }
+                }, 5000);
+
+                function startCountdown() {
+                    let seconds = 60;
+                    timerSpan.innerText = seconds;
+                    clearInterval(countdownInterval);
+                    countdownInterval = setInterval(() => {
+                        seconds--;
+                        timerSpan.innerText = seconds;
+                        if (seconds <= 0) clearInterval(countdownInterval);
+                    }, 1000);
+                }
+            })();
+        </script>
+        @endif
+    </div>
 </x-app-layout>

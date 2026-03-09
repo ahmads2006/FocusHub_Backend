@@ -29,7 +29,18 @@ class SharedLink extends Model
         'password',
     ];
 
+    protected static function booted()
+    {
+        static::saving(function ($link) {
+            if ($link->isDirty('token')) {
+                $link->token_hash = hash('sha256', $link->token);
+            }
+        });
+    }
+
     protected $casts = [
+        'token' => 'encrypted',
+        'session_id' => 'encrypted',
         'expires_at' => 'datetime',
         'last_accessed_at' => 'datetime',
         'revoked_at' => 'datetime',

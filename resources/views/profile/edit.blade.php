@@ -234,6 +234,10 @@
                             <span class="sidebar-dot"></span>
                             كلمة المرور
                         </a>
+                        <a href="#security" class="sidebar-item">
+                            <span class="sidebar-dot"></span>
+                            إعدادات الأمان
+                        </a>
                         <div class="sidebar-divider"></div>
                         <a href="#delete" class="sidebar-item danger">
                             <span class="sidebar-dot" style="background:#4a1515;"></span>
@@ -291,6 +295,49 @@
                             </div>
                         </div>
 
+                        <!-- Session Security -->
+                        <div class="profile-panel" id="security">
+                            <div class="panel-gold-bar" style="background: linear-gradient(90deg, transparent, #34d39955 40%, transparent);"></div>
+                            <div class="panel-header">
+                                <p class="panel-eyebrow" style="color:#34d399;">إعدادات الأمان</p>
+                                <p class="panel-title">أمان الجلسة</p>
+                              
+                            </div>
+                            <div class="panel-body">
+                                <form method="post" action="{{ route('profile.security.update') }}" class="space-y-6">
+                                    @csrf
+                                    @method('put')
+
+                                    <div class="flex items-center gap-4">
+                                        <label class="relative inline-flex items-center cursor-pointer">
+                                            <input type="checkbox" name="stay_logged_in" value="1" class="sr-only peer" {{ $user->stay_logged_in ? 'checked' : '' }}>
+                                            <div class="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gold"></div>
+                                            <span class="ms-3 text-sm font-medium text-gray-400">
+                                                إبقاء الجلسة نشطة دائماً (تعطيل تسجيل الخروج التلقائي)
+                                                  <label>
+                                              <input type="checkbox" onclick="showStayLoggedInfo()">
+                                                 إبقاء الجلسة نشطة
+                                            </label>
+
+                                            </span>
+                                    </div>
+                                    <div class="flex items-center gap-4">
+                                        <x-primary-button>حفظ الإعدادات</x-primary-button>
+
+                                        @if (session('status') === 'security-updated')
+                                            <p
+                                                x-data="{ show: true }"
+                                                x-show="show"
+                                                x-transition
+                                                x-init="setTimeout(() => show = false, 2000)"
+                                                class="text-sm text-green-400"
+                                            >تم التحديث بنجاح.</p>
+                                        @endif
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+
                         <!-- Delete account -->
                         <div class="profile-panel danger-panel" id="delete">
                             <div class="panel-gold-bar"></div>
@@ -310,5 +357,18 @@
             </div>
         </div>
     </div>
-
+<script>
+    async function showStayLoggedInfo() {
+        // نستخدم الـ Backend لجلب المعلومة كما طلب المستخدم
+        try {
+            const response = await fetch('{{ route('profile.stayLoggedInfo') }}');
+            if (!response.ok) throw new Error('Network response was not ok');
+            const data = await response.json();
+            alert(data.message);
+        } catch (error) {
+            console.error('Error fetching security info:', error);
+            alert('إبقاء الجلسة نشطة دائماً يعني أن حسابك سيبقى مسجلاً دون تسجيل خروج تلقائي.');
+        }
+    }
+</script>
 </x-app-layout>

@@ -38,9 +38,11 @@ Route::post('/verify-code', [VerifyCodeController::class, 'verify'])->name('veri
 // ────────────────────────────────────────────────
 // Authenticated + verified routes
 // ────────────────────────────────────────────────
-Route::middleware(['auth', 'check.verified', 'check.banned'])->group(function () {
+Route::middleware(['auth', 'check.verified', 'check.banned', 'check.timeout'])->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::put('/profile/security', [ProfileController::class, 'updateSecurity'])->name('profile.security.update');
+Route::get('/profile/stay-logged-info', [ProfileController::class, 'stayLoggedInfo'])->name('profile.stayLoggedInfo');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
@@ -74,6 +76,14 @@ Route::middleware(['auth', 'check.verified', 'ProtectAdminPanel'])->prefix('admi
     Route::post('/users/{user}/unban', [AdminUserController::class, 'unban'])->name('users.unban');
     Route::post('/users/{user}/shadow', [AdminUserController::class, 'toggleShadow'])->name('users.shadow');
     Route::post('/users/{user}/role', [AdminUserController::class, 'updateRole'])->name('users.role');
+
+    // ─── إدارة الصور (Admin Photo Management) ───────────────────────
+    Route::get('/photos', [App\Http\Controllers\Admin\PhotoController::class, 'index'])->name('photos.index');
+    Route::post('/photos/{image}/visibility', [App\Http\Controllers\Admin\PhotoController::class, 'toggleVisibility'])->name('photos.visibility');
+    Route::delete('/photos/{image}', [App\Http\Controllers\Admin\PhotoController::class, 'destroy'])->name('photos.destroy');
+    Route::post('/photos/{image}/ban', [App\Http\Controllers\Admin\PhotoController::class, 'ban'])->name('photos.ban');
+    Route::get('/banned-hashes', [App\Http\Controllers\Admin\PhotoController::class, 'bannedHashes'])->name('banned_hashes.index');
+    Route::delete('/banned-hashes/{hash}', [App\Http\Controllers\Admin\PhotoController::class, 'unbanHash'])->name('banned_hashes.destroy');
 });
 
 // ────────────────────────────────────────────────

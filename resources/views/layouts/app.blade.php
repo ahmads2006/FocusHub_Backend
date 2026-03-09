@@ -18,6 +18,24 @@
         <div class="min-h-screen bg-gray-100">
             @include('layouts.navigation')
 
+            @if(session('warning'))
+                <script>
+                    document.addEventListener('DOMContentLoaded', function() {
+                        if (window.Swal) {
+                            Swal.fire({
+                                title: 'تنبيه أمني',
+                                text: "{{ session('warning') }}",
+                                icon: 'warning',
+                                confirmButtonText: 'حسناً',
+                                confirmButtonColor: '#d4a853'
+                            });
+                        } else {
+                            alert("{{ session('warning') }}");
+                        }
+                    });
+                </script>
+            @endif
+
             <!-- Page Heading -->
             @isset($header)
                 <header class="bg-white shadow">

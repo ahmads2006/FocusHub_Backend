@@ -16,7 +16,7 @@ class ValidateSharedLink
     {
         $token = $request->route('token');
         
-        $link = SharedLink::where('token', $token)->first();
+        $link = SharedLink::where('token_hash', hash('sha256', $token))->first();
 
         if (!$link || $link->isExpired() || $link->isRevoked() || $link->isLimitReached()) {
             abort(404, 'Shared link is invalid or expired.');

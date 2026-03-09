@@ -38,6 +38,18 @@ class ProfileController extends Controller
     }
 
     /**
+     * Update the user's security settings.
+     */
+    public function updateSecurity(Request $request): RedirectResponse
+    {
+        $user = $request->user();
+        $user->stay_logged_in = $request->has('stay_logged_in');
+        $user->save();
+
+        return Redirect::route('profile.edit')->with('status', 'security-updated');
+    }
+
+    /**
      * Delete the user's account.
      */
     public function destroy(Request $request): RedirectResponse
@@ -56,5 +68,14 @@ class ProfileController extends Controller
         $request->session()->regenerateToken();
 
         return Redirect::to('/');
+    }
+
+    /**
+     * Provide stay logged info for frontend info button.
+     */
+    public function stayLoggedInfo(Request $request)
+    {
+        $message = 'إبقاء الجلسة نشطة دائماً يعني أن حسابك سيبقى مسجلاً دون تسجيل خروج تلقائي. يمكنك إلغاء ذلك في أي وقت بتعطيل هذا الخيار.';
+        return response()->json(['message' => $message]);
     }
 }

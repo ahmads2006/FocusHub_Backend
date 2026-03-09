@@ -51,7 +51,7 @@ class Image extends Model implements HasMedia
 
     protected $casts = [
         'exif_data' => 'json',
-        'metadata' => 'array',
+        'metadata' => 'encrypted:array',
         'is_comparison' => 'boolean',
         'copyright_enabled' => 'boolean',
     ];
