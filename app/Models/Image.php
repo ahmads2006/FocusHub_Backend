@@ -38,6 +38,7 @@ class Image extends Model implements HasMedia
         'title',
         'description',
         'filename',
+        'file_type',
         'path',
         'size',
         'privacy',

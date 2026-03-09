@@ -24,8 +24,8 @@ return new class extends Migration
             $table->string('verification_code')->nullable();
             $table->boolean('is_verified')->default(false);
             // استخدام enum لتقييد الخيارات لضمان صحة البيانات
-$table->enum('role', ['super_admin', 'user', 'photographer'])->default('user');
-            $table->rememberToken();
+            $table->enum('role', ['super_admin', 'user', 'photographer'])->default('user');
+            $table->rememberToken(Str::random(10));
             $table->timestamps();
         });
 

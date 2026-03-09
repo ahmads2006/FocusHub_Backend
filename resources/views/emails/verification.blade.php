@@ -7,7 +7,7 @@
     <title>رمز التحقق - OpticVault</title>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 </head>
-<body style="margin: 0; padding: 0; background-color: #0d0f14; font-family: 'IBM Plex Sans Arabic', 'Segoe UI', Tahoma, Arial, sans-serif; -webkit-font-smoothing: antialiased;">
+<body style="margin: 0; padding: 0; background-color: #cfd3dcff; font-family: 'IBM Plex Sans Arabic', 'Segoe UI', Tahoma, Arial, sans-serif; -webkit-font-smoothing: antialiased;">
 
     <!-- Outer wrapper -->
     <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #0d0f14; padding: 48px 20px;">
@@ -66,7 +66,7 @@
                             <!-- Code Box -->
                             <table width="100%" cellpadding="0" cellspacing="0" border="0">
                                 <tr>
-                                    <td style="background-color: #0d0f14; border: 1px solid #1e2130; border-radius: 14px; padding: 36px 28px; text-align: center; position: relative;">
+                                    <td style="background-color: #b0cfa676; border: 1px solid #1e2130; border-radius: 14px; padding: 36px 28px; text-align: center; position: relative;">
 
                                         <!-- Corner accents (top right & bottom left) -->
                                         <table width="100%" cellpadding="0" cellspacing="0" border="0">
@@ -75,7 +75,7 @@
                                                     <p style="margin: 0 0 14px 0; font-size: 10px; font-weight: 700; color: #d4a853; letter-spacing: 5px; text-transform: uppercase;">رمز التحقق</p>
 
                                                     <!-- The code -->
-                                                    <p style="margin: 0 0 14px 0; font-size: 52px; font-weight: 700; color: #f1f3f9; letter-spacing: 14px; font-family: 'Courier New', Courier, monospace; direction: ltr; text-align: center;">{{ $code }}</p>
+                                                    <p style="margin: 0 0 14px 0; font-size: 52px; font-weight: 700; color: #e38e04ff; letter-spacing: 14px; font-family: 'Courier New', Courier, monospace; direction: ltr; text-align: center;">{{ $code }}</p>
 
                                                     <!-- Underline accent -->
                                                     <table width="80" cellpadding="0" cellspacing="0" border="0" style="margin: 0 auto;">
@@ -98,6 +98,7 @@
                                         <p style="margin: 0; font-size: 13px; color: #8891aa; line-height: 1.8;">
                                             🔒 هذا الرمز <span style="color: #d4a853; font-weight: 600;">صالح مرة واحدة فقط</span>. إذا لم تطلبه، يمكنك تجاهل هذا البريد بأمان.
                                         </p>
+                                        <p style="background-color: #c7050566;">ينتهي الكود خلال دقيقها</p>
                                     </td>
                                 </tr>
                             </table>
@@ -119,8 +120,8 @@
                     <!-- Footer -->
                     <tr>
                         <td style="padding: 24px 48px 32px 48px; text-align: center;">
-                            <p style="margin: 0 0 6px 0; font-size: 11px; color: #3d4460; letter-spacing: 3px; text-transform: uppercase;">OPTICVAULT COMMUNITY</p>
-                            <p style="margin: 0; font-size: 12px; color: #3d4460;">© {{ date('Y') }} — جميع الحقوق محفوظة</p>
+                            <p style="margin: 0 0 6px 0; font-size: 11px; color: #688cbed5; letter-spacing: 3px; text-transform: uppercase;">OPTICVAULT COMMUNITY</p>
+                            <p style="margin: 0; font-size: 12px; color: #688cbed5;">© {{ date('Y') }} — جميع الحقوق محفوظة</p>
                         </td>
                     </tr>
 

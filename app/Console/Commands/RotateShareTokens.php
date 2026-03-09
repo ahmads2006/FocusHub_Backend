@@ -64,7 +64,7 @@ class RotateShareTokens extends Command
     {
         do {
             $token = Str::random(64);
-        } while (SharedLink::where('token', $token)->exists());
+        } while (SharedLink::where('token_hash', hash('sha256', $token))->exists());
 
         return $token;
     }
