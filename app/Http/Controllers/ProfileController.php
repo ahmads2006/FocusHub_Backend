@@ -50,6 +50,44 @@ class ProfileController extends Controller
     }
 
     /**
+     * Update photography preferences.
+     */
+    public function updatePhotography(Request $request): RedirectResponse
+    {
+        $user = $request->user();
+        $user->dynamic_watermark = $request->has('dynamic_watermark');
+        $user->auto_orient_default = $request->has('auto_orient_default');
+        $user->save();
+
+        return Redirect::route('profile.edit')->with('status', 'photography-updated');
+    }
+
+    /**
+     * Update user avatar.
+     */
+    public function updateAvatar(Request $request): RedirectResponse
+    {
+        $request->validate([
+            'profile_picture' => 'required|image|max:5120', // 5MB max for avatar
+        ]);
+
+        $user = $request->user();
+
+        // Use ImageUploadService to process and store the avatar
+        $service = app(\App\Services\ImageUploadService::class);
+        $path = $service->generateAvatar($request->file('profile_picture'));
+
+        // Delete old avatar if it exists and is not a default UI avatar
+        if ($user->profile_picture && !str_contains($user->profile_picture, 'ui-avatars.com')) {
+            \Illuminate\Support\Facades\Storage::disk('public')->delete($user->profile_picture);
+        }
+
+        $user->update(['profile_picture' => $path]);
+
+        return Redirect::route('profile.edit')->with('status', 'avatar-updated');
+    }
+
+    /**
      * Delete the user's account.
      */
     public function destroy(Request $request): RedirectResponse

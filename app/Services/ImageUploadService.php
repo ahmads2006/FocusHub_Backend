@@ -3,8 +3,10 @@
 namespace App\Services;
 
 use App\Models\Image;
+use App\Jobs\ProcessImageThumbnails;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Log;
 use Intervention\Image\ImageManager;
 use Intervention\Image\Drivers\Gd\Driver;
 
@@ -34,7 +36,8 @@ class ImageUploadService
 
         // 3. Sanitization (Re-encoding) 
         // We "Destroy and Recreate" the image to strip any embedded malicious blobs
-        $sanitizedFile = $this->sanitizeImage($file, $detectedExtension);
+        $autoOrient = (bool) ($data['auto_orient'] ?? false);
+        $sanitizedFile = $this->sanitizeImage($file, $detectedExtension, $autoOrient);
 
         $filename = uniqid() . '_' . time() . '.' . $detectedExtension;
         $disk = 'public'; 
@@ -57,7 +60,7 @@ class ImageUploadService
         // Cleanup temporary sanitized file
         @unlink($sanitizedFile);
 
-        return Image::create([
+        $image = Image::create([
             'user_id' => $userId,
             'album_id' => $data['album_id'] ?? null,
             'title' => $data['title'] ?? $file->getClientOriginalName(),
@@ -71,13 +74,18 @@ class ImageUploadService
             'metadata' => $metadata,
             'is_comparison' => $data['is_comparison'] ?? false,
         ]);
+
+        // 4. Dispatch Async Thumbnail Generation
+        ProcessImageThumbnails::dispatch($image);
+
+        return $image;
     }
 
     /**
      * Sanitizes an image by re-encoding it. 
      * This strips out suspicious metadata or binary chunks hidden inside the image file structure.
      */
-    private function sanitizeImage(UploadedFile $file, string $extension): string
+    private function sanitizeImage(UploadedFile $file, string $extension, bool $shouldOrient = false): string
     {
         $tempPath = storage_path('app/tmp/' . uniqid() . '.' . $extension);
         if (!is_dir(dirname($tempPath))) {
@@ -85,19 +93,28 @@ class ImageUploadService
         }
 
         // Special Case: SVG cannot be re-encoded by GD/Intervention easily without conversion
-        // SecurityService already ran a strict regex/XML check on SVG content.
         if ($extension === 'svg') {
             copy($file->getRealPath(), $tempPath);
             return $tempPath;
         }
 
         try {
-            $manager = new ImageManager(new Driver());
+            // Dynamic Driver Selection (Imagick with GD Fallback)
+            $driver = extension_loaded('imagick') 
+                ? new \Intervention\Image\Drivers\Imagick\Driver() 
+                : new \Intervention\Image\Drivers\Gd\Driver();
+            
+            $manager = new ImageManager($driver);
             $image = $manager->read($file->getRealPath());
 
-            // Re-encoding to the same or optimized format
+            // 1. Optional Auto-Orientation (Runs first to ensure correct gravity)
+            if ($shouldOrient) {
+                $image->orientate();
+            }
+
+            // 2. Metadata Stripping & Re-encoding
             // This process creates a BRAND NEW binary structure based only on the pixel data
-            $image->scaleDown(1600, 1600); // Standardize size
+            $image->scaleDown(1600, 1600); 
             $image->save($tempPath, quality: 85);
 
             return $tempPath;
@@ -107,6 +124,39 @@ class ImageUploadService
                 'image' => 'فشل تطهير الملف المرفوع. قد يكون الملف تالفاً أو يحتوي على هيكلية غير صالحة.'
             ]);
         }
+    }
+
+    /**
+     * Specialized logic for generating premium profile icons.
+     * Force 150x150 square crop, WebP format, <20KB.
+     */
+    public function generateAvatar(UploadedFile $file): string
+    {
+        $filename = 'avatar_' . uniqid() . '.webp';
+        $directory = 'avatars';
+        $path = $directory . '/' . $filename;
+
+        if (!Storage::disk('public')->exists($directory)) {
+            Storage::disk('public')->makeDirectory($directory);
+        }
+
+        // Use GD/Imagick dynamically
+        $driver = extension_loaded('imagick') 
+            ? new \Intervention\Image\Drivers\Imagick\Driver() 
+            : new \Intervention\Image\Drivers\Gd\Driver();
+            
+        $manager = new ImageManager($driver);
+        $image = $manager->read($file->getRealPath());
+
+        // Smart Cropping: Cover a 150x150 area (Centered)
+        $image->cover(150, 150, 'center');
+
+        // Save as WebP with high compression
+        $encoded = $image->toWebp(70);
+        
+        Storage::disk('public')->put($path, $encoded);
+
+        return $path;
     }
 
 

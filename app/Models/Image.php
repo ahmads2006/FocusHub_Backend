@@ -78,15 +78,34 @@ class Image extends Model implements HasMedia
     }
 
     /**
-     * Accessor for the image URL, handling CDN (TwicPics) architecture.
+     * Accessor for the image URL.
+     * Default to 'Medium' (800px) version for performance and protection.
      */
     public function getUrlAttribute(): string
     {
-        $path = $this->path;
-        
-        if (config('services.twicpics.domain')) {
-            return config('services.twicpics.domain') . '/' . ltrim($path, '/');
+        return app(\App\Services\AssetDeliveryService::class)->getUrl($this, 'gallery');
+    }
+
+    /**
+     * Get a secure, masked URL for the original high-res file.
+     */
+    public function getOriginalUrl(): string
+    {
+        return app(\App\Services\AssetDeliveryService::class)->getUrl($this, 'original');
+    }
+
+    /**
+     * Get the URL for a specific thumbnail size.
+     */
+    public function getThumbnailUrl(string $size = 'medium'): string
+    {
+        try {
+            $thumbnails = $this->metadata['thumbnails'] ?? [];
+        } catch (\Exception $e) {
+            $thumbnails = [];
         }
+
+        $path = $thumbnails[$size] ?? $this->path;
 
         return asset('storage/' . ltrim($path, '/'));
     }

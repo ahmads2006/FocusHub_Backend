@@ -1,374 +1,199 @@
-<x-app-layout>
+@extends('layouts.premium')
 
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap');
-        .profile-wrap * { font-family: 'IBM Plex Sans Arabic', 'Segoe UI', sans-serif; }
-        .profile-bg { background-color: #0d0f14; min-height: 100vh; }
+@section('title', 'Profile Settings')
 
-        /* Layout */
-        .profile-grid {
-            display: grid;
-            grid-template-columns: 220px 1fr;
-            gap: 20px;
-            align-items: start;
-        }
-        @media (max-width: 768px) {
-            .profile-grid { grid-template-columns: 1fr; }
-            .profile-sidebar { display: flex; flex-direction: row; overflow-x: auto; gap: 4px; }
-            .sidebar-item { white-space: nowrap; }
-        }
-
-        /* Sidebar */
-        .profile-sidebar {
-            background: #13151c;
-            border: 1px solid #1e2130;
-            border-radius: 16px;
-            padding: 10px;
-            position: sticky;
-            top: 24px;
-        }
-        .sidebar-item {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 12px 14px;
-            border-radius: 10px;
-            font-size: 12px;
-            font-weight: 600;
-            letter-spacing: 1px;
-            color: #4a5270;
-            cursor: pointer;
-            transition: background 0.15s, color 0.15s;
-            text-decoration: none;
-        }
-        .sidebar-item:hover { background: #0d0f14; color: #c8cfe0; }
-        .sidebar-item.active { background: #0d0f14; color: #d4a853; }
-        .sidebar-item.active .sidebar-dot { background: #d4a853; box-shadow: 0 0 6px #d4a85388; }
-        .sidebar-item.danger { color: #4a5270; }
-        .sidebar-item.danger:hover { color: #f87171; background: #f8717110; }
-        .sidebar-dot { width: 6px; height: 6px; border-radius: 50%; background: #2a2f45; flex-shrink: 0; }
-        .sidebar-divider { height: 1px; background: #1e2130; margin: 6px 4px; }
-
-        /* Panel */
-        .profile-panel {
-            background: #13151c;
-            border: 1px solid #1e2130;
-            border-radius: 16px;
-            overflow: hidden;
-        }
-        .panel-gold-bar {
-            height: 2px;
-            background: linear-gradient(90deg, transparent, #d4a853 40%, transparent);
-        }
-        .panel-gold-bar.danger-bar {
-            background: linear-gradient(90deg, transparent, #f8717155 40%, transparent);
-        }
-        .panel-header {
-            padding: 22px 28px;
-            border-bottom: 1px solid #1e2130;
-        }
-        .panel-eyebrow {
-            font-size: 9px;
-            font-weight: 700;
-            letter-spacing: 4px;
-            text-transform: uppercase;
-            color: #d4a853;
-            margin: 0 0 6px 0;
-        }
-        .panel-eyebrow.danger { color: #f87171; }
-        .panel-title {
-            font-size: 16px;
-            font-weight: 700;
-            color: #f1f3f9;
-            margin: 0 0 3px 0;
-        }
-        .panel-sub {
-            font-size: 12px;
-            color: #3d4460;
-            margin: 0;
-        }
-        .panel-body { padding: 28px; }
-
-        /* Avatar section */
-        .avatar-section {
-            display: flex;
-            align-items: center;
-            gap: 18px;
-            padding: 22px 28px;
-            border-bottom: 1px solid #1e2130;
-            background: #0d0f1488;
-        }
-        .avatar-ring {
-            width: 72px; height: 72px;
-            border-radius: 50%;
-            border: 2px solid #d4a853;
-            overflow: hidden;
-            flex-shrink: 0;
-            background: #1e2130;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 26px;
-            font-weight: 700;
-            color: #d4a853;
-        }
-        .avatar-ring img { width: 100%; height: 100%; object-fit: cover; }
-        .avatar-name { font-size: 16px; font-weight: 700; color: #f1f3f9; margin: 0 0 3px 0; }
-        .avatar-email { font-size: 12px; color: #3d4460; margin: 0; }
-
-        /* Form overrides — works with Breeze's existing partials */
-        .profile-panel .max-w-xl { max-width: 100% !important; }
-
-        /* Style Breeze form elements inside panels */
-        .profile-panel label,
-        .profile-panel .block { color: #8891aa !important; }
-
-        .profile-panel input[type="text"],
-        .profile-panel input[type="email"],
-        .profile-panel input[type="password"],
-        .profile-panel input[type="url"] {
-            background: #0d0f14 !important;
-            border: 1px solid #1e2130 !important;
-            border-radius: 10px !important;
-            color: #c8cfe0 !important;
-            padding: 11px 14px !important;
-            font-family: 'IBM Plex Sans Arabic', sans-serif !important;
-            font-size: 13px !important;
-            transition: border-color 0.2s, box-shadow 0.2s !important;
-            outline: none !important;
-        }
-        .profile-panel input:focus {
-            border-color: #d4a85366 !important;
-            box-shadow: 0 0 0 3px rgba(212,168,83,0.07) !important;
-        }
-        .profile-panel input[type="password"]:focus {
-            border-color: #60a5fa44 !important;
-            box-shadow: 0 0 0 3px rgba(96,165,250,0.05) !important;
-        }
-
-        /* Breeze primary button */
-        .profile-panel button[type="submit"]:not(.danger-btn) {
-            background: linear-gradient(135deg, #d4a853, #f0c97a) !important;
-            color: #0d0f14 !important;
-            font-weight: 800 !important;
-            letter-spacing: 1.5px !important;
-            font-size: 11px !important;
-            text-transform: uppercase !important;
-            border: none !important;
-            border-radius: 10px !important;
-            padding: 12px 22px !important;
-            cursor: pointer !important;
-            transition: opacity 0.2s !important;
-            font-family: 'IBM Plex Sans Arabic', sans-serif !important;
-        }
-        .profile-panel button[type="submit"]:not(.danger-btn):hover { opacity: 0.88 !important; }
-
-        /* Danger zone */
-        .danger-panel .panel-gold-bar { background: linear-gradient(90deg, transparent, #f8717155 40%, transparent); }
-        .danger-panel input:focus {
-            border-color: #f8717144 !important;
-            box-shadow: 0 0 0 3px rgba(248,113,113,0.05) !important;
-        }
-        .danger-panel button[type="submit"],
-        .danger-panel button[type="button"] {
-            background: transparent !important;
-            color: #f87171 !important;
-            border: 1px solid #4a1515 !important;
-            font-weight: 700 !important;
-            letter-spacing: 1.5px !important;
-            font-size: 11px !important;
-            text-transform: uppercase !important;
-            border-radius: 10px !important;
-            padding: 11px 22px !important;
-            cursor: pointer !important;
-            transition: background 0.2s !important;
-            font-family: 'IBM Plex Sans Arabic', sans-serif !important;
-        }
-        .danger-panel button:hover { background: #f8717115 !important; }
-
-        /* Verified badge */
-        .verified-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 5px;
-            font-size: 10px;
-            font-weight: 700;
-            letter-spacing: 1.5px;
-            color: #34d399;
-            background: #0a1f10;
-            border: 1px solid #1a4a22;
-            padding: 4px 10px;
-            border-radius: 6px;
-        }
-
-        /* Breeze error text */
-        .profile-panel .text-red-600,
-        .profile-panel .text-red-500 { color: #f87171 !important; font-size: 11px !important; }
-
-        /* Breeze success text */
-        .profile-panel .text-green-600 { color: #34d399 !important; font-size: 11px !important; }
-
-        /* Breeze link */
-        .profile-panel a { color: #d4a853 !important; }
-    </style>
-
-    <div class="profile-bg profile-wrap" dir="rtl">
-        <div class="py-10">
-            <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-
-                <!-- Page heading -->
-                <div style="margin-bottom: 28px;">
-                    <p style="font-size:10px;font-weight:700;letter-spacing:5px;text-transform:uppercase;color:#d4a853;margin:0 0 6px 0;">OPTICVAULT</p>
-                    <h1 style="font-size:26px;font-weight:700;color:#f1f3f9;margin:0;">الملف الشخصي</h1>
-                </div>
-
-                <div class="profile-grid">
-
-                    <!-- Sidebar nav -->
-                    <div class="profile-sidebar">
-                        <a href="#info" class="sidebar-item active">
-                            <span class="sidebar-dot"></span>
-                            معلومات الحساب
-                        </a>
-                        <a href="#password" class="sidebar-item">
-                            <span class="sidebar-dot"></span>
-                            كلمة المرور
-                        </a>
-                        <a href="#security" class="sidebar-item">
-                            <span class="sidebar-dot"></span>
-                            إعدادات الأمان
-                        </a>
-                        <div class="sidebar-divider"></div>
-                        <a href="#delete" class="sidebar-item danger">
-                            <span class="sidebar-dot" style="background:#4a1515;"></span>
-                            حذف الحساب
-                        </a>
-                    </div>
-
-                    <!-- Panels -->
-                    <div style="display: flex; flex-direction: column; gap: 16px;">
-
-                        <!-- Avatar strip -->
-                        <div class="profile-panel">
-                            <div class="panel-gold-bar"></div>
-                            <div class="avatar-section">
-                                <div class="avatar-ring">
-                                    @if(Auth::user()->avatar)
-                                        <img src="{{ Auth::user()->avatar }}" alt="">
-                                    @else
-                                        {{ mb_substr(Auth::user()->name, 0, 1) }}
-                                    @endif
-                                </div>
-                                <div>
-                                    <p class="avatar-name">{{ Auth::user()->name }}</p>
-                                    <p class="avatar-email">{{ Auth::user()->email }}</p>
-                                    @if(Auth::user()->email_verified_at)
-                                        <span class="verified-badge" style="margin-top:8px;display:inline-flex;">✓ بريد موثّق</span>
-                                    @endif
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Profile info -->
-                        <div class="profile-panel" id="info">
-                            <div class="panel-gold-bar"></div>
-                            <div class="panel-header">
-                                <p class="panel-eyebrow">معلومات الحساب</p>
-                                <p class="panel-title">تعديل البيانات الشخصية</p>
-                                <p class="panel-sub">اسمك وبريدك الإلكتروني الظاهران في المنصة</p>
-                            </div>
-                            <div class="panel-body">
-                                @include('profile.partials.update-profile-information-form')
-                            </div>
-                        </div>
-
-                        <!-- Password -->
-                        <div class="profile-panel" id="password">
-                            <div class="panel-gold-bar" style="background: linear-gradient(90deg, transparent, #60a5fa55 40%, transparent);"></div>
-                            <div class="panel-header">
-                                <p class="panel-eyebrow" style="color:#60a5fa;">كلمة المرور</p>
-                                <p class="panel-title">تغيير كلمة المرور</p>
-                                <p class="panel-sub">استخدم كلمة مرور قوية وفريدة لحماية حسابك</p>
-                            </div>
-                            <div class="panel-body">
-                                @include('profile.partials.update-password-form')
-                            </div>
-                        </div>
-
-                        <!-- Session Security -->
-                        <div class="profile-panel" id="security">
-                            <div class="panel-gold-bar" style="background: linear-gradient(90deg, transparent, #34d39955 40%, transparent);"></div>
-                            <div class="panel-header">
-                                <p class="panel-eyebrow" style="color:#34d399;">إعدادات الأمان</p>
-                                <p class="panel-title">أمان الجلسة</p>
-                              
-                            </div>
-                            <div class="panel-body">
-                                <form method="post" action="{{ route('profile.security.update') }}" class="space-y-6">
-                                    @csrf
-                                    @method('put')
-
-                                    <div class="flex items-center gap-4">
-                                        <label class="relative inline-flex items-center cursor-pointer">
-                                            <input type="checkbox" name="stay_logged_in" value="1" class="sr-only peer" {{ $user->stay_logged_in ? 'checked' : '' }}>
-                                            <div class="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gold"></div>
-                                            <span class="ms-3 text-sm font-medium text-gray-400">
-                                                إبقاء الجلسة نشطة دائماً (تعطيل تسجيل الخروج التلقائي)
-                                                  <label>
-                                              <input type="checkbox" onclick="showStayLoggedInfo()">
-                                                 إبقاء الجلسة نشطة
-                                            </label>
-
-                                            </span>
-                                    </div>
-                                    <div class="flex items-center gap-4">
-                                        <x-primary-button>حفظ الإعدادات</x-primary-button>
-
-                                        @if (session('status') === 'security-updated')
-                                            <p
-                                                x-data="{ show: true }"
-                                                x-show="show"
-                                                x-transition
-                                                x-init="setTimeout(() => show = false, 2000)"
-                                                class="text-sm text-green-400"
-                                            >تم التحديث بنجاح.</p>
-                                        @endif
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
-
-                        <!-- Delete account -->
-                        <div class="profile-panel danger-panel" id="delete">
-                            <div class="panel-gold-bar"></div>
-                            <div class="panel-header">
-                                <p class="panel-eyebrow danger">منطقة الخطر</p>
-                                <p class="panel-title" style="color:#f87171;">حذف الحساب</p>
-                                <p class="panel-sub">بمجرد الحذف لا يمكن استرجاع بياناتك. تصرّف بحذر.</p>
-                            </div>
-                            <div class="panel-body">
-                                @include('profile.partials.delete-user-form')
-                            </div>
-                        </div>
-
-                    </div>
-                </div>
-
-            </div>
+@section('content')
+<div class="space-y-8" dir="rtl">
+    
+    <!-- Profile Header -->
+    <div class="flex justify-between items-center">
+        <div>
+            <h2 class="text-3xl font-bold tracking-tight">إعدادات <span class="accent-text-gradient">المستودع</span></h2>
+            <p class="text-gray-400 mt-1">تخصيص بياناتك الشخصية وتفضيلات معالجة الصور.</p>
         </div>
     </div>
-<script>
-    async function showStayLoggedInfo() {
-        // نستخدم الـ Backend لجلب المعلومة كما طلب المستخدم
-        try {
-            const response = await fetch('{{ route('profile.stayLoggedInfo') }}');
-            if (!response.ok) throw new Error('Network response was not ok');
-            const data = await response.json();
-            alert(data.message);
-        } catch (error) {
-            console.error('Error fetching security info:', error);
-            alert('إبقاء الجلسة نشطة دائماً يعني أن حسابك سيبقى مسجلاً دون تسجيل خروج تلقائي.');
-        }
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        
+        <!-- Navigation sidebar (In-page) -->
+        <aside class="lg:col-span-3 space-y-2">
+            <div class="glass p-2 rounded-2xl sticky top-8">
+                <a href="#info" class="flex items-center gap-3 p-3 px-4 rounded-xl text-purple-400 bg-purple-500/10 font-bold border-r-2 border-purple-500 transition-all">
+                    <span>بيانات الحساب</span>
+                </a>
+                <a href="#photography" class="flex items-center gap-3 p-3 px-4 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white transition-all">
+                    <span>إعدادات التصوير</span>
+                </a>
+                <a href="#password" class="flex items-center gap-3 p-3 px-4 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white transition-all">
+                    <span>كلمة المرور</span>
+                </a>
+                <a href="#delete" class="flex items-center gap-3 p-3 px-4 rounded-xl text-red-400 hover:bg-red-500/10 transition-all">
+                    <span>منطقة الخطر</span>
+                </a>
+            </div>
+        </aside>
+
+        <!-- Main Settings Area -->
+        <main class="lg:col-span-9 space-y-8">
+            
+            <!-- User Info -->
+            <div id="info" class="glass rounded-[40px] overflow-hidden">
+                <div class="p-8 border-b border-white/5 bg-white/5 flex items-center gap-6">
+                    <div class="w-20 h-20 rounded-full border-4 border-purple-500/30 p-1">
+                        <img src="{{ auth()->user()->avatar }}" class="w-full h-full object-cover rounded-full">
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-bold">{{ auth()->user()->name }}</h3>
+                        <p class="text-gray-500 text-sm font-mono">{{ auth()->user()->email }}</p>
+                    </div>
+                </div>
+                <div class="p-8">
+                    @include('profile.partials.update-profile-information-form')
+                </div>
+            </div>
+
+            <!-- Account Settings Header -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px;">
+                <div>
+                    <h1 style="font-size: 28px; font-weight: 800; color: #ffffff; margin-bottom: 8px;">إعدادات الحساب</h1>
+                    <p style="color: #8a8fb0;">تخصيص هويتك الرقمية وتفضيلات التصوير</p>
+                </div>
+            </div>
+
+            <!-- Avatar Section (Premium Glass) -->
+            <div class="glass-card" style="padding: 32px; margin-bottom: 32px; display: flex; align-items: center; gap: 32px; background: linear-gradient(135deg, rgba(127, 156, 245, 0.1) 0%, rgba(135, 94, 245, 0.05) 100%); border: 1px solid rgba(127, 156, 245, 0.2);">
+                <div style="position: relative;">
+                    <img id="avatar-preview" src="{{ $user->avatar }}" alt="{{ $user->name }}" 
+                         style="width: 120px; height: 120px; border-radius: 50%; object-fit: cover; border: 3px solid #7f9cf5; box-shadow: 0 0 20px rgba(127, 156, 245, 0.3);">
+                    <label for="avatar-input" style="position: absolute; bottom: 0; right: 0; background: #7f9cf5; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 2px solid #0f121d; transition: all 0.3s ease;">
+                        <span style="font-size: 18px;">📷</span>
+                    </label>
+                </div>
+                <div style="flex: 1;">
+                    <h3 style="font-size: 18px; font-weight: 700; color: #ffffff; margin-bottom: 8px;">الصورة الشخصية</h3>
+                    <p style="font-size: 13px; color: #8a8fb0; margin-bottom: 16px;">ارفع صورة مربعة عالية الدقة. سيتم تحسينها تلقائياً لتناسب ملفك الشخصي.</p>
+                    
+                    <form id="avatar-form" action="{{ route('profile.avatar.update') }}" method="POST" enctype="multipart/form-data">
+                        @csrf
+                        <input type="file" id="avatar-input" name="profile_picture" accept="image/*" style="display: none;" onchange="handleAvatarSelection(this)">
+                        <button type="button" onclick="document.getElementById('avatar-input').click()" class="btn-primary" style="padding: 10px 20px; font-size: 13px;">
+                            اختيار صورة جديدة
+                        </button>
+                        <button id="avatar-save-btn" type="submit" class="btn-primary" style="display: none; padding: 10px 20px; font-size: 13px; background: #10b981; border-color: #10b981; margin-top: 8px;">
+                            <span id="avatar-btn-text">حفظ التغييرات</span>
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <script>
+                function handleAvatarSelection(input) {
+                    if (input.files && input.files[0]) {
+                        const reader = new FileReader();
+                        reader.onload = function(e) {
+                            document.getElementById('avatar-preview').src = e.target.result;
+                            document.getElementById('avatar-save-btn').style.display = 'inline-block';
+                        }
+                        reader.readAsDataURL(input.files[0]);
+                    }
+                }
+
+                document.getElementById('avatar-form').addEventListener('submit', function() {
+                    const btn = document.getElementById('avatar-save-btn');
+                    btn.disabled = true;
+                    document.getElementById('avatar-btn-text').innerText = 'جاري المعالجة...';
+                });
+            </script>
+
+            <!-- Photography Settings (NEW) -->
+            <div id="photography" class="glass rounded-[40px] overflow-hidden">
+                <div class="p-8 border-b border-white/5 flex justify-between items-center">
+                    <div>
+                        <h3 class="text-xl font-bold">تفضيلات المعالجة الذكية</h3>
+                        <p class="text-gray-500 text-xs mt-1">كيف يتعامل النظام مع صورك الاحترافية تلقائياً.</p>
+                    </div>
+                    <div class="p-3 rounded-2xl bg-purple-500/10 text-purple-400">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path></svg>
+                    </div>
+                </div>
+                <div class="p-8 space-y-6">
+                    <form method="post" action="{{ route('profile.photography.update') }}" class="space-y-8">
+                        @csrf
+                        @method('put')
+
+                        <!-- Watermark Toggle -->
+                        <div class="flex items-center justify-between p-6 rounded-[30px] bg-white/5 hover:bg-white/10 transition-all border border-white/5 group">
+                            <div>
+                                <p class="text-lg font-bold">تفعيل العلامة المائية الديناميكية</p>
+                                <p class="text-sm text-gray-500">حماية الصور عند التحميل بواسطة الزوار عبر رابط آمن.</p>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" name="dynamic_watermark" value="1" class="sr-only peer" {{ auth()->user()->dynamic_watermark ? 'checked' : '' }}>
+                                <div class="w-14 h-7 bg-white/5 border border-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-purple-500 shadow-inner"></div>
+                            </label>
+                        </div>
+
+                        <!-- Orientation Toggle (Persistent preference) -->
+                        <div class="flex items-center justify-between p-6 rounded-[30px] bg-white/5 hover:bg-white/10 transition-all border border-white/5">
+                            <div>
+                                <p class="text-lg font-bold">تصحيح الاتجاه تلقائياً (EXIF)</p>
+                                <p class="text-sm text-gray-500">تدوير الصور بشكل قائم دائماً اعتماداً على مستشعر الجاذبية.</p>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" name="auto_orient_default" value="1" class="sr-only peer" {{ auth()->user()->auto_orient_default ? 'checked' : '' }}>
+                                <div class="w-14 h-7 bg-white/5 border border-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-purple-500 shadow-inner"></div>
+                            </label>
+                        </div>
+
+                        <div class="flex justify-end">
+                            <button type="submit" class="accent-gradient p-3 px-8 rounded-2xl font-bold shadow-lg shadow-purple-500/20 hover:scale-105 transition-transform">حفظ التفضيلات</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Password -->
+            <div id="password" class="glass rounded-[40px] overflow-hidden border-blue-500/10 border">
+                <div class="p-8 border-b border-white/5">
+                    <h3 class="text-xl font-bold text-blue-400">تغيير السر</h3>
+                </div>
+                <div class="p-8">
+                    @include('profile.partials.update-password-form')
+                </div>
+            </div>
+
+            <!-- Delete -->
+            <div id="delete" class="glass rounded-[40px] overflow-hidden border-red-500/10 border">
+                <div class="p-8 border-b border-white/5">
+                    <h3 class="text-xl font-bold text-red-500">حذف الحساب</h3>
+                </div>
+                <div class="p-8">
+                    @include('profile.partials.delete-user-form')
+                </div>
+            </div>
+
+        </main>
+    </div>
+</div>
+
+<style>
+    /* Styling for Breeze partials to match premium UI */
+    .space-y-6 label { color: #8891aa !important; font-weight: 600; font-size: 13px; }
+    .space-y-6 input:not([type="checkbox"]) { 
+        background: rgba(255, 255, 255, 0.05) !important; 
+        border: 1px solid rgba(255, 255, 255, 0.1) !important; 
+        border-radius: 15px !important;
+        color: white !important;
+        padding: 12px !important;
     }
-</script>
-</x-app-layout>
+    .space-y-6 input:focus { border-color: #a855f7 !important; border-width: 2px !important; outline: none !important; }
+    .space-y-6 button[type="submit"]:not(.accent-gradient) {
+        background: rgba(255,255,255,0.05) !important;
+        color: white !important;
+        border-radius: 12px !important;
+        border: 1px solid rgba(255,255,255,0.1) !important;
+        font-weight: 700 !important;
+        padding: 10px 20px !important;
+    }
+</style>
+@endsection

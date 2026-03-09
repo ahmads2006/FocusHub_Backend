@@ -1,399 +1,108 @@
-<x-app-layout>
-  
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap');
+@extends('layouts.premium')
 
-        .dash-wrap * { font-family: 'IBM Plex Sans Arabic', sans-serif; }
+@section('title', 'Control Center')
 
-        /* Background */
-        .dash-bg {
-            background-color: #0d0f14;
-            min-height: 100vh;
-        }
-
-        /* Stat card */
-        .stat-card {
-            background: #13151c;
-            border: 1px solid #1e2130;
-            border-radius: 16px;
-            padding: 28px;
-            position: relative;
-            overflow: hidden;
-            transition: transform 0.2s ease, border-color 0.2s ease;
-        }
-        .stat-card:hover {
-            transform: translateY(-3px);
-            border-color: #2e3450;
-        }
-        .stat-card::before {
-            content: '';
-            position: absolute;
-            top: 0; right: 0;
-            width: 60px; height: 3px;
-            border-radius: 0 16px 0 0;
-        }
-        .stat-card.gold::before  { background: linear-gradient(90deg, transparent, #d4a853); }
-        .stat-card.blue::before  { background: linear-gradient(90deg, transparent, #60a5fa); }
-        .stat-card.green::before { background: linear-gradient(90deg, transparent, #34d399); }
-
-        .stat-label {
-            font-size: 11px;
-            font-weight: 700;
-            letter-spacing: 3px;
-            text-transform: uppercase;
-            color: #4a5270;
-            margin-bottom: 12px;
-        }
-        .stat-number {
-            font-size: 42px;
-            font-weight: 700;
-            line-height: 1;
-            margin-bottom: 6px;
-        }
-        .stat-number.gold  { color: #d4a853; }
-        .stat-number.blue  { color: #60a5fa; }
-        .stat-number.green { color: #34d399; }
-        .stat-icon {
-            position: absolute;
-            bottom: 20px;
-            left: 24px;
-            font-size: 36px;
-            opacity: 0.07;
-        }
-        .stat-sub {
-            font-size: 12px;
-            color: #3d4460;
-        }
-
-        /* Activity card */
-        .activity-card {
-            background: #13151c;
-            border: 1px solid #1e2130;
-            border-radius: 16px;
-            overflow: hidden;
-        }
-        .activity-header {
-            padding: 24px 28px;
-            border-bottom: 1px solid #1e2130;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .activity-title {
-            font-size: 14px;
-            font-weight: 700;
-            color: #f1f3f9;
-            letter-spacing: 2px;
-            text-transform: uppercase;
-        }
-        .view-all-link {
-            font-size: 12px;
-            color: #d4a853;
-            text-decoration: none;
-            font-weight: 600;
-            letter-spacing: 1px;
-            transition: opacity 0.2s;
-        }
-        .view-all-link:hover { opacity: 0.7; }
-
-        .activity-row {
-            padding: 18px 28px;
-            border-bottom: 1px solid #0d0f14;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            transition: background 0.15s;
-        }
-        .activity-row:last-of-type { border-bottom: none; }
-        .activity-row:hover { background: #0d0f14; }
-
-        .activity-dot {
-            width: 7px; height: 7px;
-            background: #d4a853;
-            border-radius: 50%;
-            flex-shrink: 0;
-            margin-left: 14px;
-            box-shadow: 0 0 8px rgba(212,168,83,0.5);
-        }
-        .activity-desc {
-            font-size: 14px;
-            color: #c8cfe0;
-            font-weight: 500;
-        }
-        .activity-time {
-            font-size: 11px;
-            color: #3d4460;
-            margin-top: 4px;
-        }
-        .activity-badge {
-            font-size: 10px;
-            font-weight: 700;
-            letter-spacing: 2px;
-            text-transform: uppercase;
-            color: #4a5270;
-            background: #0d0f14;
-            border: 1px solid #1e2130;
-            padding: 5px 10px;
-            border-radius: 6px;
-            white-space: nowrap;
-            margin-right: 12px;
-        }
-        .no-activity {
-            padding: 40px 28px;
-            text-align: center;
-            color: #3d4460;
-            font-size: 14px;
-        }
-
-        /* Profile card */
-        .profile-card {
-            background: #13151c;
-            border: 1px solid #1e2130;
-            border-radius: 16px;
-            padding: 28px;
-            display: flex;
-            align-items: center;
-            gap: 20px;
-            position: relative;
-            overflow: hidden;
-        }
-        .profile-card::after {
-            content: '';
-            position: absolute;
-            bottom: 0; right: 0;
-            width: 100%; height: 2px;
-            background: linear-gradient(90deg, transparent, #d4a853 70%, transparent);
-        }
-        .profile-avatar {
-            width: 64px; height: 64px;
-            border-radius: 50%;
-            object-fit: cover;
-            border: 2px solid #d4a853;
-            flex-shrink: 0;
-        }
-        .profile-avatar-placeholder {
-            width: 64px; height: 64px;
-            border-radius: 50%;
-            background: #1e2130;
-            border: 2px solid #d4a853;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 24px;
-            color: #d4a853;
-            flex-shrink: 0;
-        }
-        .profile-name {
-            font-size: 17px;
-            font-weight: 700;
-            color: #f1f3f9;
-            margin-bottom: 4px;
-        }
-        .profile-email {
-            font-size: 12px;
-            color: #4a5270;
-            margin-bottom: 4px;
-        }
-        .profile-joined {
-            font-size: 11px;
-            color: #3d4460;
-        }
-        .profile-edit-btn {
-            margin-right: auto;
-            font-size: 11px;
-            font-weight: 700;
-            letter-spacing: 2px;
-            text-transform: uppercase;
-            color: #d4a853;
-            background: transparent;
-            border: 1px solid #d4a85355;
-            padding: 8px 16px;
-            border-radius: 8px;
-            text-decoration: none;
-            transition: background 0.2s, border-color 0.2s;
-            white-space: nowrap;
-        }
-        .profile-edit-btn:hover {
-            background: #d4a85315;
-            border-color: #d4a853;
-        }
-
-        /* Gold accent separator */
-        .gold-line {
-            height: 1px;
-            background: linear-gradient(90deg, transparent, #d4a85355, transparent);
-            margin: 0;
-        }
-    </style>
-
-    <div class="dash-bg dash-wrap" dir="rtl">
-        <div class="py-10">
-            <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-
-                <!-- Page heading -->
-                <div style="margin-bottom: 32px;">
-                    <p style="font-size: 10px; font-weight: 700; letter-spacing: 5px; text-transform: uppercase; color: #d4a853; margin: 0 0 8px 0;">OPTICVAULT</p>
-                    <h1 style="font-size: 26px; font-weight: 700; color: #f1f3f9; margin: 0;">لوحة التحكم</h1>
-                </div>
-
-                <!-- Stats Grid -->
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px;">
-
-                    <div class="stat-card gold">
-                        <div class="stat-label">إجمالي الصور</div>
-                        <div class="stat-number gold">{{ $stats['total_images'] }}</div>
-                        <div class="stat-sub">صورة مرفوعة</div>
-                        <div class="stat-icon">🖼</div>
-                    </div>
-
-                    <div class="stat-card blue">
-                        <div class="stat-label">الألبومات</div>
-                        <div class="stat-number blue">{{ $stats['total_albums'] }}</div>
-                        <div class="stat-sub">ألبوم مُنشأ</div>
-                        <div class="stat-icon">📁</div>
-                    </div>
-
-                    <div class="stat-card green">
-                        <div class="stat-label">النشاطات الأخيرة</div>
-                        <div class="stat-number green">{{ count($stats['recent_activities']) }}</div>
-                        <div class="stat-sub">نشاط مسجّل</div>
-                        <div class="stat-icon">⚡</div>
-                    </div>
-
-                </div>
-
-                <!-- Quick Actions Grid -->
-                <div style="margin-bottom: 32px;">
-                    <p style="font-size: 11px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: #4a5270; margin-bottom: 16px;">الوصول السريع</p>
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px;">
-                        <a href="{{ route('images.test.index') }}" class="stat-card" style="padding: 20px; text-align: center; text-decoration: none;">
-                            <div style="font-size: 24px; margin-bottom: 8px;">📤</div>
-                            <div style="font-size: 13px; font-weight: 700; color: #f1f3f9;">رفع صور</div>
-                        </a>
-                        <a href="{{ route('gallery.index') }}" class="stat-card" style="padding: 20px; text-align: center; text-decoration: none;">
-                            <div style="font-size: 24px; margin-bottom: 8px;">🖼</div>
-                            <div style="font-size: 13px; font-weight: 700; color: #f1f3f9;">المعرض</div>
-                        </a>
-                        <a href="{{ route('tasks.index') }}" class="stat-card" style="padding: 20px; text-align: center; text-decoration: none;">
-                            <div style="font-size: 24px; margin-bottom: 8px;">✅</div>
-                            <div style="font-size: 13px; font-weight: 700; color: #f1f3f9;">المهام</div>
-                        </a>
-                        <a href="{{ route('timer.index') }}" class="stat-card" style="padding: 20px; text-align: center; text-decoration: none;">
-                            <div style="font-size: 24px; margin-bottom: 8px;">⏱️</div>
-                            <div style="font-size: 13px; font-weight: 700; color: #f1f3f9;">الموقت</div>
-                        </a>
-                        <a href="{{ route('notifications.index') }}" class="stat-card" style="padding: 20px; text-align: center; text-decoration: none;">
-                            <div style="font-size: 24px; margin-bottom: 8px;">🔔</div>
-                            <div style="font-size: 13px; font-weight: 700; color: #f1f3f9;">التنبيهات</div>
-                        </a>
-                        <a href="{{ route('profile.edit') }}" class="stat-card" style="padding: 20px; text-align: center; text-decoration: none;">
-                            <div style="font-size: 24px; margin-bottom: 8px;">⚙️</div>
-                            <div style="font-size: 13px; font-weight: 700; color: #f1f3f9;">الإعدادات</div>
-                        </a>
-                    </div>
-                </div>
-
-                <!-- Profile card -->
-                <div class="profile-card" style="margin-bottom: 24px;">
-                    @if(Auth::user()->avatar)
-                        <img src="{{ Auth::user()->avatar }}" alt="{{ Auth::user()->name }}" class="profile-avatar">
-                    @else
-                        <div class="profile-avatar-placeholder">{{ mb_substr(Auth::user()->name, 0, 1) }}</div>
-                    @endif
-                    <div>
-                        <div class="profile-name">{{ Auth::user()->name }}</div>
-                        <div class="profile-email">{{ Auth::user()->email }}</div>
-                        <div class="profile-joined">انضم {{ Auth::user()->created_at->diffForHumans() }}</div>
-                    </div>
-                    <a href="{{ route('profile.edit') }}" class="profile-edit-btn">تعديل الملف</a>
-                </div>
-
-                <!-- Recent Activity -->
-                <div class="activity-card">
-                    <div class="activity-header">
-                        <span class="activity-title">آخر النشاطات</span>
-                        <a href="{{ route('activities.index') }}" class="view-all-link">عرض الكل ←</a>
-                    </div>
-
-                    @forelse($stats['recent_activities'] as $activity)
-                        <div class="activity-row">
-                            <div style="display: flex; align-items: center;">
-                                <div class="activity-dot"></div>
-                                <div>
-                                    <div class="activity-desc">{{ $activity->description }}</div>
-                                    <div class="activity-time">{{ $activity->created_at->diffForHumans() }}</div>
-                                </div>
-                            </div>
-                            <div class="activity-badge">{{ basename($activity->subject_type ?? 'System') }}</div>
-                        </div>
-                    @empty
-                        <div class="no-activity">لا يوجد نشاطات مسجلة حالياً.</div>
-                    @endforelse
-                </div>
-
-            </div>
+@section('content')
+<div class="space-y-8" x-data="{ }">
+    
+    <!-- Welcome Header -->
+    <div class="flex justify-between items-end">
+        <div>
+            <h2 class="text-3xl font-bold tracking-tight">مرحباً <span class="accent-text-gradient">{{ auth()->user()->name }}</span></h2>
+            <p class="text-gray-400 mt-1">نظرة عامة على نشاط مستودعك الرقمي اليوم.</p>
         </div>
-
-        @if(!Auth::user()->stay_logged_in)
-        <div id="timeout-modal" class="fixed inset-0 z-50 flex items-center justify-center hidden bg-black bg-opacity-80 backdrop-blur-sm">
-            <div class="bg-[#13151c] border border-[#d4a853] p-8 rounded-2xl w-full max-w-md text-center shadow-2xl">
-                <div class="text-4xl mb-4">⌛</div>
-                <h2 class="text-xl font-bold text-white mb-2">تنبيه أمني: الجلسة تنتهي قريباً</h2>
-                <p class="text-gray-400 mb-6">سيتم تسجيل خروجك بسبب الخمول خلال <span id="countdown-timer" class="text-gold font-bold text-lg">60</span> ثانية.</p>
-                <div class="flex gap-4">
-                    <button onclick="location.reload()" class="flex-1 bg-gold text-black font-extrabold py-3 border-none rounded-xl cursor-pointer hover:opacity-90">البقاء مسجلاً</button>
-                    <a href="{{ route('logout') }}" class="flex-1 bg-transparent text-red-400 font-bold py-3 border border-red-900/30 rounded-xl hover:bg-red-900/10">خروج الآن</a>
-                </div>
-            </div>
+        <div class="flex items-center gap-4 bg-white/5 p-2 rounded-full px-4 border border-white/10">
+            <span class="text-[10px] font-bold text-purple-400 uppercase tracking-widest">Premium Account</span>
         </div>
-
-        <script>
-            (function() {
-                const timeoutMinutes = 10; // Default 10 minutes as requested
-                const timeoutMs = timeoutMinutes * 60 * 1000;
-                const warningMs = 60 * 1000; // Show warning 60 seconds before
-                
-                let lastActivity = Date.now();
-                const modal = document.getElementById('timeout-modal');
-                const timerSpan = document.getElementById('countdown-timer');
-                let countdownInterval;
-
-                // Simple activity tracker
-                window.addEventListener('mousemove', () => lastActivity = Date.now());
-                window.addEventListener('keydown', () => lastActivity = Date.now());
-
-                setInterval(() => {
-                    const idleTime = Date.now() - lastActivity;
-                    
-                    if (idleTime >= (timeoutMs - warningMs)) {
-                        if (modal.classList.contains('hidden')) {
-                            modal.classList.remove('hidden');
-                            startCountdown();
-                        }
-                    } else {
-                        if (!modal.classList.contains('hidden')) {
-                            modal.classList.add('hidden');
-                            clearInterval(countdownInterval);
-                        }
-                    }
-
-                    if (idleTime >= timeoutMs) {
-                        window.location.href = "{{ route('login') }}?timeout=true";
-                    }
-                }, 5000);
-
-                function startCountdown() {
-                    let seconds = 60;
-                    timerSpan.innerText = seconds;
-                    clearInterval(countdownInterval);
-                    countdownInterval = setInterval(() => {
-                        seconds--;
-                        timerSpan.innerText = seconds;
-                        if (seconds <= 0) clearInterval(countdownInterval);
-                    }, 1000);
-                }
-            })();
-        </script>
-        @endif
     </div>
-</x-app-layout>
+
+    <!-- Stats Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div class="glass p-8 rounded-[40px] flex flex-col gap-2 group hover:bg-white/5 transition-all">
+            <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">إجمالي الصور</p>
+            <h3 class="text-4xl font-bold italic">{{ auth()->user()->images->count() }}</h3>
+            <div class="mt-4 flex items-center gap-2">
+                <div class="w-full h-1 bg-white/5 rounded-full overflow-hidden">
+                    <div class="h-full bg-purple-500 w-[65%]"></div>
+                </div>
+                <span class="text-[8px] text-purple-400 font-bold font-mono">65%</span>
+            </div>
+        </div>
+        <div class="glass p-8 rounded-[40px] flex flex-col gap-2">
+            <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">الألبومات</p>
+            <h3 class="text-4xl font-bold italic">{{ auth()->user()->ownedAlbums->count() }}</h3>
+            <p class="text-[8px] text-gray-600 mt-2 uppercase tracking-tighter">Photography Collections</p>
+        </div>
+        <div class="glass p-8 rounded-[40px] flex flex-col gap-2 border-green-500/10 border">
+            <p class="text-[10px] font-bold text-green-500 uppercase tracking-widest">التوفير بالضغط</p>
+            <h3 class="text-4xl font-bold italic">-64%</h3>
+            <p class="text-[8px] text-green-500/50 mt-2 uppercase tracking-tighter">Bandwidth Saved</p>
+        </div>
+        <div class="glass p-8 rounded-[40px] flex flex-col gap-2">
+            <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">الروابط النشطة</p>
+            <h3 class="text-4xl font-bold italic">12</h3>
+            <p class="text-[8px] text-gray-600 mt-2 uppercase tracking-tighter">Shared Assets</p>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        
+        <!-- Quick Actions Panel -->
+        <div class="lg:col-span-4 glass p-8 rounded-[40px] space-y-8">
+            <h3 class="text-xs font-bold uppercase tracking-widest text-purple-400">الوصول السريع</h3>
+            
+            <div class="grid grid-cols-2 gap-4">
+                <a href="{{ route('images.index') }}" class="glass-dark hover:bg-white/5 border border-white/5 p-6 rounded-3xl flex flex-col items-center gap-3 transition-all group">
+                    <div class="w-12 h-12 rounded-2xl bg-purple-500/10 flex items-center justify-center text-purple-400 group-hover:bg-purple-500 group-hover:text-white transition-all">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                    </div>
+                    <span class="text-xs font-bold uppercase tracking-widest">رفع صور</span>
+                </a>
+                <a href="{{ route('gallery.index') }}" class="glass-dark hover:bg-white/5 border border-white/5 p-6 rounded-3xl flex flex-col items-center gap-3 transition-all group">
+                    <div class="w-12 h-12 rounded-2xl bg-blue-500/10 flex items-center justify-center text-blue-400 group-hover:bg-blue-500 group-hover:text-white transition-all">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                    </div>
+                    <span class="text-xs font-bold uppercase tracking-widest">المعرض</span>
+                </a>
+                <a href="{{ route('lab.index') }}" class="glass-dark hover:bg-white/5 border border-white/5 p-6 rounded-3xl flex flex-col items-center gap-3 transition-all group">
+                    <div class="w-12 h-12 rounded-2xl bg-amber-500/10 flex items-center justify-center text-amber-400 group-hover:bg-amber-500 group-hover:text-white transition-all">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
+                    </div>
+                    <span class="text-xs font-bold uppercase tracking-widest">المختبر</span>
+                </a>
+                <a href="{{ route('profile.edit') }}" class="glass-dark hover:bg-white/5 border border-white/5 p-6 rounded-3xl flex flex-col items-center gap-3 transition-all group">
+                    <div class="w-12 h-12 rounded-2xl bg-indigo-500/10 flex items-center justify-center text-indigo-400 group-hover:bg-indigo-500 group-hover:text-white transition-all">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg>
+                    </div>
+                    <span class="text-xs font-bold uppercase tracking-widest">الإعدادات</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- Recent Activity Feed -->
+        <div class="lg:col-span-8 glass p-8 rounded-[40px]">
+             <div class="flex justify-between items-center mb-8">
+                <h3 class="text-xs font-bold uppercase tracking-widest text-purple-400">النشاط الأخير</h3>
+                <a href="{{ route('activities.index') }}" class="text-[10px] uppercase font-bold text-gray-500 hover:text-white transition-colors">عرض الكل ←</a>
+             </div>
+
+             <div class="space-y-6">
+                @foreach(auth()->user()->images()->latest()->take(5)->get() as $activity)
+                    <div class="flex items-center gap-6 p-4 rounded-3xl hover:bg-white/5 transition-all border border-transparent hover:border-white/5">
+                        <div class="w-12 h-12 rounded-2xl overflow-hidden glass border border-white/10">
+                            <img src="{{ $activity->url }}" class="w-full h-full object-cover">
+                        </div>
+                        <div class="flex-1">
+                            <p class="text-sm font-bold truncate">تم رفع وإكمال معالجة صورة "{{ $activity->title ?? $activity->filename }}"</p>
+                            <p class="text-[10px] text-gray-500 font-mono mt-1 uppercase">{{ $activity->created_at->diffForHumans() }} • Success</p>
+                        </div>
+                        <div class="px-3 py-1 bg-green-500/10 text-green-500 text-[8px] font-bold uppercase italic rounded-full">Optimized</div>
+                    </div>
+                @endforeach
+             </div>
+        </div>
+
+    </div>
+
+</div>
+@endsection

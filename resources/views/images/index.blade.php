@@ -1,563 +1,207 @@
-<x-app-layout>
+@extends('layouts.premium')
+
+@section('title', 'Image Management')
+
+@section('content')
+<div class="space-y-8" dir="rtl" x-data="{ view: '{{ request()->query('view', 'all') }}' }">
     
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap');
-
-        .mgmt-wrap * { font-family: 'IBM Plex Sans Arabic', 'Segoe UI', sans-serif; }
-        .mgmt-bg { background-color: #0d0f14; min-height: 100vh; }
-
-        /* Cards */
-        .panel {
-            background: #13151c;
-            border: 1px solid #1e2130;
-            border-radius: 16px;
-            padding: 28px;
-        }
-        .panel-title {
-            font-size: 10px;
-            font-weight: 700;
-            letter-spacing: 4px;
-            text-transform: uppercase;
-            color: #d4a853;
-            margin: 0 0 20px 0;
-        }
-
-        /* Flash message */
-        .flash-success {
-            background: #0d1a0e;
-            border: 1px solid #1a4a1e;
-            border-right: 3px solid #34d399;
-            border-radius: 10px;
-            padding: 14px 18px;
-            font-size: 13px;
-            color: #34d399;
-            margin-bottom: 24px;
-            font-weight: 500;
-        }
-
-        /* Form elements */
-        .form-label {
-            display: block;
-            font-size: 11px;
-            font-weight: 700;
-            letter-spacing: 2px;
-            text-transform: uppercase;
-            color: #4a5270;
-            margin-bottom: 8px;
-        }
-        .form-input {
-            width: 100%;
-            background: #0d0f14;
-            border: 1px solid #1e2130;
-            border-radius: 10px;
-            padding: 11px 14px;
-            font-size: 13px;
-            color: #c8cfe0;
-            font-family: 'IBM Plex Sans Arabic', sans-serif;
-            transition: border-color 0.2s, box-shadow 0.2s;
-            outline: none;
-            box-sizing: border-box;
-        }
-        .form-input:focus {
-            border-color: #d4a85366;
-            box-shadow: 0 0 0 3px rgba(212,168,83,0.07);
-        }
-        .form-input option { background: #13151c; }
-
-        /* File input */
-        .file-drop {
-            background: #0d0f14;
-            border: 1px dashed #2e3450;
-            border-radius: 10px;
-            padding: 28px;
-            text-align: center;
-            transition: border-color 0.2s;
-            cursor: pointer;
-            position: relative;
-        }
-        .file-drop:hover { border-color: #d4a85355; }
-        .file-drop input[type="file"] {
-            position: absolute; inset: 0;
-            width: 100%; height: 100%;
-            opacity: 0; cursor: pointer;
-        }
-        .file-drop-icon { font-size: 28px; margin-bottom: 8px; opacity: 0.4; }
-        .file-drop-label { font-size: 13px; color: #3d4460; }
-        .file-drop-sub { font-size: 11px; color: #2a2f45; margin-top: 4px; }
-
-        /* Checkbox */
-        .checkbox-row {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        .checkbox-row input[type="checkbox"] {
-            width: 16px; height: 16px;
-            accent-color: #d4a853;
-            cursor: pointer;
-        }
-        .checkbox-row label {
-            font-size: 13px;
-            color: #8891aa;
-            cursor: pointer;
-        }
-
-        /* Buttons */
-        .btn-gold {
-            width: 100%;
-            background: linear-gradient(135deg, #d4a853, #f0c97a);
-            color: #0d0f14;
-            font-size: 12px;
-            font-weight: 800;
-            letter-spacing: 2px;
-            text-transform: uppercase;
-            padding: 13px;
-            border: none;
-            border-radius: 10px;
-            cursor: pointer;
-            transition: opacity 0.2s, transform 0.1s;
-            font-family: 'IBM Plex Sans Arabic', sans-serif;
-        }
-        .btn-gold:hover { opacity: 0.9; transform: translateY(-1px); }
-        .btn-gold:active { transform: translateY(0); }
-
-        .btn-outline-gold {
-            width: 100%;
-            background: transparent;
-            color: #d4a853;
-            font-size: 12px;
-            font-weight: 700;
-            letter-spacing: 2px;
-            text-transform: uppercase;
-            padding: 12px;
-            border: 1px solid #d4a85355;
-            border-radius: 10px;
-            cursor: pointer;
-            transition: background 0.2s, border-color 0.2s;
-            font-family: 'IBM Plex Sans Arabic', sans-serif;
-        }
-        .btn-outline-gold:hover { background: #d4a85315; border-color: #d4a853; }
-
-        /* Gallery grid */
-        .gallery-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-            gap: 14px;
-        }
-        .img-card {
-            background: #0d0f14;
-            border: 1px solid #1e2130;
-            border-radius: 12px;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-            transition: border-color 0.2s, transform 0.2s;
-        }
-        .img-card:hover { border-color: #2e3450; transform: translateY(-2px); }
-
-        .img-thumb {
-            width: 100%;
-            aspect-ratio: 4/3;
-            object-fit: cover;
-            display: block;
-        }
-
-        .img-body { padding: 14px; flex: 1; display: flex; flex-direction: column; justify-content: space-between; }
-        .img-name {
-            font-size: 13px;
-            font-weight: 600;
-            color: #c8cfe0;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            margin-bottom: 4px;
-        }
-        .img-album-label {
-            font-size: 10px;
-            color: #d4a853;
-            font-weight: 600;
-            margin-bottom: 8px;
-        }
-        .tags-row { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 10px; }
-        .tag-pill {
-            font-size: 9px;
-            font-weight: 600;
-            letter-spacing: 1px;
-            color: #4a5270;
-            background: #13151c;
-            border: 1px solid #1e2130;
-            padding: 3px 7px;
-            border-radius: 4px;
-        }
-
-        .img-footer {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-top: 6px;
-        }
-        .privacy-badge {
-            font-size: 9px;
-            font-weight: 700;
-            letter-spacing: 2px;
-            text-transform: uppercase;
-            padding: 4px 8px;
-            border-radius: 5px;
-        }
-        .privacy-public { background: #0a1f10; color: #34d399; border: 1px solid #1a4a22; }
-        .privacy-private { background: #1a0a0a; color: #f87171; border: 1px solid #4a1515; }
-
-        .img-size { font-size: 10px; color: #2a2f45; }
-
-        .btn-delete {
-            width: 100%;
-            margin-top: 10px;
-            background: transparent;
-            border: 1px solid #4a1515;
-            color: #f87171;
-            font-size: 10px;
-            font-weight: 700;
-            letter-spacing: 2px;
-            text-transform: uppercase;
-            padding: 8px;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: background 0.2s;
-            font-family: 'IBM Plex Sans Arabic', sans-serif;
-        }
-        .btn-delete:hover { background: #f8717115; }
-
-        /* Empty state */
-        .empty-state {
-            text-align: center;
-            padding: 60px 20px;
-            color: #2a2f45;
-        }
-        .empty-state-icon { font-size: 40px; margin-bottom: 12px; opacity: 0.3; }
-        .empty-state p { font-size: 14px; }
-
-        /* CTA Banner */
-        .cta-banner {
-            background: #13151c;
-            border: 1px solid #1e2130;
-            border-radius: 16px;
-            padding: 32px 28px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 20px;
-            flex-wrap: wrap;
-            position: relative;
-            overflow: hidden;
-        }
-        .cta-banner::before {
-            content: '';
-            position: absolute;
-            bottom: 0; left: 0; right: 0;
-            height: 2px;
-            background: linear-gradient(90deg, transparent, #d4a85355, transparent);
-        }
-        .cta-text-label { font-size: 10px; font-weight: 700; letter-spacing: 4px; color: #d4a853; margin-bottom: 6px; }
-        .cta-text-main { font-size: 18px; font-weight: 700; color: #f1f3f9; margin: 0; }
-        .cta-text-sub { font-size: 13px; color: #3d4460; margin-top: 4px; }
-        .btn-cta {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            background: linear-gradient(135deg, #d4a853, #f0c97a);
-            color: #0d0f14;
-            font-size: 12px;
-            font-weight: 800;
-            letter-spacing: 2px;
-            text-transform: uppercase;
-            padding: 13px 24px;
-            border-radius: 10px;
-            text-decoration: none;
-            white-space: nowrap;
-            transition: opacity 0.2s, transform 0.1s;
-        }
-        .btn-cta:hover { opacity: 0.9; transform: translateY(-1px); }
-
-        /* Two-col grid */
-        .top-grid {
-            display: grid;
-            grid-template-columns: 1fr 2fr;
-            gap: 16px;
-            margin-bottom: 24px;
-        }
-        @media (max-width: 767px) {
-            .top-grid { grid-template-columns: 1fr; }
-        }
-        .upload-inner-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 16px;
-        }
-        @media (max-width: 640px) {
-            .upload-inner-grid { grid-template-columns: 1fr; }
-        }
-    </style>
-
-    <div class="mgmt-bg mgmt-wrap" dir="rtl">
-        <div class="py-10">
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-
-                <!-- Page heading -->
-                <div style="margin-bottom: 28px;">
-                    <p style="font-size:10px;font-weight:700;letter-spacing:5px;text-transform:uppercase;color:#d4a853;margin:0 0 6px 0;">OPTICVAULT</p>
-                    <h1 style="font-size:26px;font-weight:700;color:#f1f3f9;margin:0;">إدارة الصور والألبومات</h1>
-                </div>
-
-                <!-- Flash -->
-                @if(session('success'))
-                    <div class="flash-success">✓ {{ session('success') }}</div>
-                @endif
-
-                <!-- Top panels: Create album + Upload image -->
-                <div class="top-grid">
-
-                    <!-- Create album -->
-                    <div class="panel">
-                        <p class="panel-title">ألبوم جديد</p>
-                        <form action="{{ route('albums.test.store') }}" method="POST" style="display:flex;flex-direction:column;gap:16px;">
-                            @csrf
-                            <div>
-                                <label class="form-label">عنوان الألبوم</label>
-                                <input type="text" name="title" required class="form-input" placeholder="اسم الألبوم...">
-                            </div>
-                            <div>
-                                <label class="form-label">الخصوصية</label>
-                                <select name="privacy" class="form-input">
-                                    <option value="public">عام (Public)</option>
-                                    <option value="private" selected>خاص (Private)</option>
-                                    <option value="hidden">مخفي (Hidden)</option>
-                                </select>
-                            </div>
-                            <button type="submit" class="btn-outline-gold">إنشاء الألبوم</button>
-                        </form>
-                    </div>
-
-                    <!-- Upload image -->
-                    <div class="panel">
-                        <p class="panel-title">رفع صورة جديدة</p>
-                        <form action="{{ route('images.test.store') }}" method="POST" enctype="multipart/form-data" style="display:flex;flex-direction:column;gap:16px;">
-                            @csrf
-
-                            <!-- File drop zone -->
-                            <div class="file-drop">
-                                <input type="file" name="image" accept="image/*" required>
-                                <div class="file-drop-icon">📁</div>
-                                <p class="file-drop-label">اسحب الصورة هنا أو انقر للاختيار</p>
-                                <p class="file-drop-sub">PNG, JPG, WEBP</p>
-                            </div>
-                            <!-- Error displaying for 'image' field -->
-                            @error('image')
-                                <div style="color: #f87171; font-size: 12px; font-weight: 700; background: #1a0a0a; padding: 12px; border-radius: 8px; border: 1px solid #4a1515; margin-top: -8px; text-align: center;">
-                                    ⚠️ {{ $message }}
-                                </div>
-                            @enderror
-
-                            <div class="upload-inner-grid">
-                                <div>
-                                    <label class="form-label">العنوان</label>
-                                    <input type="text" name="title" class="form-input" placeholder="عنوان الصورة...">
-                                </div>
-                                <div>
-                                    <label class="form-label">الألبوم</label>
-                                    <select name="album_id" class="form-input">
-                                        <option value="">بدون ألبوم</option>
-                                        @foreach($ownedAlbums as $album)
-                                            <option value="{{ $album->id }}">{{ $album->title }} — {{ $album->privacy === 'private' ? 'خاص' : ($album->privacy === 'public' ? 'عام' : 'مخفي') }}</option>
-                                        @endforeach
-                                        @foreach($sharedAlbums as $album)
-                                            <option value="{{ $album->id }}">{{ $album->title }} (مشترك)</option>
-                                        @endforeach
-                                    </select>
-                                </div>
-                                <div style="grid-column: span 2; display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 8px;">
-                                    <p style="font-size: 11px; color: #4a5270;">أو</p>
-                                    <a href="#" onclick="document.getElementById('album-list-section').scrollIntoView({behavior: 'smooth'}); return false;" style="font-size: 12px; color: #d4a853; text-decoration: underline; font-weight: 600;">إدارة الألبومات الحالية</a>
-                                </div>
-                                <div>
-                                    <label class="form-label">الوسوم</label>
-                                    <input type="text" name="tags" class="form-input" placeholder="طبيعة, مدينة, ...">
-                                </div>
-                                <div>
-                                    <label class="form-label">الخصوصية</label>
-                                    <select name="privacy" class="form-input">
-                                        <option value="public">عامة (Public)</option>
-                                        <option value="private">خاصة (Private)</option>
-                                    </select>
-                                </div>
-                            </div>
-
-                            <button type="submit" class="btn-gold">رفع الصورة ومعالجتها</button>
-                        </form>
-                    </div>
-
-                </div>
-
-                <!-- My Albums -->
-                <div id="album-list-section" class="panel" style="margin-bottom: 24px;">
-                    <p class="panel-title">ألبوماتي الخاصة</p>
-                    @if($ownedAlbums->isEmpty())
-                        <div class="empty-state">
-                            <div class="empty-state-icon">📁</div>
-                            <p>لا توجد ألبومات تملكها بعد.</p>
-                        </div>
-                    @else
-                        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px;">
-                            @foreach($ownedAlbums as $album)
-                                <div class="panel" style="padding: 18px; display: flex; flex-direction: column; gap: 12px; background: #0d0f14;">
-                                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                                        <h3 style="font-size: 15px; font-weight: 700; color: #f1f3f9;">{{ $album->title }}</h3>
-                                        <span class="privacy-badge {{ $album->privacy === 'public' ? 'privacy-public' : ($album->privacy === 'private' ? 'privacy-private' : '') }}" style="padding: 2px 6px; font-size: 8px;">
-                                            {{ $album->privacy === 'public' ? 'عام' : ($album->privacy === 'private' ? 'خاص' : 'مخفي') }}
-                                        </span>
-                                    </div>
-                                    <p style="font-size: 11px; color: #3d4460;">{{ $album->images->count() }} صورة</p>
-                                    <div style="margin-top: auto; display: flex; gap: 10px;">
-                                        <a href="{{ route('albums.show', $album) }}" class="btn-outline-gold" style="padding: 8px; font-size: 10px; text-align: center; text-decoration: none;">إدارة الألبوم</a>
-                                    </div>
-                                </div>
-                            @endforeach
-                        </div>
-                    @endif
-                </div>
-
-                <!-- Shared Albums -->
-                @if($sharedAlbums->isNotEmpty())
-                <div class="panel" style="margin-bottom: 24px; border-color: #60a5fa33;">
-                    <p class="panel-title" style="color: #60a5fa;">ألبومات مشتركة معي</p>
-                    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px;">
-                        @foreach($sharedAlbums as $album)
-                            <div class="panel" style="padding: 18px; display: flex; flex-direction: column; gap: 12px; background: #0d0f14; border-color: #1a2c4a;">
-                                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                                    <h3 style="font-size: 15px; font-weight: 700; color: #f1f3f9;">{{ $album->title }}</h3>
-                                    <span style="font-size: 8px; background: #0a141f; color: #60a5fa; border: 1px solid #1a2c4a; padding: 2px 6px; border-radius: 5px; text-transform: uppercase; letter-spacing: 1px; font-weight: 700;">
-                                        {{ $album->pivot->role }}
-                                    </span>
-                                </div>
-                                <p style="font-size: 11px; color: #3d4460;">بواسطة: {{ $album->owner->name }} • {{ $album->images->count() }} صورة</p>
-                                <div style="margin-top: auto; display: flex; gap: 10px;">
-                                    <a href="{{ route('albums.show', $album) }}" class="btn-outline-gold" style="padding: 8px; font-size: 10px; text-align: center; text-decoration: none; border-color: #1a2c4a; color: #60a5fa;">عرض الألبوم</a>
-                                </div>
-                            </div>
-                        @endforeach
-                    </div>
-                </div>
-                @endif
-
-                <!-- My Gallery -->
-                <div class="panel" style="margin-bottom: 24px;">
-                    <p class="panel-title">معرض صوري</p>
-
-                    @if($images->isEmpty())
-                        <div class="empty-state">
-                            <div class="empty-state-icon">🖼</div>
-                            <p>لا توجد صور بعد. ارفع صورتك الأولى!</p>
-                        </div>
-                    @else
-                        <div class="gallery-grid">
-                            @foreach($images as $image)
-                                <div class="img-card">
-                                    <img src="{{ $image->url }}" class="img-thumb" alt="{{ $image->title ?? $image->filename }}" loading="lazy">
-                                    <div class="img-body">
-                                        <div>
-                                            <p class="img-name">{{ $image->title ?? $image->filename }}</p>
-                                            <p class="img-album-label">
-                                                @if($image->album)
-                                                    ✦ {{ $image->album->title }}
-                                                @else
-                                                    <span style="color:#2a2f45;">بدون ألبوم</span>
-                                                @endif
-                                            </p>
-                                            @if($image->tags->count() > 0)
-                                                <div class="tags-row">
-                                                    @foreach($image->tags as $tag)
-                                                        <span class="tag-pill">#{{ $tag->name }}</span>
-                                                    @endforeach
-                                                </div>
-                                            @endif
-                                        </div>
-                                        <div>
-                                            <div class="img-footer">
-                                                <span class="privacy-badge {{ $image->privacy === 'public' ? 'privacy-public' : 'privacy-private' }}">
-                                                    {{ $image->privacy === 'public' ? 'عام' : 'خاص' }}
-                                                </span>
-                                                <span class="img-size">{{ number_format($image->size / 1024, 1) }} KB</span>
-                                            </div>
-                                            <div style="display: flex; gap: 8px; margin-top: 10px;">
-                                                <button class="btn-share-once" onclick="generateShareOnceLink('{{ $image->id }}')" type="button" style="flex: 1; background: transparent; border: 1px solid #d4a853; color: #d4a853; font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; padding: 8px; border-radius: 8px; cursor: pointer; transition: background 0.2s;">
-                                                    مشاركة لمرة
-                                                </button>
-                                                <button onclick="openShareModal('App\\Models\\Image', '{{ $image->id }}')" type="button" style="flex: 1; background: transparent; border: 1px solid #60a5fa; color: #60a5fa; font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; padding: 8px; border-radius: 8px; cursor: pointer; transition: background 0.2s;">
-                                                    متقدمة
-                                                </button>
-                                                <form action="{{ route('images.test.destroy', $image) }}" method="POST"
-                                                      onsubmit="return confirm('هل أنت متأكد من الحذف النهائي؟');" style="flex: 1;">
-                                                    @csrf @method('DELETE')
-                                                    <button class="btn-delete" type="submit" style="margin-top: 0;">حذف</button>
-                                                </form>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            @endforeach
-                        </div>
-                    @endif
-                </div>
-
-                <!-- CTA Banner -->
-                <div class="cta-banner">
-                    <div>
-                        <p class="cta-text-label">اكتشف المزيد</p>
-                        <p class="cta-text-main">المعرض العام</p>
-                        <p class="cta-text-sub">تصفّح ما يشاركه المستخدمون الآخرون</p>
-                    </div>
-                    <a href="{{ route('gallery.index') }}" class="btn-cta">
-                        استكشف المعرض
-                        <svg style="width:14px;height:14px;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"/>
-                        </svg>
-                    </a>
-                </div>
-
+    <!-- Page Header -->
+    <div class="flex justify-between items-center">
+        <div>
+            <h2 class="text-3xl font-bold tracking-tight">إدارة <span class="accent-text-gradient">الأصول</span></h2>
+            <p class="text-gray-400 mt-1">تنظيم وحماية مكتبتك الفوتوغرافية.</p>
+        </div>
+        
+        @if(session('success'))
+            <div class="bg-green-500/10 text-green-400 border border-green-500/20 px-6 py-2 rounded-2xl flex items-center gap-2 animate-bounce">
+                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                 <span class="text-sm font-bold">{{ session('success') }}</span>
             </div>
+        @endif
+    </div>
+
+    <!-- Top Grid: Controls -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        <!-- Create Album Panel -->
+        <div class="glass p-8 rounded-[40px] flex flex-col">
+            <h3 class="text-xs font-bold uppercase tracking-widest text-purple-400 mb-6">ألبوم جديد</h3>
+            <form action="{{ route('albums.store') }}" method="POST" class="space-y-6">
+                @csrf
+                <div class="space-y-2">
+                    <label class="text-[10px] uppercase tracking-widest text-gray-500 font-bold">عنوان الألبوم</label>
+                    <input type="text" name="title" required class="w-full bg-white/5 border border-white/10 rounded-2xl p-3 px-4 focus:ring-2 focus:ring-purple-500/50 outline-none transition-all" placeholder="ذكريات الرحلة...">
+                </div>
+                <div class="space-y-2">
+                    <label class="text-[10px] uppercase tracking-widest text-gray-500 font-bold">الخصوصية</label>
+                    <select name="privacy" class="w-full bg-white/5 border border-white/10 rounded-2xl p-3 px-4 focus:ring-2 focus:ring-purple-500/50 outline-none transition-all">
+                        <option value="public" class="bg-black">عام (Public)</option>
+                        <option value="private" selected class="bg-black">خاص (Private)</option>
+                        <option value="hidden" class="bg-black">مخفي (Hidden)</option>
+                    </select>
+                </div>
+                <button type="submit" class="w-full bg-white/5 border border-white/10 hover:border-purple-500/50 hover:bg-purple-500/5 text-xs font-bold uppercase tracking-widest p-4 rounded-2xl transition-all">إنشاء الألبوم</button>
+            </form>
+        </div>
+
+        <!-- Unified Upload Panel -->
+        <div class="lg:col-span-2 glass p-8 rounded-[40px] border-purple-500/10 border relative overflow-hidden">
+            <div class="absolute top-0 right-0 p-8 opacity-5">
+                <svg class="w-24 h-24" fill="currentColor" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"></path></svg>
+            </div>
+            
+            <h3 class="text-xs font-bold uppercase tracking-widest text-purple-400 mb-6">رفع أصل احترافي</h3>
+            
+            <form action="{{ route('images.store') }}" method="POST" enctype="multipart/form-data" class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                @csrf
+                
+                <div class="space-y-4">
+                    <div class="relative group h-40 border-2 border-dashed border-white/10 rounded-3xl hover:border-purple-500/50 transition-all flex flex-col items-center justify-center bg-white/5">
+                        <input type="file" name="image" accept="image/*" required class="absolute inset-0 opacity-0 cursor-pointer">
+                        <svg class="w-10 h-10 text-gray-600 group-hover:text-purple-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                        <p class="text-[10px] font-bold uppercase tracking-tighter text-gray-500">انقر أو اسحب الصورة هنا</p>
+                    </div>
+                    @error('image') <p class="text-red-400 text-[10px] font-bold">{{ $message }}</p> @enderror
+                    
+                    <button type="submit" class="w-full accent-gradient p-4 rounded-2xl font-bold uppercase tracking-widest text-xs shadow-lg shadow-purple-500/20 hover:scale-[1.02] transition-transform">بدء المعالجة والرفع</button>
+                </div>
+
+                <div class="space-y-4">
+                    <div class="space-y-2">
+                        <label class="text-[10px] uppercase tracking-widest text-gray-500 font-bold">عنوان الصورة</label>
+                        <input type="text" name="title" class="w-full bg-white/5 border border-white/10 rounded-2xl p-3 px-4 outline-none focus:ring-2 focus:ring-purple-500/50 transition-all" placeholder="بلا عنوان...">
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="space-y-2">
+                            <label class="text-[10px] uppercase tracking-widest text-gray-500 font-bold">الألبوم</label>
+                            <select name="album_id" class="w-full bg-white/5 border border-white/10 rounded-2xl p-3 px-4 outline-none focus:ring-2 focus:ring-purple-500/50 transition-all h-12">
+                                <option value="" class="bg-black">بدون ألبوم</option>
+                                @foreach($ownedAlbums as $album)
+                                    <option value="{{ $album->id }}" class="bg-black">{{ $album->title }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="space-y-2">
+                            <label class="text-[10px] uppercase tracking-widest text-gray-500 font-bold">الخصوصية</label>
+                            <select name="privacy" class="w-full bg-white/5 border border-white/10 rounded-2xl p-3 px-4 outline-none focus:ring-2 focus:ring-purple-500/50 transition-all h-12">
+                                <option value="public" class="bg-black">عامة</option>
+                                <option value="private" selected class="bg-black">خاصة</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </form>
         </div>
     </div>
 
-    <!-- JavaScript for View Once Link -->
-    <script>
-        async function generateShareOnceLink(imageId) {
-            try {
-                // Show a loading state (Optional, could use SweetAlert but we use a simple confirm/alert for now)
-                
-                const response = await fetch(`/images/${imageId}/share-once`, {
-                    method: 'POST',
-                    headers: {
-                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                        'Accept': 'application/json',
-                        'Content-Type': 'application/json'
-                    }
-                });
+    <!-- Main Content Tabs -->
+    <div class="space-y-8">
+        
+        <!-- Section Toggle -->
+        <div class="flex items-center gap-8 border-b border-white/5 pb-2">
+            <button @click="view = 'all'" :class="view === 'all' ? 'text-white border-b-2 border-purple-500' : 'text-gray-500'" class="pb-4 font-bold tracking-tight px-2 transition-all">جميع الصور</button>
+            <button @click="view = 'albums'" :class="view === 'albums' ? 'text-white border-b-2 border-purple-500' : 'text-gray-500'" class="pb-4 font-bold tracking-tight px-2 transition-all">الألبومات</button>
+        </div>
 
-                const data = await response.json();
+        <!-- Images Grid -->
+        <div x-show="view === 'all'" x-transition class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            @foreach($images as $image)
+                <div class="glass group rounded-[32px] overflow-hidden border border-white/5 hover:border-purple-500/30 transition-all duration-500">
+                    <div class="relative h-48 overflow-hidden">
+                        <img src="{{ $image->url }}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000">
+                        <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent flex flex-col justify-end p-6 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
+                             <div class="flex flex-col gap-3">
+                                <div class="flex gap-2">
+                                    <button onclick="generateShareOnceLink('{{ $image->id }}')" class="flex-1 bg-white/10 backdrop-blur-md rounded-xl p-2 text-[10px] font-bold uppercase tracking-widest hover:bg-white/20 transition-all">مشاركة لمرة</button>
+                                    <button onclick="openShareModal('{{ $image->id }}', 'App\\Models\\Image')" class="p-2 bg-purple-500/20 backdrop-blur-md rounded-xl hover:bg-purple-500/40 transition-all">
+                                        <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6a3 3 0 100-2.684m0 2.684l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"></path></svg>
+                                    </button>
+                                </div>
+                                <form action="{{ route('images.destroy', $image) }}" method="POST" onsubmit="return confirm('حذف نهائي؟')">
+                                    @csrf @method('DELETE')
+                                    <button type="submit" class="w-full text-[10px] font-bold text-red-400 bg-red-400/5 p-2 rounded-xl hover:bg-red-400/20 transition-all border border-red-400/10 uppercase tracking-widest">حذف بشكل دائم</button>
+                                </form>
+                             </div>
+                        </div>
+                    </div>
+                    <div class="p-5">
+                        <div class="flex justify-between items-start mb-2">
+                            <h4 class="font-bold text-sm truncate max-w-[120px]">{{ $image->title ?? 'Untitled' }}</h4>
+                            <span class="text-[8px] font-bold uppercase px-2 py-0.5 rounded bg-white/5 border border-white/10 text-gray-500">{{ $image->file_type }}</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div class="w-1.5 h-1.5 rounded-full {{ $image->privacy === 'public' ? 'bg-green-500' : 'bg-red-500' }}"></div>
+                            <span class="text-[10px] text-gray-400 uppercase tracking-widest font-bold">{{ $image->privacy }}</span>
+                            <span class="text-gray-700 mx-1">•</span>
+                            <span class="text-[10px] text-gray-600 font-mono">{{ number_format($image->size / 1024 / 1024, 2) }} MB</span>
+                        </div>
+                    </div>
+                </div>
+            @endforeach
+        </div>
 
-                if (response.ok && data.success) {
-                    // Copy to clipboard
-                    await navigator.clipboard.writeText(data.url);
-                    alert("تم نسخ رابط العرض لمرة واحدة بنجاح:\n\n" + data.url + "\n\n(هذا الرابط سيتدمر فور مشاهدته للمرة الأولى)");
-                } else {
-                    alert('حدث خطأ: ' + (data.message || 'غير مصرح لك.'));
+        <!-- Albums View -->
+        <div x-show="view === 'albums'" x-transition class="space-y-8">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                @foreach($ownedAlbums as $album)
+                    <div class="glass p-6 rounded-[40px] flex gap-6 items-center group hover:bg-white/5 transition-all">
+                        <div class="w-20 h-20 rounded-3xl glass-dark border border-white/5 flex items-center justify-center relative overflow-hidden">
+                            @if($album->images->first())
+                                <img src="{{ $album->images->first()->url }}" class="w-full h-full object-cover opacity-40 group-hover:opacity-100 transition-opacity">
+                            @else
+                                <svg class="w-8 h-8 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path></svg>
+                            @endif
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h4 class="font-bold truncate text-lg">{{ $album->title }}</h4>
+                            <p class="text-xs text-gray-500 uppercase tracking-widest mt-1">{{ $album->images->count() }} Assets</p>
+                            <a href="{{ route('albums.show', $album) }}" class="inline-block mt-3 text-[10px] font-bold text-purple-400 hover:text-purple-300 transition-colors uppercase tracking-widest">إدارة المحتوى ←</a>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+    async function generateShareOnceLink(imageId) {
+        const btn = event.currentTarget;
+        const originalText = btn.innerText;
+        btn.innerText = 'جاري النسخ...';
+        btn.disabled = true;
+
+        try {
+            const response = await fetch(`/images/${imageId}/share-once`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
                 }
-            } catch (error) {
-                console.error("Error generating link:", error);
-                alert("حدث خطأ أثناء الاتصال بالخادم.");
+            });
+
+            const data = await response.json();
+
+            if (response.ok && data.success) {
+                await navigator.clipboard.writeText(data.url);
+                Swal.fire({
+                    title: 'تم النسخ!',
+                    text: 'رابط العرض لمرة واحدة جاهز الآن. سيتدمر فور مشاهدته.',
+                    icon: 'success',
+                    confirmButtonColor: '#a855f7'
+                });
             }
+        } catch (error) {
+            Swal.fire('خطأ', 'فشل إنشاء الرابط', 'error');
+        } finally {
+            btn.innerText = originalText;
+            btn.disabled = false;
         }
-    </script>
+    }
+</script>
 
-    @include('shared_links._generate_modal')
-
-</x-app-layout>
+@include('shared_links._generate_modal')
+@endsection

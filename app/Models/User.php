@@ -59,6 +59,8 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
         'profile_picture',
         'bio',
         'verification_code',
+        'dynamic_watermark',
+        'auto_orient_default',
         'is_verified',
         'role',
         'stay_logged_in',
@@ -79,6 +81,8 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_verified' => 'boolean',
+            'dynamic_watermark' => 'boolean',
+            'auto_orient_default' => 'boolean',
             'role' => 'string',
             'stay_logged_in' => 'boolean',
         ];
@@ -143,13 +147,20 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
 
     /**
      * الحصول على رابط الصورة الشخصية أو صورة افتراضية.
+     * يستخدم النسخة المحسنة (avatar.webp) إذا كانت متوفرة.
      */
     public function getAvatarAttribute(): string
     {
         if ($this->profile_picture) {
+            // If it's a full URL (like UI Avatars), return it
+            if (filter_var($this->profile_picture, FILTER_VALIDATE_URL)) {
+                return $this->profile_picture;
+            }
+
+            // Return the stored path (which is already optimized to 150x150 WebP)
             return asset('storage/' . $this->profile_picture);
         }
 
-        return 'https://ui-avatars.com/api/?name=' . urlencode($this->name) . '&color=7F9CF5&background=EBF4FF';
+        return 'https://ui-avatars.com/api/?name=' . urlencode($this->name) . '&color=7F9CF5&background=EBF4FF&size=150';
     }
 }

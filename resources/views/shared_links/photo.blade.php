@@ -1,71 +1,102 @@
-<x-guest-layout>
-    <div style="min-height: 100vh; background: #0d0f14; color: #f1f3f9; display: flex; align-items: center; justify-content: center; font-family: 'IBM Plex Sans Arabic', sans-serif;" dir="rtl">
-        <div style="max-width: 900px; margin: 0 auto; padding: 40px 20px; width: 100%;">
-            <div style="background: #13151c; border: 1px solid #1e2130; border-radius: 20px; overflow: hidden; box-shadow: 0 20px 50px rgba(0,0,0,0.5);">
-                <div style="position: relative;">
-                    <img src="{{ $photo->url }}" alt="{{ $photo->title }}" style="width: 100%; max-height: 70vh; object-fit: contain; background: #000;">
+<!DOCTYPE html>
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="dark">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ $photo->title }} | FocusHub Shared Asset</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Outfit', sans-serif; background: #0a0a0c; color: #e1e1e6; }
+        .glass { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.05); }
+        .glass-dark { background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.05); }
+        .accent-gradient { background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%); }
+    </style>
+</head>
+<body class="antialiased min-h-screen bg-[#0a0a0c] overflow-x-hidden" dir="rtl">
+    
+    <div class="fixed inset-0 pointer-events-none">
+        <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-purple-600/5 blur-[120px]"></div>
+    </div>
+
+    <div class="relative min-h-screen flex flex-col p-6 lg:p-12">
+        <div class="max-w-6xl mx-auto w-full flex-1 flex flex-col gap-12 justify-center">
+            
+            <!-- Asset Card -->
+            <div class="glass-dark rounded-[40px] border border-white/5 overflow-hidden shadow-2xl flex flex-col lg:flex-row min-h-[600px]">
+                <!-- Image Side -->
+                <div class="lg:w-2/3 bg-black/40 flex items-center justify-center p-4 min-h-[400px]">
+                    <img src="{{ $photo->url }}" alt="{{ $photo->title }}" class="max-w-full max-h-[80vh] shadow-2xl rounded-lg">
                 </div>
-                <div style="padding: 32px;">
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px;">
+
+                <!-- Info Side -->
+                <div class="lg:w-1/3 p-8 lg:p-12 border-t lg:border-t-0 lg:border-r border-white/5 flex flex-col justify-between">
+                    <div class="space-y-8">
                         <div>
-                            <h1 style="font-size: 24px; font-weight: 700; color: #d4a853; margin-bottom: 8px;">{{ $photo->title }}</h1>
-                            <p style="color: #c8cfe0; line-height: 1.6;">{{ $photo->description }}</p>
-                        </div>
-                        <div style="text-align: left;">
-                            <span style="display: block; font-size: 12px; color: #4a5270;">تحميلات: {{ $photo->downloads_count }}</span>
-                            <span style="display: block; font-size: 12px; color: #4a5270;">مشاهدات: {{ $photo->views_count }}</span>
-                        </div>
-                    </div>
-                    
-                    @if(!empty($photo->metadata))
-                    <div style="background: #0d0f14; border: 1px solid #1e2130; border-radius: 12px; padding: 16px; margin-top: 16px; margin-bottom: 24px; display: flex; gap: 24px; flex-wrap: wrap;">
-                        @if(isset($photo->metadata['CameraModel']))
-                        <div>
-                            <span style="display: block; font-size: 10px; color: #4a5270; text-transform: uppercase; letter-spacing: 1px;">الكاميرا</span>
-                            <span style="font-size: 13px; font-weight: 600; color: #c8cfe0;">{{ $photo->metadata['CameraModel'] }}</span>
-                        </div>
-                        @endif
-                        @if(isset($photo->metadata['ApertureValue']))
-                        <div>
-                            <span style="display: block; font-size: 10px; color: #4a5270; text-transform: uppercase; letter-spacing: 1px;">الفتحة</span>
-                            <span style="font-size: 13px; font-weight: 600; color: #c8cfe0;">{{ $photo->metadata['ApertureValue'] }}</span>
-                        </div>
-                        @endif
-                        @if(isset($photo->metadata['ShutterSpeed']))
-                        <div>
-                            <span style="display: block; font-size: 10px; color: #4a5270; text-transform: uppercase; letter-spacing: 1px;">السرعة</span>
-                            <span style="font-size: 13px; font-weight: 600; color: #c8cfe0;">{{ $photo->metadata['ShutterSpeed'] }}s</span>
-                        </div>
-                        @endif
-                        @if(isset($photo->metadata['ISO']))
-                        <div>
-                            <span style="display: block; font-size: 10px; color: #4a5270; text-transform: uppercase; letter-spacing: 1px;">ISO</span>
-                            <span style="font-size: 13px; font-weight: 600; color: #c8cfe0;">{{ $photo->metadata['ISO'] }}</span>
-                        </div>
-                        @endif
-                    </div>
-                    @endif
-                    
-                    <div style="border-top: 1px solid #1e2130; padding-top: 24px; display: flex; align-items: center; justify-content: space-between;">
-                        <div style="display: flex; align-items: center; gap: 12px;">
-                            <div style="width: 40px; height: 40px; background: #1e2130; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #d4a853; font-weight: 700;">
-                                {{ mb_substr($photo->user->name, 0, 1) }}
+                            <div class="inline-block px-3 py-1 rounded-full glass border-white/5 text-[8px] font-bold uppercase tracking-widest text-purple-400 mb-4">
+                                Shared Asset
                             </div>
+                            <h1 class="text-3xl font-bold text-white mb-4">{{ $photo->title }}</h1>
+                            <p class="text-gray-400 leading-relaxed text-sm">{{ $photo->description }}</p>
+                        </div>
+
+                        <!-- Technical Stats -->
+                        @if(!empty($photo->metadata))
+                        <div class="grid grid-cols-2 gap-4">
+                            @if(isset($photo->metadata['CameraModel']))
+                            <div class="glass p-4 rounded-2xl border border-white/5">
+                                <p class="text-[8px] font-bold text-gray-500 uppercase tracking-widest mb-1">الكاميرا</p>
+                                <p class="text-xs font-semibold uppercase">{{ $photo->metadata['CameraModel'] }}</p>
+                            </div>
+                            @endif
+                            @if(isset($photo->metadata['ApertureValue']))
+                            <div class="glass p-4 rounded-2xl border border-white/5">
+                                <p class="text-[8px] font-bold text-gray-500 uppercase tracking-widest mb-1">الفتحة</p>
+                                <p class="text-xs font-semibold">{{ $photo->metadata['ApertureValue'] }}</p>
+                            </div>
+                            @endif
+                            @if(isset($photo->metadata['ISO']))
+                            <div class="glass p-4 rounded-2xl border border-white/5">
+                                <p class="text-[8px] font-bold text-gray-500 uppercase tracking-widest mb-1">ISO</p>
+                                <p class="text-xs font-semibold">{{ $photo->metadata['ISO'] }}</p>
+                            </div>
+                            @endif
+                            <div class="glass p-4 rounded-2xl border border-white/5">
+                                <p class="text-[8px] font-bold text-gray-500 uppercase tracking-widest mb-1">الأبعاد</p>
+                                <p class="text-xs font-semibold">{{ $photo->width }} × {{ $photo->height }}</p>
+                            </div>
+                        </div>
+                        @endif
+
+                        <!-- Creator -->
+                        <div class="flex items-center gap-4 p-4 glass rounded-[32px] border border-white/5">
+                            <img src="{{ $photo->user->avatar }}" class="w-12 h-12 rounded-full border border-purple-500/30 p-0.5">
                             <div>
-                                <span style="display: block; font-size: 14px; font-weight: 600; color: #f1f3f9;">{{ $photo->user->name }}</span>
-                                <span style="display: block; font-size: 12px; color: #4a5270;">تم الرفع في {{ $photo->created_at->format('Y-m-d') }}</span>
+                                <p class="text-[8px] text-gray-500 font-bold uppercase tracking-widest">المصور</p>
+                                <p class="text-sm font-bold">{{ $photo->user->name }}</p>
                             </div>
                         </div>
-                        
+                    </div>
+
+                    <div class="pt-8">
                         @if($link->permission === 'download')
-                            <a href="{{ $photo->url }}" download class="btn" 
-                               style="background: #d4a853; color: #0d0f14; padding: 10px 24px; border-radius: 10px; font-weight: 700; text-decoration: none; transition: opacity 0.2s;">
-                                تحميل الصورة
+                            <a href="{{ $photo->url }}" download class="w-full inline-flex items-center justify-center gap-3 accent-gradient p-5 rounded-3xl font-bold uppercase tracking-widest text-[10px] shadow-lg shadow-purple-500/20 hover:scale-[1.02] transition-all">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                                تحميل الملف الأصلي
                             </a>
+                        @else
+                            <div class="w-full text-center glass p-5 rounded-3xl text-gray-500 text-[10px] font-bold uppercase tracking-widest">
+                                العرض فقط متاح حالياً
+                            </div>
                         @endif
                     </div>
                 </div>
             </div>
         </div>
+
+        <footer class="text-center pt-12">
+            <p class="text-gray-500 text-xs">مشاركة آمنة عبر <span class="text-white font-bold tracking-tight">Focus<span class="text-purple-500">Hub</span></span></p>
+        </footer>
     </div>
-</x-guest-layout>
+</body>
+</html>

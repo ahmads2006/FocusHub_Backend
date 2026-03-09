@@ -17,7 +17,7 @@ class ShadowPrivacyScope implements Scope
     {
         $user = auth()->user();
 
-        if ($user && ($user->hasRole('super_admin') || $user->id === $model->user_id)) {
+        if ($user && $user->hasRole('super_admin')) {
             return; // super_admin يرى كل شيء
         }
 

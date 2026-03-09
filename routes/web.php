@@ -42,7 +42,9 @@ Route::middleware(['auth', 'check.verified', 'check.banned', 'check.timeout'])->
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::put('/profile/security', [ProfileController::class, 'updateSecurity'])->name('profile.security.update');
-Route::get('/profile/stay-logged-info', [ProfileController::class, 'stayLoggedInfo'])->name('profile.stayLoggedInfo');
+    Route::put('/profile/photography', [ProfileController::class, 'updatePhotography'])->name('profile.photography.update');
+    Route::post('/profile/avatar', [ProfileController::class, 'updateAvatar'])->name('profile.avatar.update');
+    Route::get('/profile/info', [ProfileController::class, 'stayLoggedInfo'])->name('profile.info');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
@@ -51,12 +53,18 @@ Route::get('/profile/stay-logged-info', [ProfileController::class, 'stayLoggedIn
     Route::get('/activities', [ActivityController::class, 'index'])->middleware('permission:view-activity-logs')->name('activities.index');
 
     // إدارة الصور والألبومات (Consolidated)
-    Route::get('/manage-images', [ImageController::class, 'manage'])->name('images.test.index');
-    Route::post('/manage-images', [ImageController::class, 'store'])->name('images.test.store');
-    Route::delete('/manage-images/{image}', [ImageController::class, 'destroy'])->name('images.test.destroy');
-    Route::post('/manage-albums', [ImageController::class, 'storeAlbum'])->name('albums.test.store');
+    Route::get('/manage-images', [ImageController::class, 'manage'])->name('images.index');
+    Route::post('/manage-images', [ImageController::class, 'store'])->name('images.store');
+    Route::delete('/manage-images/{image}', [ImageController::class, 'destroy'])->name('images.destroy');
+    Route::post('/manage-albums', [ImageController::class, 'storeAlbum'])->name('albums.store');
 
     Route::get('/gallery', [ImageController::class, 'gallery'])->name('gallery.index');
+
+    // Laboratory (Feature Testing)
+    Route::get('/lab', function() {
+        return view('lab.dashboard');
+    })->name('lab.index');
+    Route::post('/lab/process', [\App\Http\Controllers\LabController::class, 'process'])->name('lab.process');
 
     // Album Collaboration & Management
     Route::get('/albums/{album}', [AlbumController::class, 'show'])->name('albums.show');
@@ -105,5 +113,7 @@ Route::middleware(['auth', 'check.verified'])->post('/images/{image}/share-once'
 
 // Generate Custom Shared Link (Authenticated)
 Route::middleware(['auth', 'check.verified'])->post('/share/generate', [App\Http\Controllers\SharedLinkController::class, 'generate'])->name('share.generate');
+
+Route::middleware(['signed'])->get('/assets/original/{image}', [App\Http\Controllers\AssetAccessController::class, 'serveOriginal'])->name('assets.original');
 
 require __DIR__.'/auth.php';

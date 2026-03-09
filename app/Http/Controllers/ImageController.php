@@ -40,6 +40,7 @@ class ImageController extends Controller
             'privacy' => 'in:public,private',
             'album_id' => 'nullable|exists:albums,id',
             'title' => 'nullable|string|max:255',
+            'auto_orient' => 'nullable|boolean',
         ]);
 
         if ($request->filled('album_id')) {

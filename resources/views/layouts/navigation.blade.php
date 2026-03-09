@@ -157,9 +157,9 @@
                    class="nav-link {{ request()->routeIs('dashboard') ? 'active' : '' }}">
                     لوحة التحكم
                 </a>
-                <a href="{{ route('images.test.index') }}"
-                   class="nav-link {{ request()->routeIs('images.test.*') ? 'active' : '' }}">
-                    إدارة الصور
+                <a href="{{ route('images.index') }}"
+                   class="nav-link {{ request()->routeIs('images.index') ? 'active' : '' }}">
+                    إدارة المحتوى
                 </a>
                 <a href="{{ route('gallery.index') }}"
                    class="nav-link {{ request()->routeIs('gallery.index') ? 'active' : '' }}">
@@ -243,7 +243,7 @@
     <!-- Mobile menu -->
     <div :class="{'block': open, 'hidden': !open}" class="hidden mobile-menu">
         <a href="{{ route('dashboard') }}" class="mobile-link {{ request()->routeIs('dashboard') ? 'active' : '' }}">لوحة التحكم</a>
-        <a href="{{ route('images.test.index') }}" class="mobile-link {{ request()->routeIs('images.test.*') ? 'active' : '' }}">إدارة الصور</a>
+        <a href="{{ route('images.index') }}" class="mobile-link {{ request()->routeIs('images.index') ? 'active' : '' }}">إدارة المحتوى</a>
         <a href="{{ route('gallery.index') }}" class="mobile-link {{ request()->routeIs('gallery.index') ? 'active' : '' }}">المعرض العام</a>
         @can('view-activity-logs')
             <a href="{{ route('activities.index') }}" class="mobile-link {{ request()->routeIs('activities.index') ? 'active' : '' }}">سجل النشاطات</a>
