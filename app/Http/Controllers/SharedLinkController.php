@@ -41,6 +41,8 @@ class SharedLinkController extends Controller
             'shareable_type' => 'required|string|in:App\Models\Image,App\Models\Album',
             'expires_in' => 'nullable|integer', // hours
             'permission' => 'nullable|in:view,download',
+            'max_access' => 'nullable|integer|min:1',
+            'auto_rotate' => 'nullable|boolean',
         ]);
 
         $modelClass = $request->shareable_type;
@@ -52,8 +54,10 @@ class SharedLinkController extends Controller
 
         $expiry = $request->expires_in ? now()->addHours($request->expires_in) : null;
         $permission = $request->permission ?? 'view';
+        $maxAccess = $request->max_access;
+        $autoRotate = $request->input('auto_rotate', false);
 
-        $link = $this->service->generate($model, $expiry, null, null, $permission);
+        $link = $this->service->generate($model, $expiry, null, $maxAccess, $permission, $autoRotate);
         $url = $this->service->getFullUrl($link);
 
         return response()->json([

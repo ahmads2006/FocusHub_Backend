@@ -15,6 +15,8 @@ class SharedLink extends Model
         'shareable_type',
         'token',
         'password',
+        'session_id',
+        'auto_rotate',
         'permission',
         'expires_at',
         'access_count',
@@ -33,6 +35,7 @@ class SharedLink extends Model
         'revoked_at' => 'datetime',
         'access_count' => 'integer',
         'max_access' => 'integer',
+        'auto_rotate' => 'boolean',
     ];
 
     public function shareable(): MorphTo

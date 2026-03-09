@@ -42,6 +42,7 @@ class Image extends Model implements HasMedia
         'size',
         'privacy',
         'exif_data',
+        'metadata',
         'is_comparison',
         'views_count',
         'downloads_count',
@@ -50,6 +51,7 @@ class Image extends Model implements HasMedia
 
     protected $casts = [
         'exif_data' => 'json',
+        'metadata' => 'array',
         'is_comparison' => 'boolean',
         'copyright_enabled' => 'boolean',
     ];

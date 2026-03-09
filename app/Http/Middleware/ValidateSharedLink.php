@@ -22,6 +22,33 @@ class ValidateSharedLink
             abort(404, 'Shared link is invalid or expired.');
         }
 
+        // Handle token rotation and session locking
+        if ($link->auto_rotate) {
+            $sessionId = $request->session()->getId();
+
+            if (empty($link->session_id)) {
+                // First visit: lock link to this session and rotate token
+                $newToken = \Illuminate\Support\Str::random(64);
+                
+                $link->update([
+                    'session_id' => $sessionId,
+                    'token' => $newToken,
+                ]);
+
+                // Store an indicator that we just rotated the token
+                // to avoid incrementing access count twice on redirect
+                $request->session()->flash("rotated_link_{$link->id}", true);
+
+                // Redirect to the new secure URL
+                return redirect()->route('shared.link.show', $newToken);
+            } else {
+                // Secondary visits: verify session matches
+                if ($link->session_id !== $sessionId) {
+                    abort(403, 'هذا الرابط مخصص لجلسة أخرى غير مصرح لك بفتحه.');
+                }
+            }
+        }
+
         // Handle password protection
         if ($link->password && !$request->session()->get("link_auth_{$link->id}")) {
             // If it's the POST request for password verification, let it through to controller
@@ -32,9 +59,11 @@ class ValidateSharedLink
             return response()->view('shared_links.password', ['link' => $link]);
         }
 
-        // Increment access count
-        $link->increment('access_count');
-        $link->update(['last_accessed_at' => now()]);
+        // Increment access count (unless we just rotated the token and redirected)
+        if (!$request->session()->has("rotated_link_{$link->id}")) {
+            $link->increment('access_count');
+            $link->update(['last_accessed_at' => now()]);
+        }
 
         // Store link in request for controller usage
         $request->attributes->set('shared_link', $link);

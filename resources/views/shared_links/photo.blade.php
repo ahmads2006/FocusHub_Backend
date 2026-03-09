@@ -17,6 +17,35 @@
                         </div>
                     </div>
                     
+                    @if(!empty($photo->metadata))
+                    <div style="background: #0d0f14; border: 1px solid #1e2130; border-radius: 12px; padding: 16px; margin-top: 16px; margin-bottom: 24px; display: flex; gap: 24px; flex-wrap: wrap;">
+                        @if(isset($photo->metadata['CameraModel']))
+                        <div>
+                            <span style="display: block; font-size: 10px; color: #4a5270; text-transform: uppercase; letter-spacing: 1px;">الكاميرا</span>
+                            <span style="font-size: 13px; font-weight: 600; color: #c8cfe0;">{{ $photo->metadata['CameraModel'] }}</span>
+                        </div>
+                        @endif
+                        @if(isset($photo->metadata['ApertureValue']))
+                        <div>
+                            <span style="display: block; font-size: 10px; color: #4a5270; text-transform: uppercase; letter-spacing: 1px;">الفتحة</span>
+                            <span style="font-size: 13px; font-weight: 600; color: #c8cfe0;">{{ $photo->metadata['ApertureValue'] }}</span>
+                        </div>
+                        @endif
+                        @if(isset($photo->metadata['ShutterSpeed']))
+                        <div>
+                            <span style="display: block; font-size: 10px; color: #4a5270; text-transform: uppercase; letter-spacing: 1px;">السرعة</span>
+                            <span style="font-size: 13px; font-weight: 600; color: #c8cfe0;">{{ $photo->metadata['ShutterSpeed'] }}s</span>
+                        </div>
+                        @endif
+                        @if(isset($photo->metadata['ISO']))
+                        <div>
+                            <span style="display: block; font-size: 10px; color: #4a5270; text-transform: uppercase; letter-spacing: 1px;">ISO</span>
+                            <span style="font-size: 13px; font-weight: 600; color: #c8cfe0;">{{ $photo->metadata['ISO'] }}</span>
+                        </div>
+                        @endif
+                    </div>
+                    @endif
+                    
                     <div style="border-top: 1px solid #1e2130; padding-top: 24px; display: flex; align-items: center; justify-content: space-between;">
                         <div style="display: flex; align-items: center; gap: 12px;">
                             <div style="width: 40px; height: 40px; background: #1e2130; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #d4a853; font-weight: 700;">

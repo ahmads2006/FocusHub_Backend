@@ -10,11 +10,23 @@ use Intervention\Image\Drivers\Gd\Driver;
 
 class ImageUploadService
 {
+    protected $contentSafety;
+    protected $metadataService;
+
+    public function __construct(ContentSafetyService $contentSafety, MetadataService $metadataService)
+    {
+        $this->contentSafety = $contentSafety;
+        $this->metadataService = $metadataService;
+    }
+
     /**
      * Process and upload image
      */
     public function upload(UploadedFile $file, array $data, string $userId): Image
     {
+        // 1. Run Content Safety Check before any processing
+        $this->contentSafety->validate($file);
+
         $filename = uniqid() . '_' . time() . '.' . $file->getClientOriginalExtension();
         $disk = 'public'; 
         $directory = 'images/' . date('Y/m');
@@ -28,7 +40,10 @@ class ImageUploadService
         $imageProc->scaleDown(1200, 1200); // Higher res for "original"
         $imageProc->save($absolutePath, quality: 80);
 
-        // Extract EXIF if needed (simplified)
+        // Extract structured EXIF metadata
+        $metadata = $this->metadataService->extract($file);
+
+        // Keep raw EXIF as fallback if needed
         $exif = [];
         try {
             $exif = @exif_read_data($file->getRealPath());
@@ -44,6 +59,7 @@ class ImageUploadService
             'size' => $file->getSize(),
             'privacy' => $data['privacy'] ?? 'public',
             'exif_data' => $exif,
+            'metadata' => $metadata,
             'is_comparison' => $data['is_comparison'] ?? false,
         ]);
     }
