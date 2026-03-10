@@ -1,67 +1,88 @@
-<x-app-layout>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap');
-        .admin-wrap * { font-family: 'IBM Plex Sans Arabic', sans-serif; }
-        .admin-bg { background-color: #0d0f14; min-height: 100vh; color: #f1f3f9; }
-        .hash-table { width: 100%; border-collapse: separate; border-spacing: 0 8px; }
-        .hash-table th { padding: 12px 20px; text-align: right; color: #4a5270; text-transform: uppercase; font-size: 11px; letter-spacing: 2px; }
-        .hash-row { background: #13151c; transition: all 0.2s; }
-        .hash-row:hover { background: #1a1d26; }
-        .hash-cell { padding: 16px 20px; border-top: 1px solid #1e2130; border-bottom: 1px solid #1e2130; }
-        .hash-cell:first-child { border-right: 1px solid #1e2130; border-radius: 0 12px 12px 0; }
-        .hash-cell:last-child { border-left: 1px solid #1e2130; border-radius: 12px 0 0 12px; }
-        .hash-string { font-family: monospace; color: #d4a853; background: #00000044; padding: 4px 8px; border-radius: 4px; font-size: 13px; }
-        .reason-badge { font-size: 10px; background: #f8717122; color: #f87171; padding: 4px 8px; border-radius: 6px; }
-        .btn-unban { color: #34d399; font-size: 12px; font-weight: 700; background: none; border: none; cursor: pointer; }
-        .btn-unban:hover { text-decoration: underline; }
-    </style>
+@extends('layouts.premium')
 
-    <div class="admin-bg admin-wrap" dir="rtl">
-        <div class="py-12">
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div class="flex justify-between items-end mb-8">
-                    <div>
-                        <p class="text-xs uppercase tracking-widest text-gold mb-2" style="color:#d4a853">القائمة السوداء</p>
-                        <h1 class="text-3xl font-bold">بصمات الصور المحظورة</h1>
-                    </div>
-                </div>
+@section('title', 'Banned Hash Registry')
 
-                <div class="overflow-x-auto">
-                    <table class="hash-table">
-                        <thead>
-                            <tr>
-                                <th>البصمة (MD5)</th>
-                                <th>سبب الحظر</th>
-                                <th>التاريخ</th>
-                                <th>الإجراء</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @forelse($hashes as $hash)
-                                <tr class="hash-row">
-                                    <td class="hash-cell"><span class="hash-string">{{ $hash->hash }}</span></td>
-                                    <td class="hash-cell"><span class="reason-badge">{{ $hash->reason }}</span></td>
-                                    <td class="hash-cell text-xs text-gray-500">{{ $hash->created_at->format('Y/m/d H:i') }}</td>
-                                    <td class="hash-cell">
-                                        <form action="{{ route('admin.banned_hashes.destroy', $hash) }}" method="POST" onsubmit="return confirm('هل تريد إزالة هذه البصمة من قائمة الحظر؟');">
-                                            @csrf @method('DELETE')
-                                            <button class="btn-unban">إلغاء حظر</button>
-                                        </form>
-                                    </td>
-                                </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="4" class="text-center py-20 text-gray-600">لا توجد بصمات محظورة حالياً.</td>
-                                </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                </div>
-
-                <div class="mt-8">
-                    {{ $hashes->links() }}
-                </div>
-            </div>
+@section('content')
+<div class="space-y-8" dir="rtl">
+    
+    <!-- Header -->
+    <div class="flex justify-between items-end flex-wrap gap-6">
+        <div>
+            <h2 class="text-3xl font-bold tracking-tight">قائمة <span class="accent-text-gradient">البصمات المحظورة</span></h2>
+            <p class="text-gray-400 mt-1">السجل الأسود لبصمات الملفات (MD5) الممنوعة من الرفع دولياً.</p>
+        </div>
+        <div class="flex items-center gap-6">
+            <a href="{{ route('admin.photos.index') }}" class="text-[10px] font-bold uppercase tracking-[0.2em] {{ request()->routeIs('admin.photos.index') ? 'text-purple-400' : 'text-gray-500 hover:text-gray-300' }} transition-colors">جميع الصور</a>
+            <a href="{{ route('admin.banned_hashes.index') }}" class="text-[10px] font-bold uppercase tracking-[0.2em] {{ request()->routeIs('admin.banned_hashes.index') ? 'text-purple-400' : 'text-gray-500 hover:text-gray-300' }} transition-colors">البصمات المحظورة</a>
+            <a href="{{ route('admin.dashboard') }}" class="text-[10px] font-bold text-gray-700 hover:text-white transition-colors uppercase tracking-[0.2em]">← العودة</a>
         </div>
     </div>
-</x-app-layout>
+
+    <!-- Banned Hashes Table -->
+    <div class="glass rounded-[40px] overflow-hidden border border-white/5">
+        <div class="overflow-x-auto">
+            <table class="w-full text-right">
+                <thead>
+                    <tr class="border-b border-white/5">
+                        <th class="p-8 text-[10px] font-bold uppercase tracking-[0.2em] text-purple-400">البصمة الرقمية (MD5)</th>
+                        <th class="p-8 text-[10px] font-bold uppercase tracking-[0.2em] text-purple-400">سبب الحظر القاطع</th>
+                        <th class="p-8 text-[10px] font-bold uppercase tracking-[0.2em] text-purple-400">تاريخ الإدراج</th>
+                        <th class="p-8 text-[10px] font-bold uppercase tracking-[0.2em] text-purple-400">إجراءات</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-white/5">
+                    @forelse($hashes as $hash)
+                        <tr class="group hover:bg-white/5 transition-all">
+                            <td class="p-8">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
+                                    <code class="text-xs font-mono text-purple-400 bg-purple-500/5 px-3 py-1.5 rounded-xl border border-purple-500/10 tracking-widest">{{ $hash->hash }}</code>
+                                </div>
+                            </td>
+                            <td class="p-8">
+                                <span class="px-3 py-1 rounded-full text-[8px] font-bold border border-red-500/20 text-red-500 bg-red-500/5 uppercase tracking-widest italic">
+                                    {{ $hash->reason }}
+                                </span>
+                            </td>
+                            <td class="p-8">
+                                <div class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{{ $hash->created_at->format('Y.m.d') }}</div>
+                                <div class="text-[9px] text-gray-700 font-mono mt-1">{{ $hash->created_at->format('H:i') }}</div>
+                            </td>
+                            <td class="p-8">
+                                <form action="{{ route('admin.banned_hashes.destroy', $hash) }}" method="POST" onsubmit="return confirm('إلغاء حظر هذه البصمة؟');">
+                                    @csrf @method('DELETE')
+                                    <button class="text-[10px] font-bold text-green-500 hover:text-green-400 uppercase tracking-widest transition-colors">إعادة السماح</button>
+                                </form>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="4" class="p-20 text-center text-gray-600 font-bold uppercase tracking-widest text-[10px]">لا توجد بصمات في القائمة السوداء حالياً</td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+
+        @if($hashes->hasPages())
+            <div class="p-8 border-t border-white/5">
+                {{ $hashes->links() }}
+            </div>
+        @endif
+    </div>
+
+    <!-- Security Panel -->
+    <div class="p-8 glass-dark rounded-[40px] border border-white/5 flex items-center justify-between gap-8">
+        <div class="space-y-2">
+            <h4 class="text-sm font-bold text-gray-300">أمن البيانات وحماية الأرشفة</h4>
+            <p class="text-xs text-gray-500 leading-relaxed max-w-xl">
+                يتم استخدام بصمات MD5 الممنوعة كطبقة حماية نهائية لمنع إعادة رفع المحتوى المخالف للسياسات أو المحتوى الضار. بمجرد حظر البصمة، لن يتمكن أي مستخدم من رفع نفس الملف حتى لو قام بتغيير اسمه.
+            </p>
+        </div>
+        <div class="text-right">
+            <div class="text-3xl font-bold accent-text-gradient">{{ str_pad($hashes->total(), 2, '0', STR_PAD_LEFT) }}</div>
+            <div class="text-[9px] font-bold text-gray-600 uppercase tracking-widest mt-1">إجمالي المحظورات</div>
+        </div>
+    </div>
+</div>
+@endsection

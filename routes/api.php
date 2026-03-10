@@ -9,7 +9,7 @@ Route::middleware(['auth:sanctum', 'check.banned'])->group(function () {
         return $request->user();
     });
 
-    Route::apiResource('images', App\Http\Controllers\Api\ImageController::class);
+    Route::apiResource('images', App\Http\Controllers\Api\ImageController::class)->names('api.images');
 });
 
 // ─── Admin API (super-admin only) ──────────────────────────────

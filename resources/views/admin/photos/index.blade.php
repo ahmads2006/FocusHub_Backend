@@ -1,88 +1,92 @@
-<x-app-layout>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap');
-        .admin-wrap * { font-family: 'IBM Plex Sans Arabic', sans-serif; }
-        .admin-bg { background-color: #0d0f14; min-height: 100vh; color: #f1f3f9; }
-        .photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 24px; padding: 24px 0; }
-        .photo-card {
-            background: #13151c; border: 1px solid #1e2130; border-radius: 16px; overflow: hidden;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); position: relative;
-        }
-        .photo-card:hover { transform: translateY(-4px); border-color: #d4a853; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-        .photo-img { width: 100%; height: 200px; object-fit: cover; background: #000; }
-        .photo-info { padding: 16px; }
-        .photo-title { font-size: 14px; font-weight: 600; margin-bottom: 4px; color: #f1f3f9; }
-        .photo-meta { font-size: 12px; color: #4a5270; }
-        .photo-actions { padding: 12px; background: rgba(0,0,0,0.3); display: flex; gap: 8px; justify-content: center; border-top: 1px solid #1e2130; }
-        .badge { font-size: 10px; font-weight: 700; padding: 4px 8px; border-radius: 6px; text-transform: uppercase; }
-        .badge-public { background: #34d39922; color: #34d399; }
-        .badge-private { background: #60a5fa22; color: #60a5fa; }
-        .badge-hidden { background: #f8717122; color: #f87171; }
-        .btn-admin { font-size: 11px; font-weight: 700; padding: 8px 12px; border-radius: 8px; transition: all 0.2s; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; border: none; }
-        .btn-hide { background: #1e2130; color: #c8cfe0; }
-        .btn-hide:hover { background: #2e3450; }
-        .btn-delete { background: #f8717111; color: #f87171; }
-        .btn-delete:hover { background: #f87171; color: #fff; }
-        .btn-ban { background: #d4a85322; color: #d4a853; border: 1px solid #d4a85344; }
-        .btn-ban:hover { background: #d4a853; color: #000; }
-        .nav-link-admin { color: #4a5270; font-size: 13px; font-weight: 600; text-decoration: none; padding-bottom: 8px; border-bottom: 2px solid transparent; transition: all 0.3s; }
-        .nav-link-admin.active { color: #d4a853; border-color: #d4a853; }
-    </style>
+@extends('layouts.premium')
 
-    <div class="admin-bg admin-wrap" dir="rtl">
-        <div class="py-12">
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div class="flex justify-between items-end mb-8">
-                    <div>
-                        <p class="text-xs uppercase tracking-widest text-gold mb-2" style="color:#d4a853">الإدارة المركزية</p>
-                        <h1 class="text-3xl font-bold">إدارة الصور والرقابة</h1>
-                    </div>
-                    <div class="flex gap-6">
-                        <a href="{{ route('admin.photos.index') }}" class="nav-link-admin {{ request()->routeIs('admin.photos.index') ? 'active' : '' }}">جميع الصور</a>
-                        <a href="{{ route('admin.banned_hashes.index') }}" class="nav-link-admin {{ request()->routeIs('admin.banned_hashes.index') ? 'active' : '' }}">البصمات المحظورة</a>
-                    </div>
-                </div>
+@section('title', 'Content Moderation')
 
-                <div class="photo-grid">
-                    @forelse($images as $image)
-                        <div class="photo-card">
-                            <img src="{{ Storage::url($image->path) }}" alt="{{ $image->title }}" class="photo-img">
-                            <div class="photo-info">
-                                <div class="flex justify-between items-center mb-2">
-                                    <span class="badge badge-{{ $image->privacy }}">{{ $image->privacy }}</span>
-                                    <span class="photo-meta">{{ $image->created_at->format('Y/m/d') }}</span>
-                                </div>
-                                <h3 class="photo-title">{{ $image->title ?: 'صورة بدون عنوان' }}</h3>
-                                <p class="photo-meta">بواسطة: {{ $image->user->name }}</p>
-                            </div>
-                            <div class="photo-actions">
-                                <form action="{{ route('admin.photos.visibility', $image) }}" method="POST">
-                                    @csrf
-                                    <button class="btn-admin btn-hide">
-                                        {{ $image->privacy === 'hidden' ? 'إظهار' : 'إخفاء' }}
-                                    </button>
-                                </form>
-                                <form action="{{ route('admin.photos.destroy', $image) }}" method="POST" onsubmit="return confirm('هل أنت متأكد من الحذف النهائي؟');">
-                                    @csrf @method('DELETE')
-                                    <button class="btn-admin btn-delete">حذف</button>
-                                </form>
-                                <form action="{{ route('admin.photos.ban', $image) }}" method="POST" onsubmit="return confirm('سيتم حظر بصمة هذه الصورة ومنع رفعها نهائياً من أي مستخدم. هل تتابع؟');">
-                                    @csrf
-                                    <button class="btn-admin btn-ban">حظر البصمة (BAN)</button>
-                                </form>
-                            </div>
-                        </div>
-                    @empty
-                        <div class="col-span-full py-20 text-center bg-gray-900 border border-gray-800 rounded-2xl text-gray-500">
-                            لا توجد صور في النظام حالياً.
-                        </div>
-                    @endforelse
-                </div>
-
-                <div class="mt-8">
-                    {{ $images->links() }}
-                </div>
-            </div>
+@section('content')
+<div class="space-y-8" dir="rtl">
+    
+    <!-- Header -->
+    <div class="flex justify-between items-end flex-wrap gap-6">
+        <div>
+            <h2 class="text-3xl font-bold tracking-tight">مركز <span class="accent-text-gradient">الرقابة والتحكم</span></h2>
+            <p class="text-gray-400 mt-1">إدارة المحتوى المرفوع، مراجعة الخصوصية، وحظر الملفات المشبوهة.</p>
+        </div>
+        <div class="flex items-center gap-6">
+            <a href="{{ route('admin.photos.index') }}" class="text-[10px] font-bold uppercase tracking-[0.2em] {{ request()->routeIs('admin.photos.index') ? 'text-purple-400' : 'text-gray-500 hover:text-gray-300' }} transition-colors">جميع الصور</a>
+            <a href="{{ route('admin.banned_hashes.index') }}" class="text-[10px] font-bold uppercase tracking-[0.2em] {{ request()->routeIs('admin.banned_hashes.index') ? 'text-purple-400' : 'text-gray-500 hover:text-gray-300' }} transition-colors">البصمات المحظورة</a>
+            <a href="{{ route('admin.dashboard') }}" class="text-[10px] font-bold text-gray-700 hover:text-white transition-colors uppercase tracking-[0.2em]">← العودة</a>
         </div>
     </div>
-</x-app-layout>
+
+    <!-- Media Grid -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        @forelse($images as $image)
+            <div class="glass group rounded-[32px] overflow-hidden border border-white/5 hover:border-purple-500/30 transition-all duration-500">
+                <!-- Image Preview -->
+                <div class="aspect-square relative overflow-hidden bg-black/40">
+                    <img src="{{ Storage::url($image->path) }}" alt="{{ $image->title }}" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110">
+                    <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                    
+                    <!-- Status Badge -->
+                    <div class="absolute top-4 right-4">
+                        <span class="px-3 py-1 rounded-full text-[8px] font-bold tracking-widest uppercase italic border 
+                            {{ $image->privacy === 'public' ? 'border-green-500/20 text-green-400 bg-green-500/10' : 
+                               ($image->privacy === 'private' ? 'border-blue-500/20 text-blue-400 bg-blue-500/10' : 
+                               'border-red-500/20 text-red-500 bg-red-500/10') }}">
+                            {{ $image->privacy }}
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Info -->
+                <div class="p-6 space-y-4">
+                    <div>
+                        <h3 class="text-sm font-bold text-gray-200 truncate">{{ $image->title ?: 'صورة بدون عنوان' }}</h3>
+                        <p class="text-[10px] text-gray-500 mt-1">بواسطة: <span class="text-purple-400 font-bold uppercase">{{ $image->user->name }}</span></p>
+                    </div>
+
+                    <div class="flex items-center justify-between text-[9px] font-mono text-gray-600">
+                        <span>{{ $image->created_at->format('Y.m.d') }}</span>
+                        <span>{{ strtoupper(pathinfo($image->path, PATHINFO_EXTENSION)) }}</span>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="grid grid-cols-2 gap-2 pt-2 border-t border-white/5">
+                        <form action="{{ route('admin.photos.visibility', $image) }}" method="POST">
+                            @csrf
+                            <button class="w-full py-2 rounded-xl border border-white/10 text-[9px] font-bold uppercase tracking-widest hover:bg-white/5 transition-all">
+                                {{ $image->privacy === 'hidden' ? 'إظهار' : 'إخفاء' }}
+                            </button>
+                        </form>
+                        <form action="{{ route('admin.photos.destroy', $image) }}" method="POST" onsubmit="return confirm('حذف نهائي؟')">
+                            @csrf @method('DELETE')
+                            <button class="w-full py-2 rounded-xl border border-red-500/20 text-red-500 text-[9px] font-bold uppercase tracking-widest hover:bg-red-500/10 transition-all">
+                                حذف
+                            </button>
+                        </form>
+                        <form action="{{ route('admin.photos.ban', $image) }}" method="POST" class="col-span-2" onsubmit="return confirm('حظر بصمة هذه الصورة نهائياً؟')">
+                            @csrf
+                            <button class="w-full py-2 rounded-xl accent-gradient text-[9px] font-bold uppercase tracking-[0.2em] shadow-lg shadow-purple-500/20 hover:opacity-90 transition-all">
+                                حظر البصمة (BAN)
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        @empty
+            <div class="col-span-full py-32 text-center">
+                <div class="glass w-20 h-20 rounded-[32px] mx-auto flex items-center justify-center text-3xl mb-6">📸</div>
+                <h4 class="text-lg font-bold text-gray-400">لا توجد صور حالياً في النظام</h4>
+                <p class="text-sm text-gray-600 mt-2">كافة الأرشيفات الرقمية محدثة تماماً.</p>
+            </div>
+        @endforelse
+    </div>
+
+    <!-- Pagination -->
+    @if($images->hasPages())
+        <div class="pt-8 border-t border-white/5">
+            {{ $images->links() }}
+        </div>
+    @endif
+</div>
+@endsection

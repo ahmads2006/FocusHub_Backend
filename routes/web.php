@@ -53,9 +53,9 @@ Route::middleware(['auth', 'check.verified', 'check.banned', 'check.timeout'])->
     Route::get('/activities', [ActivityController::class, 'index'])->middleware('permission:view-activity-logs')->name('activities.index');
 
     // إدارة الصور والألبومات (Consolidated)
-    Route::get('/manage-images', [ImageController::class, 'manage'])->name('images.index');
-    Route::post('/manage-images', [ImageController::class, 'store'])->name('images.store');
-    Route::delete('/manage-images/{image}', [ImageController::class, 'destroy'])->name('images.destroy');
+    Route::get('/manage-my-vault', [ImageController::class, 'manage'])->name('images.index');
+    Route::post('/manage-my-vault', [ImageController::class, 'store'])->name('images.store');
+    Route::delete('/manage-my-vault/{image}', [ImageController::class, 'destroy'])->name('images.destroy');
     Route::post('/manage-albums', [ImageController::class, 'storeAlbum'])->name('albums.store');
 
     Route::get('/gallery', [ImageController::class, 'gallery'])->name('gallery.index');

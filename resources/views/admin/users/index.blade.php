@@ -1,141 +1,143 @@
-<x-app-layout>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap');
-        .admin-wrap * { font-family: 'IBM Plex Sans Arabic', sans-serif; }
-        .admin-bg { background-color: #0d0f14; min-height: 100vh; }
-        .admin-card { background: #13151c; border: 1px solid #1e2130; border-radius: 16px; overflow: hidden; }
-        .admin-header { padding: 24px; border-bottom: 1px solid #1e2130; }
-        .admin-title { font-size: 18px; font-weight: 700; color: #f1f3f9; }
-        .admin-search { background: #0d0f14; border: 1px solid #1e2130; border-radius: 10px; padding: 10px 16px; font-size: 14px; color: #f1f3f9; width: 100%; max-width: 280px; }
-        .admin-search::placeholder { color: #4a5270; }
-        .admin-table { width: 100%; border-collapse: collapse; }
-        .admin-table th { font-size: 10px; font-weight: 700; letter-spacing: 2px; color: #4a5270; padding: 14px 20px; text-align: right; border-bottom: 1px solid #1e2130; }
-        .admin-table td { padding: 16px 20px; border-bottom: 1px solid #0d0f14; color: #c8cfe0; font-size: 14px; }
-        .admin-table tr:hover { background: #0d0f14; }
-        .badge { font-size: 9px; font-weight: 700; letter-spacing: 1px; padding: 4px 10px; border-radius: 6px; }
-        .badge-user { background: #0a0f1f; color: #60a5fa; }
-        .badge-photographer { background: #0a1f10; color: #34d399; }
-        .badge-admin { background: #1a0a0a; color: #d4a853; }
-        .badge-banned { background: #1a0a0a; color: #f87171; }
-        .badge-shadow { background: #1a0a1f; color: #a78bfa; }
-        .btn-sm { font-size: 11px; font-weight: 600; padding: 6px 12px; border-radius: 8px; text-decoration: none; display: inline-block; margin-left: 6px; border: 1px solid; cursor: pointer; transition: opacity 0.2s; }
-        .btn-sm:hover { opacity: 0.8; }
-        .btn-gold { background: transparent; color: #d4a853; border-color: #d4a85355; }
-        .btn-red { background: transparent; color: #f87171; border-color: #f8717155; }
-        .btn-green { background: transparent; color: #34d399; border-color: #34d39955; }
-    </style>
+@extends('layouts.premium')
 
-    <div class="admin-bg admin-wrap" dir="rtl">
-        <div class="py-10">
-            <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div style="margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
-                    <div>
-                        <p style="font-size: 10px; font-weight: 700; letter-spacing: 5px; color: #d4a853; margin: 0 0 4px 0;">إدارة المستخدمين</p>
-                        <h1 style="font-size: 24px; font-weight: 700; color: #f1f3f9; margin: 0;">المستخدمون</h1>
-                    </div>
-                    <div style="display: flex; gap: 16px;">
-                        <a href="{{ route('admin.roles.index') }}" style="font-size: 13px; color: #d4a853; text-decoration: none;">إدارة الأدوار</a>
-                        <a href="{{ route('admin.dashboard') }}" style="font-size: 13px; color: #8891aa; text-decoration: none;">← العودة للوحة</a>
-                    </div>
-                </div>
+@section('title', 'User Management')
 
-                <div class="admin-card">
-                    <div class="admin-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
-                        <form method="GET" action="{{ route('admin.users.index') }}" style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
-                            <input type="text" name="search" value="{{ request('search') }}" placeholder="بحث بالاسم أو البريد..." class="admin-search">
-                            <label style="display: flex; align-items: center; gap: 8px; color: #8891aa; font-size: 13px; cursor: pointer;">
-                                <input type="checkbox" name="banned" value="1" {{ request('banned') ? 'checked' : '' }}> المحظورون فقط
-                            </label>
-                            <button type="submit" class="btn-sm btn-gold">بحث</button>
-                        </form>
-                    </div>
-
-                    <div style="overflow-x: auto;">
-                        <table class="admin-table">
-                            <thead>
-                                <tr>
-                                    <th>المستخدم</th>
-                                    <th>الدور</th>
-                                    <th>الحالة</th>
-                                    <th>التسجيل</th>
-                                    <th>إجراءات</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @forelse($users as $u)
-                                    <tr>
-                                        <td>
-                                            <div style="font-weight: 600; color: #f1f3f9;">{{ $u->name }}</div>
-                                            <div style="font-size: 12px; color: #4a5270;">{{ $u->email }}</div>
-                                        </td>
-                                        <td>
-                                            @foreach($u->roles as $r)
-                                                @php
-                                                    $badgeClass = match($r->name) {
-                                                        'super_admin' => 'badge-admin',
-                                                        'photographer' => 'badge-photographer',
-                                                        'editor' => 'badge-photographer',
-                                                        default => 'badge-user',
-                                                    };
-                                                @endphp
-                                                <span class="badge {{ $badgeClass }}">{{ $r->name }}</span>
-                                            @endforeach
-                                        </td>
-                                        <td>
-                                            @if($u->is_banned) <span class="badge badge-banned">محظور</span> @endif
-                                            @if($u->is_shadow_hidden) <span class="badge badge-shadow">حجب شامل</span> @endif
-                                            @if(!$u->is_banned && !$u->is_shadow_hidden) <span style="color:#3d4460">—</span> @endif
-                                        </td>
-                                        <td style="font-size: 12px; color: #4a5270;">{{ $u->created_at->format('Y-m-d') }}</td>
-                                        <td>
-                                            <div style="display: flex; flex-wrap: wrap; gap: 4px;">
-                                                @if($u->is_banned)
-                                                    <form method="POST" action="{{ route('admin.users.unban', $u) }}" style="display: inline;">
-                                                        @csrf
-                                                        <button type="submit" class="btn-sm btn-green">إلغاء الحظر</button>
-                                                    </form>
-                                                @else
-                                                    <form method="POST" action="{{ route('admin.users.ban', $u) }}" style="display: inline;">
-                                                        @csrf
-                                                        <button type="submit" class="btn-sm btn-red" onclick="return confirm('حظر هذا المستخدم؟')">حظر</button>
-                                                    </form>
-                                                @endif
-                                                <form method="POST" action="{{ route('admin.users.shadow', $u) }}" style="display: inline;">
-                                                    @csrf
-                                                    <button type="submit" class="btn-sm btn-gold">{{ $u->is_shadow_hidden ? 'إلغاء الحجب' : 'حجب شامل' }}</button>
-                                                </form> 
-                                                <form method="POST" action="{{ route('admin.users.role', $u) }}" style="display: inline;">
-                                                    @csrf
-                                                    <select name="role" onchange="this.form.submit()" style="background:#0d0f14;border:1px solid #1e2130;color:#c8cfe0;padding:6px 10px;border-radius:8px;font-size:12px;">
-                                                        @foreach($roles as $r)
-                                                            <option value="{{ $r->name }}" {{ $u->hasRole($r->name) ? 'selected' : '' }}>{{ $r->name }}</option>
-                                                        @endforeach
-                                                    </select>
-                                                </form>
-                                                <a href="{{ route('admin.activities.index', ['user_id' => $u->id]) }}" class="btn-sm btn-gold">النشاط</a>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                @empty
-                                    <tr><td colspan="5" style="padding: 40px; text-align: center; color: #4a5270;">لا يوجد مستخدمين.</td></tr>
-                                @endforelse
-                            </tbody>
-                        </table>
-                    </div>
-
-                    @if($users->hasPages())
-                        <div style="padding: 20px; border-top: 1px solid #1e2130;">
-                            {{ $users->links() }}
-                        </div>
-                    @endif
-                </div>
-
-                @if(session('success'))
-                    <div style="margin-top: 16px; padding: 12px 20px; background: #0a1f10; border: 1px solid #34d39944; border-radius: 10px; color: #34d399; font-size: 14px;">
-                        {{ session('success') }}
-                    </div>
-                @endif
-            </div>
+@section('content')
+<div class="space-y-8" dir="rtl">
+    
+    <!-- Header -->
+    <div class="flex justify-between items-end flex-wrap gap-6">
+        <div>
+            <h2 class="text-3xl font-bold tracking-tight">إدارة <span class="accent-text-gradient">المستخدمين</span></h2>
+            <p class="text-gray-400 mt-1">تحكّم في صلاحيات المستخدمين، حالات الحظر، والأدوار.</p>
+        </div>
+        <div class="flex items-center gap-4">
+            <a href="{{ route('admin.roles.index') }}" class="px-6 py-2 rounded-2xl glass border border-white/10 text-xs font-bold text-indigo-400 hover:bg-white/5 transition-all uppercase tracking-widest">إدارة الأدوار</a>
+            <a href="{{ route('admin.dashboard') }}" class="text-[10px] font-bold text-gray-500 hover:text-white transition-colors uppercase tracking-[0.2em]">← العودة للوحة الإدارة</a>
         </div>
     </div>
-</x-app-layout>
+
+    <!-- Filters & Search -->
+    <div class="glass p-6 rounded-[32px] border border-white/5">
+        <form method="GET" action="{{ route('admin.users.index') }}" class="flex flex-wrap items-center gap-6">
+            <div class="relative flex-1 min-w-[300px]">
+                <svg class="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                <input type="text" name="search" value="{{ request('search') }}" placeholder="بحث بالاسم أو البريد الإلكتروني..." class="w-full bg-white/5 border border-white/10 rounded-2xl py-3 pl-12 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all">
+            </div>
+            
+            <label class="flex items-center gap-3 cursor-pointer group">
+                <input type="checkbox" name="banned" value="1" {{ request('banned') ? 'checked' : '' }} class="w-5 h-5 rounded-lg bg-white/5 border-white/10 text-purple-600 focus:ring-purple-500/50 focus:ring-offset-0 transition-all">
+                <span class="text-sm font-semibold text-gray-400 group-hover:text-gray-200 transition-colors">المحظورون فقط</span>
+            </label>
+
+            <button type="submit" class="px-8 py-3 rounded-2xl accent-gradient text-sm font-bold tracking-wide shadow-lg shadow-purple-500/20 hover:opacity-90 transition-all">
+                تصفية النتائج
+            </button>
+        </form>
+    </div>
+
+    <!-- Users Table -->
+    <div class="glass rounded-[40px] overflow-hidden border border-white/5">
+        <div class="overflow-x-auto">
+            <table class="w-full text-right">
+                <thead>
+                    <tr class="border-b border-white/5">
+                        <th class="p-8 text-[10px] font-bold uppercase tracking-[0.2em] text-purple-400">المستخدم</th>
+                        <th class="p-8 text-[10px] font-bold uppercase tracking-[0.2em] text-purple-400">الدور</th>
+                        <th class="p-8 text-[10px] font-bold uppercase tracking-[0.2em] text-purple-400">الحالة</th>
+                        <th class="p-8 text-[10px] font-bold uppercase tracking-[0.2em] text-purple-400">التسجيل</th>
+                        <th class="p-8 text-[10px] font-bold uppercase tracking-[0.2em] text-purple-400">إجراءات</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-white/5">
+                    @forelse($users as $u)
+                        <tr class="group hover:bg-white/5 transition-all">
+                            <td class="p-8">
+                                <div class="font-bold text-gray-200">{{ $u->name }}</div>
+                                <div class="text-[10px] text-gray-600 font-mono mt-1">{{ $u->email }}</div>
+                            </td>
+                            <td class="p-8">
+                                <div class="flex flex-wrap gap-2">
+                                    @foreach($u->roles as $r)
+                                        <span class="px-3 py-1 rounded-full text-[8px] font-bold uppercase italic border border-purple-500/20 text-purple-400 bg-purple-500/5">
+                                            {{ $r->name }}
+                                        </span>
+                                    @endforeach
+                                </div>
+                            </td>
+                            <td class="p-8">
+                                <div class="flex flex-wrap gap-2">
+                                    @if($u->is_banned)
+                                        <span class="px-3 py-1 rounded-full text-[8px] font-bold border border-red-500/20 text-red-500 bg-red-500/5 uppercase tracking-widest">محظور</span>
+                                    @endif
+                                    @if($u->is_shadow_hidden)
+                                        <span class="px-3 py-1 rounded-full text-[8px] font-bold border border-orange-500/20 text-orange-400 bg-orange-500/5 uppercase tracking-widest">حجب شامل</span>
+                                    @endif
+                                    @if(!$u->is_banned && !$u->is_shadow_hidden)
+                                        <span class="text-gray-700">—</span>
+                                    @endif
+                                </div>
+                            </td>
+                            <td class="p-8 text-xs font-mono text-gray-500">
+                                {{ $u->created_at->format('Y-m-d') }}
+                            </td>
+                            <td class="p-8">
+                                <div class="flex items-center gap-3">
+                                    @if($u->is_banned)
+                                        <form method="POST" action="{{ route('admin.users.unban', $u) }}">
+                                            @csrf
+                                            <button type="submit" class="text-[10px] font-bold text-green-500 hover:text-green-400 uppercase tracking-widest transition-colors">إلغاء الحظر</button>
+                                        </form>
+                                    @else
+                                        <form method="POST" action="{{ route('admin.users.ban', $u) }}">
+                                            @csrf
+                                            <button type="submit" class="text-[10px] font-bold text-red-500 hover:text-red-400 uppercase tracking-widest transition-colors" onclick="return confirm('حظر هذا المستخدم؟')">حظر</button>
+                                        </form>
+                                    @endif
+                                    
+                                    <form method="POST" action="{{ route('admin.users.shadow', $u) }}">
+                                        @csrf
+                                        <button type="submit" class="text-[10px] font-bold text-orange-400 hover:text-orange-300 uppercase tracking-widest transition-colors">
+                                            {{ $u->is_shadow_hidden ? 'إلغاء الحجب' : 'حجب شامل' }}
+                                        </button>
+                                    </form>
+
+                                    <form method="POST" action="{{ route('admin.users.role', $u) }}" class="flex items-center gap-2">
+                                        @csrf
+                                        <select name="role" onchange="this.form.submit()" class="bg-black/20 border border-white/5 rounded-xl px-3 py-1.5 text-[10px] font-bold text-gray-400 focus:outline-none focus:border-purple-500/50 transition-all">
+                                            @foreach($roles as $r)
+                                                <option value="{{ $r->name }}" {{ $u->hasRole($r->name) ? 'selected' : '' }}>{{ $r->name }}</option>
+                                            @endforeach
+                                        </select>
+                                    </form>
+
+                                    <a href="{{ route('admin.activities.index', ['user_id' => $u->id]) }}" class="text-[10px] font-bold text-purple-400 hover:text-purple-300 uppercase tracking-widest transition-colors">النشاط</a>
+                                </div>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="5" class="p-20 text-center text-gray-600 font-bold uppercase tracking-widest text-[10px]">لا يوجد مستخدمين مطابقين للبحث</td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+
+        @if($users->hasPages())
+            <div class="p-8 border-t border-white/5">
+                {{ $users->links() }}
+            </div>
+        @endif
+    </div>
+
+    @if(session('success'))
+        <div class="fixed bottom-8 right-8 animate-slide-up">
+            <div class="glass border border-green-500/20 bg-green-500/5 px-6 py-4 rounded-3xl flex items-center gap-4">
+                <div class="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center text-green-500">✓</div>
+                <p class="text-sm font-semibold text-green-500">{{ session('success') }}</p>
+            </div>
+        </div>
+    @endif
+</div>
+@endsection

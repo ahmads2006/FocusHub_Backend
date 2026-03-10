@@ -1,28 +1,30 @@
-<x-app-layout>
-    <div style="background-color: #0d0f14; min-height: 100vh; font-family: 'IBM Plex Sans Arabic', sans-serif;" dir="rtl">
-        <div class="py-12">
-            <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-                
-                <div style="margin-bottom: 32px;">
-                    <p style="font-size: 10px; font-weight: 700; letter-spacing: 5px; text-transform: uppercase; color: #d4a853; margin: 0 0 8px 0;">OPTICVAULT</p>
-                    <h1 style="font-size: 26px; font-weight: 700; color: #f1f3f9; margin: 0;">مركز التنبيهات</h1>
-                </div>
+@extends('layouts.premium')
 
-                <div style="background: #13151c; border: 1px solid #1e2130; border-radius: 16px; padding: 40px; text-align: center;">
-                    <div style="font-size: 48px; margin-bottom: 20px;">🔔</div>
-                    <h2 style="color: #f1f3f9; font-size: 20px; font-weight: 700; margin-bottom: 12px;">لا يوجد تنبيهات جديدة</h2>
-                    <p style="color: #8891aa; font-size: 14px; max-width: 400px; margin: 0 auto; line-height: 1.6;">
-                        حسابك محدث بالكامل! ستظهر أي تنبيهات متعلقة بنشاطاتك أو الصور الخاصة بك هنا.
-                    </p>
-                    
-                    <div style="margin-top: 32px;">
-                        <a href="{{ route('dashboard') }}" style="display: inline-block; background: #d4a853; color: #0d0f14; padding: 12px 24px; border-radius: 10px; font-weight: 700; text-decoration: none; transition: opacity 0.2s;">
-                            العودة للوحة التحكم
-                        </a>
-                    </div>
-                </div>
+@section('title', 'Notifications Center')
 
-            </div>
-        </div>
+@section('content')
+<div class="h-full flex flex-col items-center justify-center space-y-8 text-center" dir="rtl">
+    <div class="w-24 h-24 rounded-[32px] glass flex items-center justify-center text-4xl shadow-2xl relative">
+        🔔
+        <div class="absolute -top-2 -right-2 w-6 h-6 bg-purple-500 rounded-full border-4 border-[#0a0a0c]"></div>
     </div>
-</x-app-layout>
+    
+    <div class="max-w-md space-y-4">
+        <h2 class="text-3xl font-bold tracking-tight">مركز <span class="accent-text-gradient">التنبيهات</span></h2>
+        <p class="text-gray-400 leading-relaxed">
+            حسابك محدث بالكامل! ستظهر هنا كافة التنبيهات المتعلقة بنشاطات الألبومات المشتركة ومعالجة الصور الذكية.
+        </p>
+    </div>
+
+    <div class="flex gap-4">
+        <a href="{{ route('home_new') }}" class="text-xs font-bold text-purple-400 hover:text-purple-300 transition-colors uppercase tracking-widest">Back to Control Center ←</a>
+        <button class="px-8 py-3 rounded-2xl glass border border-white/10 hover:text-white transition-all text-sm font-bold tracking-wide">
+            إعدادات التنبيه
+        </button>
+    </div>
+
+    <!-- Decorative Elements -->
+    <div class="fixed bottom-10 left-10 w-48 h-48 bg-purple-500/5 blur-[100px] rounded-full -z-10"></div>
+    <div class="fixed top-40 right-10 w-72 h-72 bg-indigo-500/5 blur-[100px] rounded-full -z-10"></div>
+</div>
+@endsection
