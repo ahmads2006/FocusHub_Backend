@@ -17,7 +17,7 @@
     </div>
 
     <div class="flex gap-4">
-        <a href="{{ route('home_new') }}" class="text-xs font-bold text-purple-400 hover:text-purple-300 transition-colors uppercase tracking-widest">Back to Control Center ←</a>
+        <a href="{{ route('dashboard') }}" class="text-xs font-bold text-purple-400 hover:text-purple-300 transition-colors uppercase tracking-widest">Back to Control Center ←</a>
         <button class="px-8 py-3 rounded-2xl glass border border-white/10 hover:text-white transition-all text-sm font-bold tracking-wide">
             إعدادات التنبيه
         </button>
