@@ -24,7 +24,8 @@ class ImageUploadService
     }
 
     /**
-     * Process and upload image with Zero-Trust security layers
+     * Process and upload image with Zero-Lag Background Pipelines.
+     * Instantly stores in quarantine and dispatches secure processing job.
      */
     public function upload(UploadedFile $file, array $data, string $userId): Image
     {
@@ -34,32 +35,12 @@ class ImageUploadService
         // 2. AI Content Safety Filter
         $this->contentSafety->validate($file);
 
-        // 3. Sanitization (Re-encoding) 
-        // We "Destroy and Recreate" the image to strip any embedded malicious blobs
-        $autoOrient = (bool) ($data['auto_orient'] ?? false);
-        $sanitizedFile = $this->sanitizeImage($file, $detectedExtension, $autoOrient);
+        // 3. Move to Quarantine (Temporal Storage)
+        // We use 'local' disk (app/quarantine) which is not public
+        $quarantinePath = $file->store('quarantine', 'local');
 
-        $filename = uniqid() . '_' . time() . '.' . $detectedExtension;
-        $disk = 'public'; 
-        $directory = 'images/' . date('Y/m');
-        
-        // Move sanitized file to final location
-        $path = Storage::disk($disk)->putFileAs($directory, $sanitizedFile, $filename);
-
-        // Extract metadata BEFORE we potentially strip it during compression (or use original)
-        $metadata = $this->metadataService->extract($file);
-        
-        // Keep raw EXIF as fallback
-        $exif = [];
-        if (in_array($detectedExtension, ['jpg', 'jpeg', 'tiff'])) {
-            try {
-                $exif = @exif_read_data($file->getRealPath());
-            } catch (\Exception $e) {}
-        }
-
-        // Cleanup temporary sanitized file
-        @unlink($sanitizedFile);
-
+        // 4. Create Placeholder Image Record
+        // Path points to quarantine temporarily; Job will move it to permanent storage
         $image = Image::create([
             'user_id' => $userId,
             'album_id' => $data['album_id'] ?? null,
@@ -67,19 +48,17 @@ class ImageUploadService
             'description' => $data['description'] ?? null,
             'filename' => $file->getClientOriginalName(),
             'file_type' => $detectedExtension,
-            'path' => $path,
-            'size' => filesize(Storage::disk($disk)->path($path)),
+            'path' => 'quarantine/' . basename($quarantinePath), // Relative to storage/app
+            'size' => $file->getSize(),
             'privacy' => $data['privacy'] ?? 'public',
-            'exif_data' => $exif,
-            'metadata' => $metadata,
-            'is_comparison' => $data['is_comparison'] ?? false,
             'is_comparison' => $data['is_comparison'] ?? false,
             'allow_download' => isset($data['allow_download']),
             'watermark_on_download' => isset($data['watermark_on_download']),
         ]);
 
-        // 4. Dispatch Async Thumbnail Generation
-        ProcessImageThumbnails::dispatch($image);
+        // 5. Dispatch Secure Background Pipeline
+        // This handles: EXIF Extraction, GPS Stripping (Sanitization), and Storage Migration
+        \App\Jobs\ProcessImageSecurely::dispatch($image, $quarantinePath, $data);
 
         return $image;
     }

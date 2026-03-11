@@ -74,7 +74,7 @@ class AssetAccessController extends Controller
 
         // 5. Serve
         if (!$shouldWatermark) {
-            return Storage::disk('public')->response($image->path, $image->filename);
+            return $this->streamFile($image->path, $image->filename);
         }
 
         // 5a. Use SecureShield to serve (handles caching/optimization internally)
@@ -96,7 +96,7 @@ class AssetAccessController extends Controller
             $path = ltrim($path, '/storage/');
             
             $filename = pathinfo($image->filename, PATHINFO_FILENAME) . '_secured.jpg';
-            return Storage::disk('public')->response($path, $filename);
+            return $this->streamFile($path, $filename);
 
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error("SecureShield processing failed: " . $e->getMessage());
@@ -105,5 +105,32 @@ class AssetAccessController extends Controller
             // Abort with error to prevent identity exposure.
             abort(500, 'Security processing failed. Please try again later.');
         }
+    }
+
+    /**
+     * Helper to stream a file with path masking and security headers.
+     */
+    protected function streamFile(string $path, string $filename)
+    {
+        if (!Storage::disk('public')->exists($path)) {
+            abort(404, 'File not found in secure vault.');
+        }
+
+        $size = Storage::disk('public')->size($path);
+        $mime = Storage::disk('public')->mimeType($path);
+
+        return response()->stream(function () use ($path) {
+            $stream = Storage::disk('public')->readStream($path);
+            if ($stream) {
+                fpassthru($stream);
+                fclose($stream);
+            }
+        }, 200, [
+            'Content-Type' => $mime,
+            'Content-Length' => $size,
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            'X-Content-Type-Options' => 'nosniff',
+            'Cache-Control' => 'no-cache, private',
+        ]);
     }
 }

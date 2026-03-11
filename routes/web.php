@@ -60,6 +60,7 @@ Route::middleware(['auth', 'check.verified', 'check.banned', 'check.timeout'])->
     Route::get('/manage-my-vault', [ImageController::class, 'manage'])->name('images.index');
     Route::post('/manage-my-vault', [ImageController::class, 'store'])->name('images.store');
     Route::delete('/manage-my-vault/{image}', [ImageController::class, 'destroy'])->name('images.destroy');
+    Route::get('/download/{image}', [ImageController::class, 'download'])->name('images.download');
     Route::post('/manage-albums', [ImageController::class, 'storeAlbum'])->name('albums.store');
     Route::post('/images/{image}/protect', [ImageController::class, 'protect'])->name('images.protect');
     Route::delete('/images/{image}/protection', [ImageController::class, 'revert'])->name('images.protection.revert');

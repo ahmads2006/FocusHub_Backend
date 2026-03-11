@@ -9,57 +9,84 @@ use Illuminate\Support\Facades\Log;
 class MetadataService
 {
     /**
-     * Extract EXIF metadata from an uploaded image file.
-     * Ensure it does not crash if EXIF data is missing or corrupted.
-     *
-     * @param UploadedFile $file
-     * @return array
+     * Extract detailed technical EXIF metadata from an uploaded image.
+     * EXPLICITLY excludes GPS and personal location data for privacy.
      */
-    public function extract(UploadedFile $file): array
+    public function extractTechnical(UploadedFile $file): array
     {
-        $metadata = [];
+        return $this->extractTechnicalFromPath($file->getRealPath());
+    }
 
-        // EXIF data is generally restricted to JPEG and TIFF files.
-        if (!in_array(strtolower($file->getClientOriginalExtension()), ['jpg', 'jpeg', 'tiff', 'tif'])) {
-            return $metadata;
+    /**
+     * Internal extraction logic from a file path.
+     */
+    public function extractTechnicalFromPath(string $path): array
+    {
+        $tech = [
+            'camera_make' => null,
+            'camera_model' => null,
+            'lens_type' => null,
+            'focal_length' => null,
+            'aperture' => null,
+            'shutter_speed' => null,
+            'iso' => null,
+            'original_creation_date' => null,
+            'extra_info' => [],
+        ];
+
+        // Basic check for EXIF capability based on file extension or signature
+        // For simplicity, we check extensions here, but mime_content_type is safer
+        $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+        if (!empty($extension) && !in_array($extension, ['jpg', 'jpeg', 'tiff', 'tif'])) {
+            return $tech;
         }
 
         try {
-            // Suppress warnings in case the EXIF data is malformed
-            $exif = @exif_read_data($file->getRealPath(), 'EXIF', true);
+            $exif = @exif_read_data($path, 'EXIF', true);
+            if ($exif === false) return $tech;
 
-            if ($exif !== false) {
-                // Extract Camera Model
-                if (isset($exif['IFD0']['Model'])) {
-                    $metadata['CameraModel'] = trim($exif['IFD0']['Model']);
+            // Camera Make/Model
+            $tech['camera_make'] = $exif['IFD0']['Make'] ?? null;
+            $tech['camera_model'] = $exif['IFD0']['Model'] ?? null;
+
+            // Technical details
+            if (isset($exif['EXIF'])) {
+                $e = $exif['EXIF'];
+                
+                $tech['iso'] = isset($e['ISOSpeedRatings']) ? (is_array($e['ISOSpeedRatings']) ? $e['ISOSpeedRatings'][0] : $e['ISOSpeedRatings']) : null;
+                $tech['shutter_speed'] = isset($e['ExposureTime']) ? $this->cleanFraction($e['ExposureTime']) : null;
+                $tech['aperture'] = isset($e['FNumber']) ? 'f/' . round($this->calculateFraction($e['FNumber']), 1) : null;
+                $tech['focal_length'] = isset($e['FocalLength']) ? round($this->calculateFraction($e['FocalLength'])) . 'mm' : null;
+                
+                if (isset($e['DateTimeOriginal'])) {
+                    try {
+                        $tech['original_creation_date'] = \Carbon\Carbon::parse($e['DateTimeOriginal']);
+                    } catch (Exception $ce) {}
                 }
 
-                // Extract DateTimeOriginal
-                if (isset($exif['EXIF']['DateTimeOriginal'])) {
-                    $metadata['DateTimeOriginal'] = $exif['EXIF']['DateTimeOriginal'];
-                }
+                // Lens Type (Often in specific tags or MakerNotes)
+                $tech['lens_type'] = $e['UndefinedTag:0xA434'] ?? $e['LensModel'] ?? null;
 
-                // Extract ISO
-                if (isset($exif['EXIF']['ISOSpeedRatings'])) {
-                    $iso = $exif['EXIF']['ISOSpeedRatings'];
-                    $metadata['ISO'] = is_array($iso) ? $iso[0] : $iso;
-                }
-
-                // Extract Shutter Speed (Exposure Time)
-                if (isset($exif['EXIF']['ExposureTime'])) {
-                    $metadata['ShutterSpeed'] = $this->cleanFraction($exif['EXIF']['ExposureTime']);
-                }
-
-                // Extract Aperture (F-Number)
-                if (isset($exif['EXIF']['FNumber'])) {
-                    $metadata['ApertureValue'] = 'f/' . round($this->calculateFraction($exif['EXIF']['FNumber']), 1);
+                // Extra technical info (excluding any GPS/Location related keys)
+                $forbidden = ['GPS', 'Location', 'Latitude', 'Longitude', 'Altitude'];
+                foreach ($e as $key => $value) {
+                    $isForbidden = false;
+                    foreach ($forbidden as $f) {
+                        if (stripos((string)$key, $f) !== false) {
+                            $isForbidden = true;
+                            break;
+                        }
+                    }
+                    if (!$isForbidden && !is_null($value) && !in_array($key, ['MakerNote', 'UserComment'])) {
+                        $tech['extra_info'][(string)$key] = is_array($value) ? count($value) : (string)$value;
+                    }
                 }
             }
         } catch (Exception $e) {
-            Log::warning('EXIF Extraction Failed: ' . $e->getMessage());
+            Log::warning('Technical EXIF Extraction Failed: ' . $e->getMessage());
         }
 
-        return $metadata;
+        return $tech;
     }
 
     /**

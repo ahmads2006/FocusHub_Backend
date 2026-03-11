@@ -15,7 +15,7 @@ class ImageController extends Controller
     protected $imageService;
     protected $secureShield;
 
-    public function __construct(ImageUploadService $imageService, SecureShieldService $secureShield)
+    public function __construct(\App\Services\ImageService $imageService, SecureShieldService $secureShield)
     {
         $this->imageService = $imageService;
         $this->secureShield = $secureShield;
@@ -63,14 +63,42 @@ class ImageController extends Controller
             }
         }
 
-        $image = $this->imageService->upload($request->file('image'), $request->all(), Auth::id());
+        // The Full-Stack Cloud Pipeline (v7.0)
+        // Handles: Local Extract -> Sanitization -> Cloud Upload -> Local Cleanup -> Database Save
+        $image = $this->imageService->processAndUpload($request->file('image'), $request->all(), Auth::id());
 
         if ($request->filled('tags')) {
             $tags = array_map('trim', explode(',', $request->tags));
             $image->attachTags($tags);
         }
 
-        return back()->with('success', 'تم رفع الصورة ومعالجتها بنجاح!');
+        return back()->with('success', 'تم رفع الصورة وتأمينها سحابياً بنجاج!');
+    }
+
+    /**
+     * Secure Streamed Download (Path Masking)
+     */
+    public function download(Image $image)
+    {
+        $this->authorize('view', $image);
+
+        // Fetch optimized URL for streaming or just stream the cloud asset
+        $url = $this->imageService->getDynamicUrl($image);
+
+        return response()->stream(function () use ($url) {
+            $stream = fopen($url, 'r');
+            while (!feof($stream)) {
+                echo fread($stream, 8192);
+                flush();
+            }
+            if (is_resource($stream)) {
+                fclose($stream);
+            }
+        }, 200, [
+            'Content-Type' => 'image/' . $image->file_type,
+            'Content-Disposition' => 'attachment; filename="' . $image->filename . '"',
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
     }
 
     /**

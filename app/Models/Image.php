@@ -49,12 +49,18 @@ class Image extends Model implements HasMedia
         'downloads_count',
         'copyright_enabled',
         'allow_download',
-        'watermark_on_download'
+        'watermark_on_download',
+        'technical_specs',
+        'specs',
+        'imagekit_file_id',
+        'imagekit_file_path',
     ];
 
     protected $casts = [
         'exif_data' => 'json',
         'metadata' => 'encrypted:array',
+        'technical_specs' => 'json',
+        'specs' => 'json',
         'is_comparison' => 'boolean',
         'copyright_enabled' => 'boolean',
         'allow_download' => 'boolean',
