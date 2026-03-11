@@ -65,9 +65,29 @@ class ValidateSharedLink
             $link->update(['last_accessed_at' => now()]);
         }
 
+        // Persist access permissions in session for the AssetAccessController/AssetDeliveryService
+        $shareable = $link->shareable;
+        if ($shareable instanceof \App\Models\Image) {
+            $this->setSessionAccess($request, $shareable->id, $link);
+        } elseif ($shareable instanceof \App\Models\Album) {
+            foreach ($shareable->photos as $photo) {
+                $this->setSessionAccess($request, $photo->id, $link);
+            }
+        }
+
         // Store link in request for controller usage
         $request->attributes->set('shared_link', $link);
 
         return $next($request);
+    }
+
+    /**
+     * Set session access details for a specific image.
+     */
+    protected function setSessionAccess(Request $request, string $imageId, SharedLink $link): void
+    {
+        $request->session()->put("shared_link_access_{$imageId}", $link->permission);
+        $request->session()->put("shared_link_watermark_{$imageId}", $link->require_watermark);
+        $request->session()->put("shared_link_id_{$imageId}", $link->id);
     }
 }

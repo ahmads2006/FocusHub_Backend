@@ -89,6 +89,26 @@
                             </select>
                         </div>
                     </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        {{-- New Download & Watermark Toggles --}}
+                        <div class="flex items-center justify-between p-3 bg-purple-500/5 rounded-2xl border border-white/5 hover:border-purple-500/30 transition-all group">
+                             <div class="flex flex-col">
+                                 <label class="text-[10px] uppercase tracking-widest text-purple-400 font-bold">السماح بالتنزيل</label>
+                                 <span class="text-[8px] text-gray-500">Allow Download</span>
+                             </div>
+                             <input type="checkbox" name="allow_download" value="1" checked 
+                                    class="w-4 h-4 accent-purple-500 cursor-pointer" 
+                                    onchange="document.getElementById('upload_watermark_toggle').style.opacity = this.checked ? '1' : '0.4'; document.getElementById('upload_watermark_cb').disabled = !this.checked;">
+                        </div>
+                        <div id="upload_watermark_toggle" class="flex items-center justify-between p-3 bg-white/5 rounded-2xl border border-white/5 hover:border-purple-500/30 transition-all group">
+                             <div class="flex flex-col">
+                                 <label class="text-[10px] uppercase tracking-widest text-gray-400 font-bold">إضافة علامة مائية</label>
+                                 <span class="text-[8px] text-gray-500">Add Watermark</span>
+                             </div>
+                             <input type="checkbox" id="upload_watermark_cb" name="watermark_on_download" value="1" class="w-4 h-4 accent-purple-500 cursor-pointer">
+                        </div>
+                    </div>
                 </div>
             </form>
         </div>
@@ -106,14 +126,20 @@
         <!-- Images Grid -->
         <div x-show="view === 'all'" x-transition class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             @foreach($images as $image)
-                <div class="glass group rounded-[32px] overflow-hidden border border-white/5 hover:border-purple-500/30 transition-all duration-500">
+                <div class="glass group rounded-[32px] overflow-hidden border border-white/5 hover:border-purple-500/30 transition-all duration-500" id="image-card-{{ $image->id }}">
                     <div class="relative h-48 overflow-hidden">
                         <img src="{{ $image->url }}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000">
+                        {{-- Shield badge: shown only if a protected copy is active --}}
+                        @if(isset($protectedImageIds[$image->id]))
+                        <div class="absolute top-3 left-3 bg-purple-500/80 backdrop-blur-md text-white text-[9px] font-bold uppercase tracking-widest px-2 py-1 rounded-lg flex items-center gap-1" title="SecureShield Active">
+                            🛡 محمية
+                        </div>
+                        @endif
                         <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent flex flex-col justify-end p-6 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
                              <div class="flex flex-col gap-3">
                                 <div class="flex gap-2">
-                                    <button onclick="generateShareOnceLink('{{ $image->id }}')" class="flex-1 bg-white/10 backdrop-blur-md rounded-xl p-2 text-[10px] font-bold uppercase tracking-widest hover:bg-white/20 transition-all">مشاركة لمرة</button>
-                                    <button onclick="openShareModal('{{ $image->id }}', 'App\\Models\\Image')" class="p-2 bg-purple-500/20 backdrop-blur-md rounded-xl hover:bg-purple-500/40 transition-all">
+                                    <button onclick="generateShareOnceLink('{{ $image->id }}', this)" class="flex-1 bg-white/10 backdrop-blur-md rounded-xl p-2 text-[10px] font-bold uppercase tracking-widest hover:bg-white/20 transition-all">مشاركة لمرة</button>
+                                    <button onclick="openShareModal('{{ $image->id }}', '{{ addslashes(App\Models\Image::class) }}')" class="p-2 bg-purple-500/20 backdrop-blur-md rounded-xl hover:bg-purple-500/40 transition-all">
                                         <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6a3 3 0 100-2.684m0 2.684l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"></path></svg>
                                     </button>
                                 </div>
@@ -121,6 +147,22 @@
                                     @csrf @method('DELETE')
                                     <button type="submit" class="w-full text-[10px] font-bold text-red-400 bg-red-400/5 p-2 rounded-xl hover:bg-red-400/20 transition-all border border-red-400/10 uppercase tracking-widest">حذف بشكل دائم</button>
                                 </form>
+                                {{-- SecureShield v2.0 Actions --}}
+                                @if(isset($protectedImageIds[$image->id]))
+                                    <button onclick="revertSecureShield('{{ $image->id }}')" class="w-full text-[10px] font-bold text-yellow-500 bg-yellow-500/10 p-2 rounded-xl hover:bg-yellow-500/20 transition-all border border-yellow-500/20 uppercase tracking-widest flex items-center justify-center gap-2">
+                                        <span>🔓 إلغاء حماية SecureShield</span>
+                                    </button>
+                                @else
+                                    <div class="flex flex-col gap-2">
+                                        <button onclick="applySecureShield('{{ $image->id }}', 'signature')" class="w-full text-[10px] font-bold text-purple-400 bg-purple-400/10 p-2 rounded-xl hover:bg-purple-400/20 transition-all border border-purple-400/20 uppercase tracking-widest flex items-center justify-center gap-2 group/btn">
+                                            <span>🛡 SecureShield Signature</span>
+                                            <svg class="w-3 h-3 group-hover/btn:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path></svg>
+                                        </button>
+                                        <button onclick="applySecureShield('{{ $image->id }}', 'grid')" class="w-full text-[10px] font-bold text-blue-400 bg-blue-400/10 p-2 rounded-xl hover:bg-blue-400/20 transition-all border border-blue-400/10 uppercase tracking-widest flex items-center justify-center gap-2 group/btn">
+                                            <span>⚡ Total Grid Overlay</span>
+                                        </button>
+                                    </div>
+                                @endif
                              </div>
                         </div>
                     </div>
@@ -166,9 +208,9 @@
 
 </div>
 
+@push('scripts')
 <script>
-    async function generateShareOnceLink(imageId) {
-        const btn = event.currentTarget;
+    async function generateShareOnceLink(imageId, btn) {
         const originalText = btn.innerText;
         btn.innerText = 'جاري النسخ...';
         btn.disabled = true;
@@ -201,7 +243,141 @@
             btn.disabled = false;
         }
     }
+
+    async function applySecureShield(imageId, mode) {
+        // Step 1: Identity Detection Prompt
+        const { value: formValues } = await Swal.fire({
+            title: '<h3 class="text-xl font-bold tracking-tight">إعداد <span class="accent-text-gradient">الهوية الرقمية</span></h3>',
+            html: `
+                <div class="space-y-4 p-2 text-right dir-rtl">
+                    <div class="space-y-2">
+                        <label class="text-[10px] uppercase tracking-widest text-gray-400 font-bold">اسم العلامة المائية (Brand Name)</label>
+                        <input id="swal-input-text" class="w-full bg-white/5 border border-white/10 rounded-2xl p-3 outline-none focus:border-purple-500/50 transition-all text-sm" value="{{ addslashes(auth()->user()->name) }}">
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="space-y-2">
+                            <label class="text-[10px] uppercase tracking-widest text-gray-400 font-bold">لون النص</label>
+                            <input type="color" id="swal-input-text-color" class="w-full h-10 bg-white/5 border border-white/10 rounded-xl cursor-pointer" value="{{ auth()->user()->watermark_text_color ?? '#ffffff' }}">
+                        </div>
+                        <div class="space-y-2">
+                            <label class="text-[10px] uppercase tracking-widest text-gray-400 font-bold">لون التوهج (Neon)</label>
+                            <input type="color" id="swal-input-neon-color" class="w-full h-10 bg-white/5 border border-white/10 rounded-xl cursor-pointer" value="{{ auth()->user()->watermark_neon_color ?? '#800080' }}">
+                        </div>
+                    </div>
+                    <div class="space-y-2">
+                        <label class="text-[10px] uppercase tracking-widest text-gray-400 font-bold">قوة التأثير (Opacity): <span id="opacity-val">80</span>%</label>
+                        <input type="range" id="swal-input-opacity" min="10" max="100" step="5" class="w-full accent-purple-500" value="{{ (auth()->user()->watermark_opacity ?? 0.8) * 100 }}" oninput="document.getElementById('opacity-val').innerText = this.value">
+                    </div>
+                    <div class="space-y-2">
+                        <label class="text-[10px] uppercase tracking-widest text-gray-400 font-bold">شعار الهوية (اختياري - Logo)</label>
+                        <input type="file" id="swal-input-logo" class="w-full bg-white/5 border border-white/10 rounded-2xl p-3 outline-none focus:border-purple-500/50 transition-all text-xs" accept="image/*">
+                    </div>
+                </div>
+            `,
+            focusConfirm: false,
+            showCancelButton: true,
+            confirmButtonText: 'تطبيق الحماية',
+            cancelButtonText: 'تراجع',
+            customClass: {
+                popup: 'glass rounded-[32px] border border-white/10',
+                confirmButton: 'accent-gradient px-8 py-3 rounded-xl font-bold uppercase tracking-widest text-xs',
+                cancelButton: 'bg-white/5 px-8 py-3 rounded-xl font-bold'
+            },
+            preConfirm: () => {
+                return {
+                    text: document.getElementById('swal-input-text').value,
+                    textColor: document.getElementById('swal-input-text-color').value,
+                    neonColor: document.getElementById('swal-input-neon-color').value,
+                    opacity: document.getElementById('swal-input-opacity').value / 100,
+                    logoFile: document.getElementById('swal-input-logo').files[0]
+                }
+            }
+        });
+
+        if (!formValues) return;
+
+        // Step 2: Show Processing Dialog
+        Swal.fire({
+            title: 'SecureShield is analyzing your asset...',
+            html: '<p class="text-gray-400 text-sm">Identity detected. Applying Glass-Neon protection layers.</p>',
+            allowOutsideClick: false,
+            didOpen: () => {
+                Swal.showLoading();
+            }
+        });
+
+        const formData = new FormData();
+        formData.append('mode', mode);
+        formData.append('watermark_text', formValues.text);
+        formData.append('watermark_text_color', formValues.textColor);
+        formData.append('watermark_neon_color', formValues.neonColor);
+        formData.append('watermark_opacity', formValues.opacity);
+        if (formValues.logoFile) {
+            formData.append('watermark_logo', formValues.logoFile);
+        }
+        formData.append('_token', '{{ csrf_token() }}');
+
+        try {
+            const response = await fetch(`/images/${imageId}/protect`, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'Accept': 'application/json'
+                }
+            });
+            const data = await response.json();
+
+            if (response.ok && data.success) {
+                await Swal.fire({
+                    title: 'الحماية مكتملة ✅',
+                    text: 'تم تأمين الأصل وأرشفة النسخة المحمية بنجاح.',
+                    icon: 'success',
+                    timer: 3000,
+                    showConfirmButton: false
+                });
+                location.reload();
+            } else {
+                Swal.fire('خطأ', data.message || 'فشل تطبيق الحماية', 'error');
+            }
+        } catch (err) {
+            console.error(err);
+            Swal.fire('خطأ', 'حدث خطأ غير متوقع أثناء المعالجة', 'error');
+        }
+    }
+
+    async function revertSecureShield(imageId) {
+        const confirm = await Swal.fire({
+            title: 'إلغاء الحماية؟',
+            text: 'سيتم إلغاء حماية SecureShield. سيحمّل الزوار النسخة الأصلية عند التنزيل.',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: 'نعم، إلغاء الحماية',
+            cancelButtonText: 'تراجع',
+            confirmButtonColor: '#eab308',
+        });
+        if (!confirm.isConfirmed) return;
+
+        try {
+            const response = await fetch(`/images/${imageId}/protection`, {
+                method: 'DELETE',
+                headers: {
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                    'Accept': 'application/json',
+                }
+            });
+            const data = await response.json();
+            if (response.ok && data.success) {
+                Swal.fire({ title: 'تم', text: 'تم إلغاء الحماية بنجاح.', icon: 'success', timer: 2000, showConfirmButton: false });
+                setTimeout(() => location.reload(), 1800);
+            } else {
+                Swal.fire('خطأ', data.message || 'فشل إلغاء الحماية', 'error');
+            }
+        } catch (err) {
+            Swal.fire('خطأ', 'حدث خطأ غير متوقع', 'error');
+        }
+    }
 </script>
+@endpush
 
 @include('shared_links._generate_modal')
 @endsection

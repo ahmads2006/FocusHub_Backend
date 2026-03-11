@@ -23,6 +23,7 @@ class SharedLink extends Model
         'max_access',
         'last_accessed_at',
         'revoked_at',
+        'require_watermark',
     ];
 
     protected $hidden = [
@@ -47,6 +48,7 @@ class SharedLink extends Model
         'access_count' => 'integer',
         'max_access' => 'integer',
         'auto_rotate' => 'boolean',
+        'require_watermark' => 'boolean',
     ];
 
     public function shareable(): MorphTo

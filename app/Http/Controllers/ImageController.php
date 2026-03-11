@@ -4,17 +4,21 @@ namespace App\Http\Controllers;
 
 use App\Models\Image;
 use App\Models\Album;
+use App\Models\ProtectedImage;
 use App\Services\ImageUploadService;
+use App\Services\SecureShieldService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 class ImageController extends Controller
 {
     protected $imageService;
+    protected $secureShield;
 
-    public function __construct(ImageUploadService $imageService)
+    public function __construct(ImageUploadService $imageService, SecureShieldService $secureShield)
     {
         $this->imageService = $imageService;
+        $this->secureShield = $secureShield;
     }
 
     /**
@@ -26,8 +30,15 @@ class ImageController extends Controller
         $images = $user->images()->latest()->get();
         $ownedAlbums = $user->ownedAlbums()->latest()->get();
         $sharedAlbums = $user->collaborativeAlbums()->latest()->get();
-        
-        return view('images.index', compact('images', 'ownedAlbums', 'sharedAlbums'));
+
+        // IDs of images that currently have an active SecureShield protected copy
+        $protectedImageIds = ProtectedImage::whereIn('image_id', $images->pluck('id'))
+            ->whereNull('reverted_at')
+            ->pluck('image_id')
+            ->flip()
+            ->all();
+
+        return view('images.index', compact('images', 'ownedAlbums', 'sharedAlbums', 'protectedImageIds'));
     }
 
     /**
@@ -41,6 +52,8 @@ class ImageController extends Controller
             'album_id' => 'nullable|exists:albums,id',
             'title' => 'nullable|string|max:255',
             'auto_orient' => 'nullable|boolean',
+            'allow_download' => 'nullable|boolean',
+            'watermark_on_download' => 'nullable|boolean',
         ]);
 
         if ($request->filled('album_id')) {
@@ -88,6 +101,75 @@ class ImageController extends Controller
         ]);
 
         return back()->with('success', 'تم إنشاء الألبوم بنجاح!');
+    }
+
+    /**
+     * تطبيق حماية SecureShield على الصورة
+     */
+    public function protect(Request $request, Image $image)
+    {
+        $this->authorize('update', $image);
+
+        $validated = $request->validate([
+            'mode' => 'required|in:signature,grid',
+            'watermark_text' => 'nullable|string|max:100',
+            'watermark_text_color' => 'nullable|string|max:7', // HEX color
+            'watermark_neon_color' => 'nullable|string|max:7', // HEX color
+            'watermark_opacity' => 'nullable|numeric|between:0,1',
+            'watermark_logo' => 'nullable|file|mimes:jpeg,png,jpg,svg,webp|max:5120',
+            // Keep others as optional/internal defaults
+            'smart_positioning' => 'boolean',
+            'dynamic_blending' => 'boolean',
+            'digital_archiving' => 'boolean',
+        ]);
+
+        // Default settings for v2.0+ high-security layer
+        $validated['smart_positioning'] = $request->input('smart_positioning', true);
+        $validated['dynamic_blending'] = $request->input('dynamic_blending', true);
+        $validated['digital_archiving'] = $request->input('digital_archiving', true);
+        $validated['watermark_strength'] = 'medium';
+
+        if ($request->hasFile('watermark_logo')) {
+            $path = $request->file('watermark_logo')->store('watermarks', 'public');
+            $validated['logo_path'] = $path;
+        }
+
+        $protectedUrl = $this->secureShield->protect($image, $validated);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Protection complete. Image secured and archived.',
+            'url'     => $protectedUrl,
+        ]);
+    }
+
+    /**
+     * Non-destructively revert SecureShield protection.
+     * Marks the active ProtectedImage row with reverted_at — the file stays on disk
+     * but is no longer served as the protected download copy.
+     */
+    public function revert(Image $image)
+    {
+        $this->authorize('update', $image);
+
+        $protected = ProtectedImage::where('image_id', $image->id)
+            ->whereNull('reverted_at')
+            ->latest()
+            ->first();
+
+        if (!$protected) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No active protection found for this image.',
+            ], 404);
+        }
+
+        $protected->update(['reverted_at' => now()]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Protection reverted. The original will now be served on download.',
+        ]);
     }
 
     /**

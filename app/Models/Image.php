@@ -47,7 +47,9 @@ class Image extends Model implements HasMedia
         'is_comparison',
         'views_count',
         'downloads_count',
-        'copyright_enabled'
+        'copyright_enabled',
+        'allow_download',
+        'watermark_on_download'
     ];
 
     protected $casts = [
@@ -55,6 +57,8 @@ class Image extends Model implements HasMedia
         'metadata' => 'encrypted:array',
         'is_comparison' => 'boolean',
         'copyright_enabled' => 'boolean',
+        'allow_download' => 'boolean',
+        'watermark_on_download' => 'boolean',
     ];
 
     public function user(): BelongsTo

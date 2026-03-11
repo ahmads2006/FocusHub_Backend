@@ -37,7 +37,27 @@
                                 Shared Asset
                             </div>
                             <h1 class="text-3xl font-bold text-white mb-4">{{ $photo->title }}</h1>
-                            <p class="text-gray-400 leading-relaxed text-sm">{{ $photo->description }}</p>
+                            <p class="text-gray-400 leading-relaxed text-sm mb-6">{{ $photo->description }}</p>
+
+                            {{-- SecureShield Status Indicator --}}
+                            @php
+                                $isWatermarked = $link->require_watermark ?? ($photo->user->dynamic_watermark ?? false);
+                            @endphp
+                            <div class="flex items-center gap-3 p-4 rounded-2xl {{ $isWatermarked ? 'bg-purple-500/10 border border-purple-500/20' : 'bg-white/5 border border-white/5' }}">
+                                <div class="w-8 h-8 rounded-full flex items-center justify-center {{ $isWatermarked ? 'bg-purple-500/20 text-purple-400' : 'bg-gray-500/20 text-gray-500' }}">
+                                    @if($isWatermarked)
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
+                                    @else
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                                    @endif
+                                </div>
+                                <div>
+                                    <p class="text-[9px] font-bold uppercase tracking-widest {{ $isWatermarked ? 'text-purple-400' : 'text-gray-500' }}">SecureShield</p>
+                                    <p class="text-[11px] font-semibold {{ $isWatermarked ? 'text-white' : 'text-gray-400' }}">
+                                        {{ $isWatermarked ? 'حماية الهوية الرقمية مفعّلة' : 'الحماية غير مطلوبة لهذا الرابط' }}
+                                    </p>
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Technical Stats -->
@@ -79,11 +99,16 @@
                     </div>
 
                     <div class="pt-8">
-                        @if($link->permission === 'download')
-                            <a href="{{ $photo->url }}" download class="w-full inline-flex items-center justify-center gap-3 accent-gradient p-5 rounded-3xl font-bold uppercase tracking-widest text-[10px] shadow-lg shadow-purple-500/20 hover:scale-[1.02] transition-all">
+                        @if($link->permission === 'download' && $photo->allow_download)
+                            <a href="{{ $photo->getOriginalUrl() }}" download class="w-full inline-flex items-center justify-center gap-3 accent-gradient p-5 rounded-3xl font-bold uppercase tracking-widest text-[10px] shadow-lg shadow-purple-500/20 hover:scale-[1.02] transition-all">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
                                 تحميل الملف الأصلي
                             </a>
+                        @elseif($link->permission === 'download' && !$photo->allow_download)
+                            <div class="w-full text-center glass p-5 rounded-3xl text-yellow-500 text-[10px] font-bold uppercase tracking-widest border border-yellow-500/20">
+                                <svg class="w-4 h-4 inline-block mb-1 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg><br>
+                                التنزيل معطل من قبل المصور
+                            </div>
                         @else
                             <div class="w-full text-center glass p-5 rounded-3xl text-gray-500 text-[10px] font-bold uppercase tracking-widest">
                                 العرض فقط متاح حالياً

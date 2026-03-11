@@ -42,6 +42,19 @@
                     <p class="text-xs text-gray-500 font-bold uppercase tracking-wider">إجمالي الأصول</p>
                     <p class="text-sm font-semibold">{{ $album->photos->count() }} صورة</p>
                 </div>
+                <div class="h-8 w-px bg-white/10"></div>
+                @php
+                    $isWatermarked = $link->require_watermark ?? ($album->owner->dynamic_watermark ?? false);
+                @endphp
+                <div class="flex items-center gap-2 {{ $isWatermarked ? 'text-purple-400' : 'text-gray-500' }}" title="{{ $isWatermarked ? 'الحماية مفعّلة على التنزيل' : 'الحماية غير مطلوبة' }}">
+                    <div class="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center border border-white/5">
+                        @if($isWatermarked)
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
+                        @else
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                        @endif
+                    </div>
+                </div>
             </div>
         </header>
 
@@ -54,9 +67,9 @@
                             <img src="{{ $photo->url }}" alt="{{ $photo->title }}" class="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110">
                             <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
                             
-                            @if($link->permission === 'download')
+                            @if($link->permission === 'download' && $photo->allow_download)
                             <div class="absolute top-4 left-4 opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all duration-500">
-                                <a href="{{ $photo->url }}" download class="glass p-3 rounded-2xl flex items-center justify-center text-white hover:bg-white/10 transition-colors">
+                                <a href="{{ $photo->getOriginalUrl() }}" download class="glass p-3 rounded-2xl flex items-center justify-center text-white hover:bg-white/10 transition-colors">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
                                 </a>
                             </div>

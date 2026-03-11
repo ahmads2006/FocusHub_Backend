@@ -64,9 +64,15 @@ class AssetDeliveryService
             return true;
         }
 
-        // 2. Check if a valid shared link session exists with download permissions
-        // This would integrate with the SharedLink session logic
-        if (session("shared_link_access_{$image->id}") === 'download') {
+        // 2. Check if a valid shared link session exists for this image
+        $sessionAccess = session("shared_link_access_{$image->id}");
+        if ($sessionAccess !== null) {
+            // Strictly follow the shared link's permission override
+            return $sessionAccess === 'download' && $image->allow_download;
+        }
+
+        // 3. Public assets are downloadable if allowed by owner
+        if ($image->privacy === 'public' && $image->allow_download) {
             return true;
         }
 

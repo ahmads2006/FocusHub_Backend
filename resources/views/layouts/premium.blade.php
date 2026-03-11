@@ -114,6 +114,9 @@
                 @yield('content')
             </div>
         </main>
+        {{-- Scripts Stack & Hooks --}}
+        @stack('scripts')
+        @yield('scripts')
     </div>
 
 </body>

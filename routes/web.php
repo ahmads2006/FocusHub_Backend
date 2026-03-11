@@ -27,11 +27,15 @@ Route::get('/', [DashboardController::class, 'index'])->middleware(['auth', 'che
 Route::middleware('guest')->group(function () {
     Route::get('register', [RegisteredUserController::class, 'create'])->name('register');
     Route::post('register', [RegisteredUserController::class, 'store']);
+
+    // Google OAuth Routes
+    Route::get('auth/google', [\App\Http\Controllers\Auth\GoogleAuthController::class, 'redirectToGoogle'])->name('auth.google');
+    Route::get('auth/google/callback', [\App\Http\Controllers\Auth\GoogleAuthController::class, 'handleGoogleCallback']);
 });
 
 // ────────────────────────────────────────────────
 // Email verification routes
-// ────────────────────────────────────────────────
+// ──────────────────────────────────────────────── 
 Route::get('/verify-code', [VerifyCodeController::class, 'show'])->name('verify.code');
 Route::post('/verify-code', [VerifyCodeController::class, 'verify'])->name('verify.code.post');
 
@@ -57,6 +61,8 @@ Route::middleware(['auth', 'check.verified', 'check.banned', 'check.timeout'])->
     Route::post('/manage-my-vault', [ImageController::class, 'store'])->name('images.store');
     Route::delete('/manage-my-vault/{image}', [ImageController::class, 'destroy'])->name('images.destroy');
     Route::post('/manage-albums', [ImageController::class, 'storeAlbum'])->name('albums.store');
+    Route::post('/images/{image}/protect', [ImageController::class, 'protect'])->name('images.protect');
+    Route::delete('/images/{image}/protection', [ImageController::class, 'revert'])->name('images.protection.revert');
 
     Route::get('/gallery', [ImageController::class, 'gallery'])->name('gallery.index');
 

@@ -22,7 +22,7 @@
                 {{ $album->privacy === 'public' ? 'Public Vault' : 'Private Vault' }}
             </span>
             @if(Auth::id() === $album->user_id)
-                <button onclick="openShareModal('{{ $album->id }}', 'App\\Models\\Album')" class="p-3 px-6 glass rounded-2xl text-xs font-bold uppercase tracking-widest hover:bg-white/5 transition-all">مشاركة الألبوم</button>
+                <button onclick="openShareModal('{{ $album->id }}', '{{ addslashes(App\Models\Album::class) }}')" class="p-3 px-6 glass rounded-2xl text-xs font-bold uppercase tracking-widest hover:bg-white/5 transition-all">مشاركة الألبوم</button>
             @endif
         </div>
     </div>

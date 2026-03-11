@@ -73,6 +73,9 @@ class ImageUploadService
             'exif_data' => $exif,
             'metadata' => $metadata,
             'is_comparison' => $data['is_comparison'] ?? false,
+            'is_comparison' => $data['is_comparison'] ?? false,
+            'allow_download' => isset($data['allow_download']),
+            'watermark_on_download' => isset($data['watermark_on_download']),
         ]);
 
         // 4. Dispatch Async Thumbnail Generation
@@ -107,10 +110,10 @@ class ImageUploadService
             $manager = new ImageManager($driver);
             $image = $manager->read($file->getRealPath());
 
-            // 1. Optional Auto-Orientation (Runs first to ensure correct gravity)
-            if ($shouldOrient) {
-                $image->orientate();
-            }
+            // 1. Optional Auto-Orientation (Handled automatically by read() in v3)
+            // if ($shouldOrient) {
+            //     // $image->orientate(); // Removed in v3, auto-orient happens on read
+            // }
 
             // 2. Metadata Stripping & Re-encoding
             // This process creates a BRAND NEW binary structure based only on the pixel data

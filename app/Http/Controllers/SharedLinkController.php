@@ -39,10 +39,11 @@ class SharedLinkController extends Controller
         $request->validate([
             'shareable_id' => 'required|string',
             'shareable_type' => 'required|string|in:App\Models\Image,App\Models\Album',
-            'expires_in' => 'nullable|integer', // hours
-            'permission' => 'nullable|in:view,download',
-            'max_access' => 'nullable|integer|min:1',
-            'auto_rotate' => 'nullable|boolean',
+            'expires_in'        => 'nullable|integer', // hours
+            'permission'         => 'nullable|in:view,download',
+            'max_access'         => 'nullable|integer|min:1',
+            'auto_rotate'        => 'nullable|boolean',
+            'require_watermark'  => 'nullable|boolean',
         ]);
 
         $modelClass = $request->shareable_type;
@@ -57,7 +58,11 @@ class SharedLinkController extends Controller
         $maxAccess = $request->max_access;
         $autoRotate = $request->input('auto_rotate', false);
 
-        $link = $this->service->generate($model, $expiry, null, $maxAccess, $permission, $autoRotate);
+        $requireWatermark = $request->has('require_watermark')
+            ? (bool) $request->input('require_watermark')
+            : null;
+
+        $link = $this->service->generate($model, $expiry, null, $maxAccess, $permission, $autoRotate, $requireWatermark);
         $url = $this->service->getFullUrl($link);
 
         return response()->json([

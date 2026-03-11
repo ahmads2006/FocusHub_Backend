@@ -60,10 +60,16 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
         'bio',
         'verification_code',
         'dynamic_watermark',
+        'watermark_text_color',
+        'watermark_neon_color',
+        'watermark_opacity',
         'auto_orient_default',
         'is_verified',
         'role',
         'stay_logged_in',
+        'google_id',
+        'avatar',
+        'provider_token',
     ];
 
     protected $with = ['userStatus'];
@@ -82,6 +88,7 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
             'password' => 'hashed',
             'is_verified' => 'boolean',
             'dynamic_watermark' => 'boolean',
+            'watermark_opacity' => 'float',
             'auto_orient_default' => 'boolean',
             'role' => 'string',
             'stay_logged_in' => 'boolean',
