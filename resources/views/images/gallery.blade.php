@@ -83,6 +83,28 @@
                         {{-- Shimmer Effect --}}
                         <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full animate-shimmer pointer-events-none"></div>
                         
+                        {{-- Status Badge (Only for Owner/Admin) --}}
+                        @if($isOwner || auth()->user()?->hasRole('super_admin'))
+                            <div class="absolute top-4 left-4 z-10">
+                                @if($image->status === 'approved')
+                                    <span class="bg-green-500/80 backdrop-blur-md text-white text-[10px] px-2 py-1 rounded-full font-bold shadow-lg flex items-center gap-1">
+                                        <div class="w-1.5 h-1.5 bg-white rounded-full animate-pulse"></div>
+                                        Approved
+                                    </span>
+                                @elseif($image->status === 'pending_review')
+                                    <span class="bg-yellow-500/80 backdrop-blur-md text-white text-[10px] px-2 py-1 rounded-full font-bold shadow-lg flex items-center gap-1" title="PII or borderline content detected">
+                                        <div class="w-1.5 h-1.5 bg-white rounded-full animate-bounce"></div>
+                                        Pending Review
+                                    </span>
+                                @elseif($image->status === 'rejected')
+                                    <span class="bg-red-500/80 backdrop-blur-md text-white text-[10px] px-2 py-1 rounded-full font-bold shadow-lg flex items-center gap-1">
+                                        <div class="w-1.5 h-1.5 bg-white rounded-full"></div>
+                                        Rejected
+                                    </span>
+                                @endif
+                            </div>
+                        @endif
+
                         {{-- Interactive Overlay --}}
                         <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-4">
                             <div class="flex justify-between items-center">

@@ -250,14 +250,14 @@ class ContentSafetyService
         }
 
         try {
-            // استخدام الموديلات التي تدعم JSON الخاص بك
+            // استخدام كافة الموديلات المطلوبة للنسخة الثالثة (PII, Drugs, Alcohol, etc.)
             $url = 'https://api.sightengine.com/1.0/check.json?' . http_build_query([
                 'api_user' => $apiUser,
                 'api_secret' => $apiSecret,
-                'models' => 'nudity-2.1,weapon,offensive-2.0,gore-2.0',
+                'models' => 'nudity-2.1,weapon,offensive-2.0,gore-2.0,alcohol,recreational_drug,medical,phones,links,emails',
             ]);
 
-            $response = Http::timeout(25)
+            $response = Http::timeout(40)
                 ->when(app()->environment('local'), function ($http) {
                     return $http->withoutVerifying(); // حل مشكلة SSL في اللوكلي
                 })
