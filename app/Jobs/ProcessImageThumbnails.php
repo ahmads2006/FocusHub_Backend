@@ -11,7 +11,7 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Storage;
 use Intervention\Image\Drivers\Imagick\Driver;
 use Intervention\Image\ImageManager;
-use App\Services\SmartCompressionService;
+use App\Services\AI\SmartCompressionService;
 
 class ProcessImageThumbnails implements ShouldQueue
 {

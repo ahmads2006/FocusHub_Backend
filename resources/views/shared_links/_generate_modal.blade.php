@@ -53,8 +53,8 @@
                     <div class="glass-dark p-6 rounded-3xl border border-white/5">
                         <div class="flex items-center justify-between">
                             <div>
-                                <h4 class="text-sm font-bold tracking-tight">السماح بتحميل ملفات الأصل</h4>
-                                <p class="text-[10px] text-gray-500 mt-1 uppercase">Allow High-Res Download</p>
+                                <h4 class="text-sm font-bold tracking-tight">السماح بالتنزيل</h4>
+                                <p class="text-[10px] text-gray-500 mt-1 uppercase">Allow Download</p>
                             </div>
                             <label class="relative inline-flex items-center cursor-pointer">
                                 <input type="checkbox" name="allow_download" class="sr-only peer" checked>
@@ -71,7 +71,7 @@
                                 <p class="text-[10px] text-gray-500 mt-1 uppercase">Enforce Glass-Neon Protection</p>
                             </div>
                             <label class="relative inline-flex items-center cursor-pointer">
-                                <input type="checkbox" name="require_watermark" class="sr-only peer" checked>
+                                <input type="checkbox" name="require_watermark" class="sr-only peer">
                                 <div class="w-11 h-6 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
                             </label>
                         </div>

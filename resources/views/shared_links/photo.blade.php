@@ -99,16 +99,11 @@
                     </div>
 
                     <div class="pt-8">
-                        @if($link->permission === 'download' && $photo->allow_download)
+                        @if($link->permission === 'download')
                             <a href="{{ $photo->getOriginalUrl() }}" download class="w-full inline-flex items-center justify-center gap-3 accent-gradient p-5 rounded-3xl font-bold uppercase tracking-widest text-[10px] shadow-lg shadow-purple-500/20 hover:scale-[1.02] transition-all">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
                                 تحميل الملف الأصلي
                             </a>
-                        @elseif($link->permission === 'download' && !$photo->allow_download)
-                            <div class="w-full text-center glass p-5 rounded-3xl text-yellow-500 text-[10px] font-bold uppercase tracking-widest border border-yellow-500/20">
-                                <svg class="w-4 h-4 inline-block mb-1 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg><br>
-                                التنزيل معطل من قبل المصور
-                            </div>
                         @else
                             <div class="w-full text-center glass p-5 rounded-3xl text-gray-500 text-[10px] font-bold uppercase tracking-widest">
                                 العرض فقط متاح حالياً

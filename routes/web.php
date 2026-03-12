@@ -1,20 +1,20 @@
 <?php
 
-use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\Web\ProfileController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\Auth\VerifyCodeController;
-use App\Http\Controllers\ImageController;
+use App\Http\Controllers\Web\ImageController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Admin\RoleController as AdminRoleController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Auth;
-use App\Http\Controllers\NotificationController;
-use App\Http\Controllers\TaskController;
-use App\Http\Controllers\TimerController;
-use App\Http\Controllers\ActivityController;
-use App\Http\Controllers\DashboardController;
-use App\Http\Controllers\AlbumController;
+use App\Http\Controllers\Web\NotificationController;
+use App\Http\Controllers\Web\TaskController;
+use App\Http\Controllers\Web\TimerController;
+use App\Http\Controllers\Web\ActivityController;
+use App\Http\Controllers\Web\DashboardController;
+use App\Http\Controllers\Web\AlbumController;
 
 // ────────────────────────────────────────────────
 // Dashboard
@@ -59,6 +59,7 @@ Route::middleware(['auth', 'check.verified', 'check.banned', 'check.timeout'])->
     // إدارة الصور والألبومات (Consolidated)
     Route::get('/manage-my-vault', [ImageController::class, 'manage'])->name('images.index');
     Route::post('/manage-my-vault', [ImageController::class, 'store'])->name('images.store');
+    Route::put('/manage-my-vault/{image}', [ImageController::class, 'update'])->name('images.update');
     Route::delete('/manage-my-vault/{image}', [ImageController::class, 'destroy'])->name('images.destroy');
     Route::get('/download/{image}', [ImageController::class, 'download'])->name('images.download');
     Route::post('/manage-albums', [ImageController::class, 'storeAlbum'])->name('albums.store');
@@ -71,12 +72,15 @@ Route::middleware(['auth', 'check.verified', 'check.banned', 'check.timeout'])->
     Route::get('/lab', function() {
         return view('lab.dashboard');
     })->name('lab.index');
-    Route::post('/lab/process', [\App\Http\Controllers\LabController::class, 'process'])->name('lab.process');
+    Route::post('/lab/process', [\App\Http\Controllers\Web\LabController::class, 'process'])->name('lab.process');
 
     // Album Collaboration & Management
     Route::get('/albums/{album}', [AlbumController::class, 'show'])->name('albums.show');
     Route::post('/albums/{album}/collaborators', [AlbumController::class, 'addCollaborator'])->name('albums.collaborators.add');
     Route::delete('/albums/{album}/collaborators/{user}', [AlbumController::class, 'removeCollaborator'])->name('albums.collaborators.remove');
+    
+    // Image Reporting
+    Route::post('/images/{image}/report', [App\Http\Controllers\Web\ReportController::class, 'image'])->name('images.report');
 });
 
 // ─── لوحة الإدارة (super-admin only) ─────────────────────────────
@@ -92,13 +96,20 @@ Route::middleware(['auth', 'check.verified', 'ProtectAdminPanel'])->prefix('admi
     Route::post('/users/{user}/shadow', [AdminUserController::class, 'toggleShadow'])->name('users.shadow');
     Route::post('/users/{user}/role', [AdminUserController::class, 'updateRole'])->name('users.role');
 
-    // ─── إدارة الصور (Admin Photo Management) ───────────────────────
-    Route::get('/photos', [App\Http\Controllers\Admin\PhotoController::class, 'index'])->name('photos.index');
-    Route::post('/photos/{image}/visibility', [App\Http\Controllers\Admin\PhotoController::class, 'toggleVisibility'])->name('photos.visibility');
-    Route::delete('/photos/{image}', [App\Http\Controllers\Admin\PhotoController::class, 'destroy'])->name('photos.destroy');
-    Route::post('/photos/{image}/ban', [App\Http\Controllers\Admin\PhotoController::class, 'ban'])->name('photos.ban');
-    Route::get('/banned-hashes', [App\Http\Controllers\Admin\PhotoController::class, 'bannedHashes'])->name('banned_hashes.index');
-    Route::delete('/banned-hashes/{hash}', [App\Http\Controllers\Admin\PhotoController::class, 'unbanHash'])->name('banned_hashes.destroy');
+    // ─── إدارة الصور (Admin Photo Management & Moderation) ──────────────────
+    Route::get('/moderation', [App\Http\Controllers\Web\Admin\ModerationController::class, 'index'])->name('moderation.index');
+    Route::post('/photos/{image}/approve', [App\Http\Controllers\Web\Admin\ModerationController::class, 'approve'])->name('photos.approve');
+    Route::post('/photos/{image}/reject', [App\Http\Controllers\Web\Admin\ModerationController::class, 'reject'])->name('photos.reject');
+    Route::post('/users/{user}/ban-system', [App\Http\Controllers\Web\Admin\ModerationController::class, 'banUser'])->name('users.ban_system');
+    Route::post('/reports/{report}/resolve/{action}', [App\Http\Controllers\Web\Admin\ModerationController::class, 'resolveReport'])->name('reports.resolve');
+    
+    Route::get('/photos', [App\Http\Controllers\Web\Admin\PhotoController::class, 'index'])->name('photos.index');
+    Route::post('/photos/{image}/visibility', [App\Http\Controllers\Web\Admin\PhotoController::class, 'toggleVisibility'])->name('photos.visibility');
+    Route::delete('/photos/{image}', [App\Http\Controllers\Web\Admin\PhotoController::class, 'destroy'])->name('photos.destroy');
+    Route::post('/photos/{image}/ban', [App\Http\Controllers\Web\Admin\PhotoController::class, 'ban'])->name('photos.ban');
+
+    Route::get('/banned-hashes', [App\Http\Controllers\Web\Admin\PhotoController::class, 'bannedHashes'])->name('banned_hashes.index');
+    Route::delete('/banned-hashes/{hash}', [App\Http\Controllers\Web\Admin\PhotoController::class, 'unbanHash'])->name('banned_hashes.destroy');
 });
 
 // ────────────────────────────────────────────────
@@ -111,16 +122,16 @@ Route::get('/logout', function () {
 
 // ─── Shared Links (Public Access with Token) ─────────────────────
 Route::middleware(\App\Http\Middleware\ValidateSharedLink::class)->group(function () {
-    Route::get('/s/{token}', [App\Http\Controllers\SharedLinkController::class, 'show'])->name('shared.link.show');
-    Route::post('/s/{token}/verify', [App\Http\Controllers\SharedLinkController::class, 'verifyPassword'])->name('shared.link.verify');
+    Route::get('/s/{token}', [App\Http\Controllers\Web\SharedLinkController::class, 'show'])->name('shared_link.show');
+    Route::post('/s/{token}/verify', [App\Http\Controllers\Web\SharedLinkController::class, 'verifyPassword'])->name('shared_link.verify');
 });
 
 // Generate View Once Link (Authenticated)
-Route::middleware(['auth', 'check.verified'])->post('/images/{image}/share-once', [App\Http\Controllers\SharedLinkController::class, 'generateShareOnceLink'])->name('images.share.once');
+Route::middleware(['auth', 'check.verified'])->post('/images/{image}/share-once', [App\Http\Controllers\Web\SharedLinkController::class, 'generateShareOnceLink'])->name('images.share.once');
 
 // Generate Custom Shared Link (Authenticated)
-Route::middleware(['auth', 'check.verified'])->post('/share/generate', [App\Http\Controllers\SharedLinkController::class, 'generate'])->name('share.generate');
+Route::middleware(['auth', 'check.verified'])->post('/share/generate', [App\Http\Controllers\Web\SharedLinkController::class, 'generate'])->name('share.generate');
 
-Route::middleware(['signed'])->get('/assets/original/{image}', [App\Http\Controllers\AssetAccessController::class, 'serveOriginal'])->name('assets.original');
+Route::middleware(['signed'])->get('/assets/original/{image}', [App\Http\Controllers\Web\AssetAccessController::class, 'serveOriginal'])->name('assets.original');
 
 require __DIR__.'/auth.php';

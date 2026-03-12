@@ -27,8 +27,8 @@ class ProcessImageSecurely implements ShouldQueue
      * Execute the job.
      */
     public function handle(
-        \App\Services\MetadataService $metadataService,
-        \App\Services\SecureShieldService $secureShield
+        \App\Services\AI\MetadataService $metadataService,
+        \App\Services\Security\SecureShieldService $secureShield
     ): void {
         try {
             // 1. Extract Technical EXIF before sanitization

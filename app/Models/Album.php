@@ -37,6 +37,7 @@ class Album extends Model implements HasMedia
         'title',
         'description',
         'privacy',
+        'status',
         'is_collaborative',
         'cover_image',
     ];

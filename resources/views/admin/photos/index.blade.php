@@ -13,6 +13,7 @@
         </div>
         <div class="flex items-center gap-6">
             <a href="{{ route('admin.photos.index') }}" class="text-[10px] font-bold uppercase tracking-[0.2em] {{ request()->routeIs('admin.photos.index') ? 'text-purple-400' : 'text-gray-500 hover:text-gray-300' }} transition-colors">جميع الصور</a>
+            <a href="{{ route('admin.moderation.index') }}" class="text-[10px] font-bold uppercase tracking-[0.2em] {{ request()->routeIs('admin.moderation.index') ? 'text-purple-400' : 'text-gray-500 hover:text-gray-300' }} transition-colors">قائمة المراجعة (AI)</a>
             <a href="{{ route('admin.banned_hashes.index') }}" class="text-[10px] font-bold uppercase tracking-[0.2em] {{ request()->routeIs('admin.banned_hashes.index') ? 'text-purple-400' : 'text-gray-500 hover:text-gray-300' }} transition-colors">البصمات المحظورة</a>
             <a href="{{ route('admin.dashboard') }}" class="text-[10px] font-bold text-gray-700 hover:text-white transition-colors uppercase tracking-[0.2em]">← العودة</a>
         </div>

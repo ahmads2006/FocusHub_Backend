@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Image;
-use App\Services\ImageUploadService;
+use App\Services\Core\ImageService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -12,7 +12,7 @@ class ImageController extends Controller
 {
     protected $imageService;
 
-    public function __construct(ImageUploadService $imageService)
+    public function __construct(ImageService $imageService)
     {
         $this->imageService = $imageService;
     }
@@ -50,7 +50,7 @@ class ImageController extends Controller
             'is_comparison' => 'boolean'
         ]);
 
-        $image = $this->imageService->upload(
+        $image = $this->imageService->processAndUpload(
             $request->file('image'), 
             $request->all(), 
             Auth::id()

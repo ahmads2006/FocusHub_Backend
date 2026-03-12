@@ -33,11 +33,18 @@ class ShadowPrivacyScope implements Scope
 
         if ($user) {
             $builder->where(function ($q) use ($user, $userColumn, $hiddenCondition) {
+                // Owner or Admin can see everything
                 $q->where($userColumn, $user->id)
-                    ->orWhereDoesntHave('user', $hiddenCondition);
+                  ->orWhere(function($sub) use ($hiddenCondition) {
+                      // Others see only APPROVED content from NON-HIDDEN users
+                      $sub->where('status', 'approved')
+                          ->whereDoesntHave('user', $hiddenCondition);
+                  });
             });
         } else {
-            $builder->whereDoesntHave('user', $hiddenCondition);
+            // Guests see only APPROVED content from NON-HIDDEN users
+            $builder->where('status', 'approved')
+                    ->whereDoesntHave('user', $hiddenCondition);
         }
     }
 }

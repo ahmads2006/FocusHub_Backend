@@ -15,6 +15,17 @@ class ImagePolicy
         return $user && $user->id === $image->user_id;
     }
 
+    public function download(?User $user, Image $image): bool
+    {
+        // Owner can always download
+        if ($user && $user->id === $image->user_id) {
+            return true;
+        }
+
+        // Public download is allowed only if the owner enabled it general settings
+        return $image->visibility === 'public' && $image->allow_download;
+    }
+
     public function update(User $user, Image $image): bool
     {
         return $user->id === $image->user_id;

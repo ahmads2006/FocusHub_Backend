@@ -136,11 +136,24 @@
                         </div>
                         @endif
                         <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent flex flex-col justify-end p-6 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
+                             {{-- Status Badges --}}
+                             <div class="absolute top-3 right-3 flex flex-col gap-2">
+                                @if($image->status === 'pending_review')
+                                    <span class="bg-yellow-500/80 backdrop-blur-md text-white text-[8px] font-bold uppercase tracking-widest px-2 py-1 rounded-lg animate-pulse">⏳ في انتظار المراجعة</span>
+                                @elseif($image->status === 'rejected')
+                                    <span class="bg-red-500/80 backdrop-blur-md text-white text-[8px] font-bold uppercase tracking-widest px-2 py-1 rounded-lg">🚫 محتوى مرفوض</span>
+                                @endif
+                             </div>
+
                              <div class="flex flex-col gap-3">
                                 <div class="flex gap-2">
                                     <button onclick="generateShareOnceLink('{{ $image->id }}', this)" class="flex-1 bg-white/10 backdrop-blur-md rounded-xl p-2 text-[10px] font-bold uppercase tracking-widest hover:bg-white/20 transition-all">مشاركة لمرة</button>
                                     <button onclick="openShareModal('{{ $image->id }}', '{{ addslashes(App\Models\Image::class) }}')" class="p-2 bg-purple-500/20 backdrop-blur-md rounded-xl hover:bg-purple-500/40 transition-all">
                                         <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6a3 3 0 100-2.684m0 2.684l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"></path></svg>
+                                    </button>
+                                    {{-- Edit Button --}}
+                                    <button onclick="openEditModal('{{ $image->id }}', '{{ addslashes($image->title ?? '') }}', '{{ $image->album_id }}', '{{ $image->privacy }}', {{ $image->allow_download ? 'true' : 'false' }})" class="p-2 bg-blue-500/20 backdrop-blur-md rounded-xl hover:bg-blue-500/40 transition-all" title="تعديل">
+                                        <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
                                     </button>
                                 </div>
                                 <form action="{{ route('images.destroy', $image) }}" method="POST" onsubmit="return confirm('حذف نهائي؟')">
@@ -158,11 +171,11 @@
                                             <span>🛡 SecureShield Signature</span>
                                             <svg class="w-3 h-3 group-hover/btn:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path></svg>
                                         </button>
-                                        <button onclick="applySecureShield('{{ $image->id }}', 'grid')" class="w-full text-[10px] font-bold text-blue-400 bg-blue-400/10 p-2 rounded-xl hover:bg-blue-400/20 transition-all border border-blue-400/10 uppercase tracking-widest flex items-center justify-center gap-2 group/btn">
-                                            <span>⚡ Total Grid Overlay</span>
-                                        </button>
                                     </div>
                                 @endif
+                                <button onclick="openReportModal('{{ $image->id }}', '{{ addslashes($image->title ?? 'Image') }}')" class="w-full text-[10px] font-bold text-gray-500 hover:text-white transition-all uppercase tracking-widest flex items-center justify-center gap-1 mt-2">
+                                    <i class="fas fa-flag text-[8px]"></i> التبليغ عن الصورة
+                                </button>
                              </div>
                         </div>
                     </div>
@@ -172,8 +185,14 @@
                             <span class="text-[8px] font-bold uppercase px-2 py-0.5 rounded bg-white/5 border border-white/10 text-gray-500">{{ $image->file_type }}</span>
                         </div>
                         <div class="flex items-center gap-2">
-                            <div class="w-1.5 h-1.5 rounded-full {{ $image->privacy === 'public' ? 'bg-green-500' : 'bg-red-500' }}"></div>
-                            <span class="text-[10px] text-gray-400 uppercase tracking-widest font-bold">{{ $image->privacy }}</span>
+                            @php
+                                $statusColor = 'bg-gray-500';
+                                if ($image->status === 'approved') $statusColor = 'bg-green-500';
+                                elseif ($image->status === 'pending_review') $statusColor = 'bg-yellow-500';
+                                elseif ($image->status === 'rejected') $statusColor = 'bg-red-500';
+                            @endphp
+                            <div class="w-1.5 h-1.5 rounded-full {{ $statusColor }}" title="Moderation Status: {{ $image->status }}"></div>
+                            <span class="text-[10px] text-gray-400 uppercase tracking-widest font-bold">{{ $image->privacy }} @if($image->status !== 'approved') <span class="text-gray-600">({{ $image->status }})</span> @endif</span>
                             <span class="text-gray-700 mx-1">•</span>
                             <span class="text-[10px] text-gray-600 font-mono">{{ number_format($image->size / 1024 / 1024, 2) }} MB</span>
                         </div>
@@ -376,8 +395,91 @@
             Swal.fire('خطأ', 'حدث خطأ غير متوقع', 'error');
         }
     }
+
+    function openEditModal(imageId, title, albumId, privacy, allowDownload) {
+        document.getElementById('edit_image_id').value = imageId;
+        document.getElementById('edit_form').action = '/manage-my-vault/' + imageId;
+        document.getElementById('edit_title').value = title;
+        document.getElementById('edit_album_id').value = albumId || '';
+        document.getElementById('edit_privacy').value = privacy;
+        document.getElementById('edit_allow_download').checked = allowDownload;
+        document.getElementById('editImageModal').classList.remove('hidden');
+    }
+
+    function openReportModal(imageId, title) {
+        document.getElementById('report_image_id').value = imageId;
+        document.getElementById('report_image_title').innerText = title;
+        document.getElementById('report_form').action = '/images/' + imageId + '/report';
+        document.getElementById('reportImageModal').classList.remove('hidden');
+    }
 </script>
 @endpush
 
+{{-- ========================= Edit Image Modal ========================= --}}
+<div id="editImageModal" class="hidden fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm bg-black/70" dir="rtl">
+    <div class="glass border border-white/10 rounded-[40px] p-8 w-full max-w-md shadow-2xl relative">
+        <button onclick="document.getElementById('editImageModal').classList.add('hidden')" class="absolute top-4 left-4 text-gray-500 hover:text-white transition-colors text-2xl leading-none">&times;</button>
+        <h3 class="text-xl font-bold tracking-tight mb-6">تعديل <span class="accent-text-gradient">معلومات الصورة</span></h3>
+        <form id="edit_form" method="POST" class="space-y-5">
+            @csrf
+            @method('PUT')
+            <input type="hidden" id="edit_image_id">
+            <div class="space-y-2">
+                <label class="text-[10px] uppercase tracking-widest text-gray-400 font-bold">عنوان الصورة</label>
+                <input type="text" id="edit_title" name="title" class="w-full bg-white/5 border border-white/10 rounded-2xl p-3 px-4 outline-none focus:ring-2 focus:ring-purple-500/50 transition-all" placeholder="عنوان الصورة...">
+            </div>
+            <div class="space-y-2">
+                <label class="text-[10px] uppercase tracking-widest text-gray-400 font-bold">الألبوم</label>
+                <select id="edit_album_id" name="album_id" class="w-full bg-white/5 border border-white/10 rounded-2xl p-3 px-4 outline-none focus:ring-2 focus:ring-purple-500/50 transition-all">
+                    <option value="" class="bg-black">بدون ألبوم</option>
+                    @foreach($ownedAlbums as $album)
+                        <option value="{{ $album->id }}" class="bg-black">{{ $album->title }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="space-y-2">
+                <label class="text-[10px] uppercase tracking-widest text-gray-400 font-bold">الخصوصية</label>
+                <select id="edit_privacy" name="privacy" class="w-full bg-white/5 border border-white/10 rounded-2xl p-3 px-4 outline-none focus:ring-2 focus:ring-purple-500/50 transition-all">
+                    <option value="public" class="bg-black">عامة (Public)</option>
+                    <option value="private" class="bg-black">خاصة (Private)</option>
+                </select>
+            </div>
+            <div class="flex items-center justify-between p-3 bg-purple-500/5 rounded-2xl border border-white/5">
+                <label for="edit_allow_download" class="text-[10px] uppercase tracking-widest text-purple-400 font-bold cursor-pointer">السماح بالتنزيل</label>
+                <input type="checkbox" id="edit_allow_download" name="allow_download" value="1" class="w-4 h-4 accent-purple-500 cursor-pointer">
+            </div>
+            <button type="submit" class="w-full accent-gradient p-4 rounded-2xl font-bold uppercase tracking-widest text-xs shadow-lg shadow-purple-500/20 hover:scale-[1.02] transition-transform">حفظ التغييرات</button>
+        </form>
+    </div>
+</div>
+
 @include('shared_links._generate_modal')
+
+{{-- ========================= Report Image Modal ========================= --}}
+<div id="reportImageModal" class="hidden fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm bg-black/70" dir="rtl">
+    <div class="glass border border-white/10 rounded-[40px] p-8 w-full max-w-md shadow-2xl relative">
+        <button onclick="document.getElementById('reportImageModal').classList.add('hidden')" class="absolute top-4 left-4 text-gray-500 hover:text-white transition-colors text-2xl leading-none">&times;</button>
+        <h3 class="text-xl font-bold tracking-tight mb-2 text-red-400">التبليغ عن محتوى</h3>
+        <p class="text-xs text-gray-400 mb-6">أنت بصدد التبليغ عن الصورة: <span id="report_image_title" class="text-white"></span></p>
+        
+        <form id="report_form" method="POST" class="space-y-5">
+            @csrf
+            <input type="hidden" id="report_image_id" name="image_id">
+            <div class="space-y-2">
+                <label class="text-[10px] uppercase tracking-widest text-gray-400 font-bold">سبب التبليغ</label>
+                <select name="reason" required class="w-full bg-white/5 border border-white/10 rounded-2xl p-3 px-4 outline-none focus:ring-2 focus:ring-red-500/50 transition-all">
+                    <option value="محتوى غير لائق" class="bg-black">محتوى غير لائق / إباحي</option>
+                    <option value="عنف أو كراهية" class="bg-black">عنف أو كراهية</option>
+                    <option value="حقوق ملكية" class="bg-black">حقوق ملكية فكرية</option>
+                    <option value="أخرى" class="bg-black">سبب آخر</option>
+                </select>
+            </div>
+            <div class="space-y-2">
+                <label class="text-[10px] uppercase tracking-widest text-gray-400 font-bold">تفاصيل إضافية</label>
+                <textarea name="details" class="w-full bg-white/5 border border-white/10 rounded-2xl p-3 px-4 outline-none focus:ring-2 focus:ring-red-500/50 transition-all h-24" placeholder="اختياري..."></textarea>
+            </div>
+            <button type="submit" class="w-full bg-red-600 hover:bg-red-700 p-4 rounded-2xl font-bold uppercase tracking-widest text-xs shadow-lg shadow-red-500/20 hover:scale-[1.02] transition-transform">إرسال البلاغ</button>
+        </form>
+    </div>
+</div>
 @endsection

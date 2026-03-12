@@ -47,4 +47,14 @@ return [
         'url_endpoint' => env('IMAGEKIT_URL_ENDPOINT'),
     ],
 
+    'content_safety' => [
+        'enabled' => env('CONTENT_SAFETY_ENABLE', true),
+        'strict_mode' => env('AI_SAFETY_STRICT_MODE', true),
+    ],
+
+    'sightengine' => [
+        'api_user' => env('SIGHTENGINE_API_USER'),
+        'api_secret' => env('SIGHTENGINE_API_SECRET'),
+    ],
+
 ];
