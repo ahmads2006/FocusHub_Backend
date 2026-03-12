@@ -80,72 +80,96 @@ class ContentSafetyService
         }
 
         // LAYER 4: Sightengine AI
-        Log::info("AI Safety: Calling Sightengine API...");
+        Log::info("AI Safety: Calling Sightengine API (Comprehensive)...");
         $sightengineRaw = $this->runSightengineRawCheck($file);
         $metadata['checks']['sightengine'] = $sightengineRaw;
 
         if ($sightengineRaw === null) {
-            // في حال فشل الـ API، نفترض أنها آمنة للمشروع المحلي
+            // Fail-Open Logic for Development
             return ['status' => 'approved', 'reason' => 'Fail-Open (Cloud Down)', 'metadata' => $metadata];
         }
 
-        // تسجيل النقاط في الـ Log للمراجعة
-        Log::info('Sightengine scores for ' . $file->getClientOriginalName() . ': ' . json_encode([
-            'nudity_none' => $sightengineRaw['nudity']['none'] ?? null,
-            'weapon' => $sightengineRaw['weapon']['classes']['firearm'] ?? 0,
-        ]));
+        // --- Extract Values for Comprehensive Analysis ---
+        
+        // 1. Nudity & Safety
+        $isSafeNudity = $sightengineRaw['nudity']['none'] ?? 0;
+        $sexualDisplay = $sightengineRaw['nudity']['sexual_display'] ?? 0;
 
-        // --- منطق اتخاذ القرار المعدل ---
-
-        // حساب أعلى نسب للأسلحة والإساءة
+        // 2. Weapons
         $maxWeapon = max(
             $sightengineRaw['weapon']['classes']['firearm'] ?? 0,
             $sightengineRaw['weapon']['classes']['knife'] ?? 0,
             $sightengineRaw['weapon']['classes']['firearm_gesture'] ?? 0
         );
 
-        $maxOffensive = max(
-            $sightengineRaw['offensive']['nazi'] ?? 0,
-            $sightengineRaw['offensive']['terrorist'] ?? 0,
-            $sightengineRaw['offensive']['middle_finger'] ?? 0
+        // 3. Alcohol & Drugs
+        $alcohol = $sightengineRaw['alcohol']['prob'] ?? 0;
+        $drugs = max(
+            $sightengineRaw['recreational_drug']['prob'] ?? 0,
+            $sightengineRaw['medical']['prob'] ?? 0
         );
 
-        // 1. الرفض الحتمي (Critical Rejection)
-        // نستخدم عتبة عالية جداً (0.85+) لتجنب الحظر الخاطئ
-        $isRejected = ($sightengineRaw['nudity']['sexual_display'] ?? 0) >= 0.85 ||
-                      ($sightengineRaw['nudity']['erotica'] ?? 0) >= 0.85 ||
-                      $maxWeapon >= 0.85 ||
-                      ($sightengineRaw['gore']['prob'] ?? 0) >= 0.75;
+        // 4. Offensive & Gore
+        $offensive = $sightengineRaw['offensive']['prob'] ?? 0;
+        $gore = $sightengineRaw['gore']['prob'] ?? 0;
+
+        // 5. Sensitive Data (PII)
+        $hasSensitiveData = (
+            ($sightengineRaw['phones']['prob'] ?? 0) > 0.5 ||
+            ($sightengineRaw['links']['prob'] ?? 0) > 0.5 ||
+            ($sightengineRaw['emails']['prob'] ?? 0) > 0.5
+        );
+
+        // Log the AI scores for transparency
+        Log::info('Sightengine V3 scores for ' . $file->getClientOriginalName() . ': ' . json_encode([
+            'safe_nudity' => $isSafeNudity,
+            'max_weapon' => $maxWeapon,
+            'gore' => $gore,
+            'pii_detected' => $hasSensitiveData
+        ]));
+
+        // --- Decision Logic (Balanced Version 3) ---
+
+        // A. Critical Rejection (Red Zone)
+        // High confidence violations get immediate rejection and ban.
+        $isRejected = ($isSafeNudity < 0.25) || // Very high nudity probability
+                      ($sexualDisplay > 0.85) ||
+                      ($maxWeapon > 0.80) ||
+                      ($gore > 0.75) ||
+                      ($drugs > 0.85) ||
+                      ($offensive > 0.95);
 
         if ($isRejected) {
-            $this->banHash($fileHash, 'AI Strict Reject', $sightengineRaw);
+            $this->banHash($fileHash, 'Strict Policy Violation (V3)', $sightengineRaw);
             return [
                 'status' => 'rejected', 
-                'reason' => 'Violation detected', 
+                'reason' => 'Violation detected (Strict Policy)', 
                 'metadata' => $metadata
             ];
         }
 
-        // 2. المحتوى المشبوه (Suspicious Content)
-        // التعديل: إذا كانت نسبة "none" (آمن) عالية (مثلاً 0.99)، لن يدخل هنا
-        $isNotNude = ($sightengineRaw['nudity']['none'] ?? 0);
-        
-        $isSuspicious = ($isNotNude < 0.2) || // لا نعتبرها مشبوهة إلا إذا قل الأمان عن 20%
-                        $maxWeapon >= 0.5 ||
-                        ($sightengineRaw['gore']['prob'] ?? 0) >= 0.4;
+        // B. Managed Review (Gray Zone)
+        // Sensitive data, alcohol, or borderline cases go to review.
+        $needsReview = (
+            ($isSafeNudity >= 0.25 && $isSafeNudity <= 0.65) || 
+            ($maxWeapon >= 0.35 && $maxWeapon <= 0.80) ||
+            ($alcohol > 0.60) || 
+            $hasSensitiveData ||
+            $pythonResult === 'SUSPICIOUS'
+        );
 
-        if ($isSuspicious || $pythonResult === 'SUSPICIOUS') {
+        if ($needsReview) {
             return [
                 'status' => 'pending_review',
-                'reason' => 'AI Flagged (Potential Issue)',
+                'reason' => 'Sensitive content/data detected (V3)',
                 'metadata' => $metadata
             ];
         }
 
-        // 3. الموافقة الكاملة
+        // C. Clean Approval (Green Zone)
         return [
             'status' => 'approved',
-            'reason' => 'Clear Pass',
+            'reason' => 'Safe (V3 Verified)',
             'metadata' => $metadata
         ];
     }
