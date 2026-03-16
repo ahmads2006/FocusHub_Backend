@@ -13,23 +13,12 @@ use Symfony\Component\Process\Process;
 
 class ContentSafetyService
 {
-    /**
-     * Validate the file and return the moderation result.
-     * Throws exception ONLY if strictly rejected by policy.
-     */
     public function validate(UploadedFile $file): array
     {
-        $result = $this->check($file);
-
-        // تعديل: الحظر فقط إذا كانت الحالة 'rejected' صراحة
-        // صور 'pending_review' سيتم السماح بها حالياً لتسهيل تجربة المشروع
-        if ($result['status'] === 'rejected') {
-            throw ValidationException::withMessages([
-                'image' => __('هذه الصورة تخالف سياسات الموقع لمكافحة المحتوى غير اللائق، وتم حظرها فوراً.'),
-            ]);
-        }
-
-        return $result;
+        // We now allow all images to be "uploaded" but they will be assigned 
+        // a status (approved, pending_review, rejected) which controls their visibility.
+        // This allows admins to review even the rejected ones in the dashboard.
+        return $this->check($file);
     }
 
     /**
@@ -54,32 +43,36 @@ class ContentSafetyService
             ];
         }
 
+        // LAYER 1.5: Redis-Cached Moderation Results (v10.0 Optimization)
+        $cachedResult = \Illuminate\Support\Facades\Cache::get("moderation_hash:{$fileHash}");
+        if ($cachedResult) {
+            Log::info("AI Safety: Skipping scan. Returning Redis-cached result for hash {$fileHash}");
+            return array_merge($cachedResult, ['metadata' => array_merge($metadata, ['cached_redis' => true])]);
+        }
+
+        // Fallback to checking existing images in DB if Redis is empty
+        $existingStorage = \App\Models\ImageStorage::where('md5_hash', $fileHash)->first();
+        if ($existingStorage) {
+            $existingImage = $existingStorage->image;
+            if ($existingImage) {
+                Log::info("AI Safety: Skipping scan. Returning DB-cached result for hash {$fileHash}");
+                $dbResult = [
+                    'status' => $existingImage->status,
+                    'is_sensitive' => $existingImage->is_sensitive,
+                    'is_visible' => $existingImage->is_visible,
+                    'reason' => 'Cached Result (Duplicate Asset)',
+                ];
+                // Cache it in Redis for next time
+                \Illuminate\Support\Facades\Cache::put("moderation_hash:{$fileHash}", $dbResult, now()->addDays(7));
+                return array_merge($dbResult, ['metadata' => array_merge($metadata, ['cached_db' => true])]);
+            }
+        }
+
         // LAYER 2: Heuristics
         $hasSkinFlag = $this->hasExcessiveSkinTones($filePath);
         $metadata['checks']['skin_heuristic'] = $hasSkinFlag ? 'flagged' : 'pass';
 
-        // LAYER 3: Local Python ML
-        Log::info("AI Safety: Running Python ML...");
-        $pythonScript = base_path('scripts/ai_filter.py');
-        $pythonResult = 'skipped';
-        if (file_exists($pythonScript)) {
-            $pythonRaw = $this->runLocalPythonModel($pythonScript, $filePath);
-            $pythonResult = $pythonRaw; 
-        }
-        $metadata['checks']['local_ml'] = $pythonResult;
-        Log::info("AI Safety: Python ML Result: " . $pythonResult);
-
-        // Auto-Ban if Local AI is UNSAFE
-        if ($pythonResult === 'UNSAFE') {
-            $this->banHash($fileHash, 'Local AI Filter Reject');
-            return [
-                'status' => 'rejected',
-                'reason' => 'Local AI Reject (Security Policy)',
-                'metadata' => $metadata
-            ];
-        }
-
-        // LAYER 4: Sightengine AI
+        // LAYER 3: Sightengine AI
         Log::info("AI Safety: Calling Sightengine API (Comprehensive)...");
         $sightengineRaw = $this->runSightengineRawCheck($file);
         $metadata['checks']['sightengine'] = $sightengineRaw;
@@ -109,69 +102,109 @@ class ContentSafetyService
             $sightengineRaw['medical']['prob'] ?? 0
         );
 
-        // 4. Offensive & Gore
+        // 4. Offensive & Gore (Aggressive Thresholding)
         $offensive = $sightengineRaw['offensive']['prob'] ?? 0;
         $gore = $sightengineRaw['gore']['prob'] ?? 0;
 
         // 5. Sensitive Data (PII)
-        $hasSensitiveData = (
-            ($sightengineRaw['phones']['prob'] ?? 0) > 0.5 ||
-            ($sightengineRaw['links']['prob'] ?? 0) > 0.5 ||
-            ($sightengineRaw['emails']['prob'] ?? 0) > 0.5
-        );
+        $hasSensitiveData = false;
+        $piiModels = ['phones', 'links', 'emails'];
+        foreach ($piiModels as $pii) {
+            if (isset($sightengineRaw[$pii])) {
+                if (($sightengineRaw[$pii]['prob'] ?? 0) > 0.1) $hasSensitiveData = true;
+                if (!empty($sightengineRaw[$pii]['matches'])) $hasSensitiveData = true;
+                if (!empty($sightengineRaw[$pii]['detected'])) $hasSensitiveData = true;
+            }
+        }
+        if (isset($sightengineRaw['text']['profanity']) && count($sightengineRaw['text']['profanity']) > 0) {
+            $hasSensitiveData = true;
+        }
+        if (isset($sightengineRaw['text']['personal']) && count($sightengineRaw['text']['personal']) > 0) {
+            $hasSensitiveData = true;
+        }
 
         // Log the AI scores for transparency
+        Log::info('Sightengine Raw Response: ' . json_encode($sightengineRaw));
         Log::info('Sightengine V3 scores for ' . $file->getClientOriginalName() . ': ' . json_encode([
             'safe_nudity' => $isSafeNudity,
             'max_weapon' => $maxWeapon,
             'gore' => $gore,
+            'alcohol' => $alcohol,
             'pii_detected' => $hasSensitiveData
         ]));
 
-        // --- Decision Logic (Balanced Version 3) ---
+        // --- Decision Logic (3-Tier Image Moderation System) ---
 
-        // A. Critical Rejection (Red Zone)
-        // High confidence violations get immediate rejection and ban.
-        $isRejected = ($isSafeNudity < 0.25) || // Very high nudity probability
-                      ($sexualDisplay > 0.85) ||
-                      ($maxWeapon > 0.80) ||
-                      ($gore > 0.75) ||
-                      ($drugs > 0.85) ||
-                      ($offensive > 0.95);
-
-        if ($isRejected) {
-            $this->banHash($fileHash, 'Strict Policy Violation (V3)', $sightengineRaw);
-            return [
-                'status' => 'rejected', 
-                'reason' => 'Violation detected (Strict Policy)', 
-                'metadata' => $metadata
+        // 1. RED (High Risk / Critical)
+        // Any score failing the Yellow threshold (e.g., Nudity < 0.25 or Weapons > 0.75)
+        // Adjusted Gore strictly: > 0.40 is considered highly graphic.
+        if ($isSafeNudity < 0.25 || $maxWeapon > 0.75 || $gore > 0.40) {
+            $this->banHash($fileHash, 'Strict Policy Violation (Red Zone)', $sightengineRaw);
+            $result = [
+                'status' => 'rejected',
+                'is_sensitive' => true,
+                'is_visible' => false,
+                'reason' => 'Strict Violation',
             ];
+            \Illuminate\Support\Facades\Cache::put("moderation_hash:{$fileHash}", $result, now()->addDays(7));
+            return array_merge($result, ['metadata' => $metadata]);
         }
 
-        // B. Managed Review (Gray Zone)
-        // Sensitive data, alcohol, or borderline cases go to review.
-        $needsReview = (
-            ($isSafeNudity >= 0.25 && $isSafeNudity <= 0.65) || 
-            ($maxWeapon >= 0.35 && $maxWeapon <= 0.80) ||
-            ($alcohol > 0.60) || 
-            $hasSensitiveData ||
-            $pythonResult === 'SUSPICIOUS'
-        );
-
-        if ($needsReview) {
-            return [
+        // 2. YELLOW (Medium Risk / Sensitive)
+        // nudity.none between 0.25 - 0.65 OR weapon/gore between 0.20 - 0.40 OR PII/Alcohol detected.
+        if ($isSafeNudity <= 0.65 || $maxWeapon >= 0.20 || $gore >= 0.20 || $alcohol >= 0.20 || $drugs >= 0.20 || $hasSensitiveData) {
+            $result = [
                 'status' => 'pending_review',
-                'reason' => 'Sensitive content/data detected (V3)',
-                'metadata' => $metadata
+                'is_sensitive' => true,
+                'is_visible' => true,
+                'reason' => 'Sensitive Content/Review Needed (Yellow Zone Triggered)',
             ];
+            \Illuminate\Support\Facades\Cache::put("moderation_hash:{$fileHash}", $result, now()->addDays(7));
+            return array_merge($result, ['metadata' => $metadata]);
         }
 
-        // C. Clean Approval (Green Zone)
-        return [
+        // 3. GREEN (Low Risk / Safe) - Primary Check
+        // LAYER 3: Local Python ML (Secondary Check for GREEN)
+        Log::info("AI Safety: Image passed Sightengine. Running Local Python ML as secondary check...");
+        $pythonScript = base_path('scripts/ai_filter.py');
+        $pythonResult = 'skipped';
+        if (file_exists($pythonScript)) {
+            $pythonResult = $this->runLocalPythonModel($pythonScript, $filePath);
+        }
+        $metadata['checks']['local_ml'] = $pythonResult;
+        Log::info("AI Safety: Python ML Result: " . $pythonResult);
+
+        if ($pythonResult === 'UNSAFE') {
+            $this->banHash($fileHash, 'Local AI Filter Reject (Post-Sightengine)', $sightengineRaw);
+            $result = [
+                'status' => 'rejected',
+                'is_sensitive' => true,
+                'is_visible' => false,
+                'reason' => 'Local AI Strong Reject',
+            ];
+            \Illuminate\Support\Facades\Cache::put("moderation_hash:{$fileHash}", $result, now()->addDays(7));
+            return array_merge($result, ['metadata' => $metadata]);
+        }
+
+        if ($pythonResult === 'SUSPICIOUS') {
+            $result = [
+                'status' => 'pending_review',
+                'is_sensitive' => true,
+                'is_visible' => true,
+                'reason' => 'Local AI Suspicious',
+            ];
+            \Illuminate\Support\Facades\Cache::put("moderation_hash:{$fileHash}", $result, now()->addDays(7));
+            return array_merge($result, ['metadata' => $metadata]);
+        }
+
+        $result = [
             'status' => 'approved',
-            'reason' => 'Safe (V3 Verified)',
-            'metadata' => $metadata
+            'is_sensitive' => false,
+            'is_visible' => true,
+            'reason' => 'Safe (Passed Sightengine & Local ML)',
         ];
+        \Illuminate\Support\Facades\Cache::put("moderation_hash:{$fileHash}", $result, now()->addDays(7));
+        return array_merge($result, ['metadata' => $metadata]);
     }
 
     /**
@@ -250,11 +283,11 @@ class ContentSafetyService
         }
 
         try {
-            // استخدام كافة الموديلات المطلوبة للنسخة الثالثة (PII, Drugs, Alcohol, etc.)
+            // استخدام كافة الموديلات المطلوبة للنسخة الثالثة المتاحة مع اضافة text-content للبيانات الحساسة
             $url = 'https://api.sightengine.com/1.0/check.json?' . http_build_query([
                 'api_user' => $apiUser,
                 'api_secret' => $apiSecret,
-                'models' => 'nudity-2.1,weapon,offensive-2.0,gore-2.0,alcohol,recreational_drug,medical,phones,links,emails',
+                'models' => 'nudity-2.1,weapon,offensive-2.0,gore-2.0,alcohol,recreational_drug,medical,text-content',
             ]);
 
             $response = Http::timeout(40)

@@ -63,22 +63,51 @@
             @forelse($images as $image)
                 {{-- استخدام key فريد لتحسين أداء DOM --}}
                 <div class="glass group rounded-3xl overflow-hidden hover:scale-[1.02] transition-all duration-500 will-change-transform" 
+                     x-data="{ revealed: false }"
                      key="image-{{ $image->id }}">
                      
                     {{-- Image Container with protection for non-owners --}}
                     @php
                         $isOwner = auth()->id() === $image->user_id;
                         $protectionAttrs = !$isOwner ? 'oncontextmenu="return false;" ondragstart="return false;"' : '';
+                        $imgUrl = $image->url;
+                        $cacheBuster = str_contains($imgUrl, '?') ? '&v=' : '?v=';
+                        $imgUrl .= $cacheBuster . $image->updated_at->timestamp;
                     @endphp
                     <div class="relative h-48 overflow-hidden bg-gray-800/50" {!! $protectionAttrs !!}>
                         {{-- Load Image --}}
                         <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" 
-                             data-src="{{ $image->url }}" 
+                             data-src="{{ $imgUrl }}" 
                              alt="{{ $image->title ?: 'Photograph' }}"
-                             class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 lazy select-none"
+                             class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 lazy select-none {{ ($image->is_sensitive || $image->status === 'rejected') ? 'blur-xl' : '' }}"
+                             :class="revealed ? 'blur-0 scale-110' : ''"
                              width="400" 
                              height="300"
                              loading="lazy">
+                        
+                        {{-- Sensitive Content Overlay --}}
+                        @if($image->is_sensitive || $image->status === 'rejected')
+                            <div x-show="!revealed" 
+                                 class="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/60 backdrop-blur-2xl transition-all duration-500">
+                                <div class="bg-red-500/20 p-3 rounded-full mb-3">
+                                    <svg class="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                                    </svg>
+                                </div>
+                                <span class="text-white font-bold text-sm text-center px-4">
+                                    {{ $image->status === 'rejected' ? 'Blocked Content Validation' : 'Warning: Sensitive Content (Nudity/Violence/Other).' }}
+                                </span>
+                                <button @click="revealed = true" 
+                                        class="mt-4 px-6 py-2 bg-white hover:bg-gray-100 text-black text-[10px] font-bold rounded-full transition-transform active:scale-95">
+                                    Show Anyway
+                                </button>
+                            </div>
+                            
+                            {{-- NSFW/Blocked Badge --}}
+                            <div class="absolute top-4 right-4 z-10 bg-red-600 text-white text-[9px] font-black px-2 py-0.5 rounded uppercase tracking-wider">
+                                {{ $image->status === 'rejected' ? 'Rejected' : 'NSFW' }}
+                            </div>
+                        @endif
                         
                         {{-- Shimmer Effect --}}
                         <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full animate-shimmer pointer-events-none"></div>
@@ -178,7 +207,7 @@
         <div class="mt-8">
             @if($images->hasPages())
                 <nav role="navigation" aria-label="Pagination">
-                    {{ $images->onEachSide(1)->links('pagination::custom-tailwind') }}
+                    {{ $images->onEachSide(1)->links() }}
                 </nav>
             @endif
         </div>

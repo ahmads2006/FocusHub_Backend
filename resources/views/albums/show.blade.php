@@ -34,7 +34,7 @@
             
             <!-- Upload in Album -->
             @can('uploadPhoto', $album)
-            <div class="glass p-8 rounded-[40px] border-purple-500/10 border relative overflow-hidden">
+            <div class="glass p-8 rounded-[40px] border-purple-500/10 border relative overflow-hidden mb-8">
                 <h3 class="text-xs font-bold uppercase tracking-widest text-purple-400 mb-6">إضافة أصل جديد للألبوم</h3>
                 <form action="{{ route('images.store') }}" method="POST" enctype="multipart/form-data" class="flex flex-wrap gap-6 items-end">
                     @csrf
@@ -50,7 +50,35 @@
                     <button type="submit" class="accent-gradient p-4 px-8 rounded-2xl font-bold uppercase tracking-widest text-xs shadow-lg shadow-purple-500/20 hover:scale-[1.02] transition-transform">رفع ومعالجة</button>
                 </form>
             </div>
+
+            <!-- Bulk Upload System -->
+            <div class="glass p-8 rounded-[40px] border-blue-500/20 border relative overflow-hidden mb-8">
+                <h3 class="text-xs font-bold uppercase tracking-widest text-blue-400 mb-6">الرفع الجماعي (ZIP/RAR)</h3>
+                
+                <form id="bulk-upload-form" onsubmit="handleBulkUpload(event)" class="flex flex-wrap gap-6 items-end mb-6">
+                    @csrf
+                    <input type="hidden" name="album_id" id="bulk_album_id" value="{{ $album->id }}">
+                    <div class="flex-1 min-w-[200px] space-y-2">
+                         <label class="text-[10px] uppercase tracking-widest text-gray-500 font-bold">مجلد الأرشيف</label>
+                         <input type="file" name="archive" id="bulk_archive" required accept=".zip,.rar" class="w-full bg-white/5 border border-white/10 rounded-2xl p-2 text-xs text-gray-400">
+                    </div>
+                    
+                    <button type="submit" id="bulk-submit-btn" class="bg-blue-600/50 border border-blue-500/50 p-4 px-8 rounded-2xl font-bold uppercase tracking-widest text-xs shadow-lg shadow-blue-500/20 hover:scale-[1.02] transition-transform text-white">رفع المجلد بالكامل</button>
+                </form>
+
+                <!-- Progress Bar UI -->
+                <div id="progress-container" class="hidden space-y-2 mt-4">
+                    <div class="flex justify-between text-[10px] font-bold uppercase tracking-widest text-gray-400">
+                        <span id="upload-status-text">جاري الرفع وبدء المعالجة...</span>
+                        <span id="upload-percentage">0%</span>
+                    </div>
+                    <div class="w-full bg-white/10 rounded-full h-3 overflow-hidden border border-white/5">
+                        <div id="upload-progress-bar" class="bg-blue-500 h-3 rounded-full transition-all duration-300" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
             @endcan
+
 
             <!-- Photo Grid -->
             <div class="glass p-8 rounded-[40px] min-h-[400px]">
@@ -155,4 +183,101 @@
 </div>
 
 @include('shared_links._generate_modal')
+
+<script>
+async function handleBulkUpload(e) {
+    e.preventDefault();
+    
+    let btn = document.getElementById('bulk-submit-btn');
+    let progressContainer = document.getElementById('progress-container');
+    let fileInput = document.getElementById('bulk_archive');
+    let albumId = document.getElementById('bulk_album_id').value;
+    
+    if (fileInput.files.length === 0) return;
+
+    btn.disabled = true;
+    btn.innerHTML = 'جاري المعالجة...';
+    progressContainer.classList.remove('hidden');
+
+    let formData = new FormData();
+    formData.append('archive', fileInput.files[0]);
+    formData.append('album_id', albumId);
+    formData.append('_token', '{{ csrf_token() }}');
+
+    try {
+        let response = await fetch('/api/upload/album', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'Accept': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            let errorData = await response.json();
+            alert('حدث خطأ: ' + (errorData.message || 'فشل الرفع'));
+            btn.disabled = false;
+            btn.innerHTML = 'إعادة المحاولة';
+            return;
+        }
+
+        let result = await response.json();
+        trackUploadProgress(result.job_id);
+
+    } catch (error) {
+        console.error("Upload error:", error);
+        alert('حدث خطأ غير متوقع.');
+        btn.disabled = false;
+        btn.innerHTML = 'إعادة المحاولة';
+    }
+}
+
+async function trackUploadProgress(jobId) {
+    const progressBar = document.getElementById('upload-progress-bar');
+    const statusText = document.getElementById('upload-status-text');
+    const percentageText = document.getElementById('upload-percentage');
+
+    const interval = setInterval(async () => {
+        try {
+            const response = await fetch(`/api/upload/progress/${jobId}`);
+            if (!response.ok) return; // Keep trying if brief network issue
+            
+            const data = await response.json();
+            
+            if (data.status === 'not_found') {
+                clearInterval(interval);
+                return;
+            }
+
+            let percent = data.percentage || 0;
+            progressBar.style.width = `${percent}%`;
+            percentageText.innerText = `${percent}%`;
+            
+            if (data.status === 'extracting') {
+                statusText.innerText = 'جاري فك الضغط وقراءة الملفات...';
+            } else {
+                statusText.innerText = `المعالج: ${data.processed_items} | المرفوض: ${data.failed_items} من ${data.total_items}`;
+            }
+
+            if (data.status === 'completed' || data.status === 'failed') {
+                clearInterval(interval);
+                if (data.status === 'completed') {
+                    statusText.innerText = 'تم الرفع والمعالجة بنجاح! سيتم تحديث الصفحة.';
+                    progressBar.style.width = '100%';
+                    percentageText.innerText = '100%';
+                    progressBar.classList.replace('bg-blue-500', 'bg-green-500');
+                    setTimeout(() => window.location.reload(), 2000);
+                } else {
+                    statusText.innerText = 'فشل في العملية أو الملف تالف.';
+                    progressBar.classList.replace('bg-blue-500', 'bg-red-500');
+                    document.getElementById('bulk-submit-btn').disabled = false;
+                    document.getElementById('bulk-submit-btn').innerHTML = 'محاولة أخرى';
+                }
+            }
+        } catch (error) {
+            console.error("Polling error:", error);
+        }
+    }, 1500);
+}
+</script>
 @endsection

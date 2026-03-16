@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AdminController;
+use App\Http\Controllers\Api\ScannerController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -27,3 +28,10 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'role:super-admin'])->group(
     Route::put('/images/{image}/privacy', [AdminController::class, 'setImagePrivacy']);
     Route::delete('/images/{image}', [AdminController::class, 'deleteImage']);
 });
+
+// ─── Internal Scanner API (Python background scanner only) ─────
+Route::prefix('internal/scanner')->group(function () {
+    Route::get('/images', [ScannerController::class, 'publicImages']);
+    Route::post('/report', [ScannerController::class, 'report']);
+});
+

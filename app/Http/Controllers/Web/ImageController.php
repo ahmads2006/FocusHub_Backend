@@ -32,7 +32,7 @@ class ImageController extends Controller
     public function manage()
     {
         $user = Auth::user();
-        $images = $user->images()->latest()->get();
+        $images = $user->images()->withoutGlobalScope('visible')->latest()->get();
         $ownedAlbums = $user->ownedAlbums()->latest()->get();
         $sharedAlbums = $user->collaborativeAlbums()->latest()->get();
 
@@ -89,6 +89,12 @@ class ImageController extends Controller
                 // Non-fatal: log and continue. The watermark will be generated on-the-fly at download.
                 \Illuminate\Support\Facades\Log::warning('Auto SecureShield failed after upload: ' . $e->getMessage());
             }
+        }
+
+        if ($image->status === 'rejected') {
+            return back()->with('error', 'تم حظر الصورة وحجبها تلقائياً لأنها تخالف سياسات الأمان الخاصة بالمنصة (محتوى غير لائق/عنيف).');
+        } elseif ($image->status === 'pending_review') {
+            return back()->with('warning', 'تم رفع الصورة، لكن تم إخفاؤها مؤقتاً لمراجعتها لاحتمالية احتوائها على محتوى حساس.');
         }
 
         return back()->with('success', 'تم رفع الصورة وتأمينها سحابياً بنجاح! 🛡');
@@ -148,8 +154,11 @@ class ImageController extends Controller
             'title' => $validated['title'] ?? $image->title,
             'album_id' => $request->has('album_id') ? $validated['album_id'] : $image->album_id,
             'privacy' => $validated['privacy'] ?? $image->privacy,
-            'allow_download' => $request->has('allow_download'),
         ]);
+
+        if ($request->has('allow_download')) {
+            $image->settings()->update(['allow_download' => $request->boolean('allow_download')]);
+        }
 
         return back()->with('success', 'تم تحديث معلومات الصورة بنجاح!');
     }

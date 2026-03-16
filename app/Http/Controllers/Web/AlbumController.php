@@ -8,6 +8,9 @@ use App\Models\Album;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Mail;
+use App\Mail\AlbumDeletionOTP;
+use Illuminate\Support\Facades\Log;
 
 class AlbumController extends Controller
 {
@@ -56,6 +59,79 @@ class AlbumController extends Controller
         $album->collaborators()->attach($userToAdd->id, ['role' => $validated['role']]);
 
         return back()->with('success', "تم إضافة {$userToAdd->name} كمتعاون بنجاح.");
+    }
+
+    /**
+     * Update the specifies album.
+     */
+    public function update(Request $request, Album $album)
+    {
+        $this->authorize('update', $album);
+
+        $validated = $request->validate([
+            'title' => 'required|string|max:255',
+            'privacy' => 'required|in:public,private,hidden',
+        ]);
+
+        $album->update($validated);
+
+        return back()->with('success', 'تم تحديث الألبوم بنجاح.');
+    }
+
+    /**
+     * Request a deletion OTP via email.
+     */
+    public function requestDeleteOTP(Album $album)
+    {
+        $this->authorize('delete', $album);
+
+        $code = rand(100000, 999999);
+        
+        // Store in Redis Cache with 10 min TTL
+        \Illuminate\Support\Facades\Cache::put("album_delete_otp_{$album->id}", $code, now()->addMinutes(10));
+
+        try {
+            Mail::to(Auth::user()->email)->send(new AlbumDeletionOTP($code, $album->title));
+        } catch (\Exception $e) {
+            Log::error("Failed to send album deletion OTP: " . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'فشل إرسال البريد الإلكتروني. يرجى المحاولة لاحقاً.'], 500);
+        }
+
+        return response()->json(['success' => true, 'message' => 'تم إرسال رمز التحقق إلى بريدك الإلكتروني.']);
+    }
+
+    /**
+     * Remove the specified album from storage after OTP verification.
+     */
+    public function destroy(Request $request, Album $album)
+    {
+        $this->authorize('delete', $album);
+
+        $request->validate([
+            'otp' => 'required|string|size:6',
+        ]);
+
+        $otpCode = \Illuminate\Support\Facades\Cache::get("album_delete_otp_{$album->id}");
+
+        if (!$otpCode || $otpCode != $request->otp) {
+            return back()->with('error', 'رمز التحقق غير صحيح أو منتهي الصلاحية.');
+        }
+
+        // Cleanup: Delete pictures if the user wants to (or just the album)
+        // For now, let's just delete the album - Eloquent will handle cleanup if Cascade is set, 
+        // but we should probably manually delete images to clear cloud/local storage via ImageService.
+        
+        $imageService = app(\App\Services\Core\ImageService::class);
+        foreach ($album->images as $image) {
+            $imageService->delete($image);
+        }
+
+        $album->delete();
+
+        // Clear OTP from Redis
+        \Illuminate\Support\Facades\Cache::forget("album_delete_otp_{$album->id}");
+
+        return redirect()->route('images.index')->with('success', 'تم حذف الألبوم وكافة محتوياته بنجاح.');
     }
 
     /**

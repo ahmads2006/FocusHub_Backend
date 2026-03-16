@@ -49,13 +49,6 @@ class ImageService
 
             if (config('services.content_safety.enabled', true)) {
                 $moderationResult = $this->contentSafety->validate($file);
-                
-                // CRITICAL: If rejected, block the upload immediately
-                if ($moderationResult['status'] === 'rejected') {
-                    throw ValidationException::withMessages([
-                        'image' => [ $moderationResult['reason'] ?? 'هذه الصورة تخالف سياسات الموقع لمكافحة المحتوى غير اللائق، وتم حظرها فوراً.' ]
-                    ]);
-                }
             }
 
             // 1. Local Pre-Processing: Extract Technical EXIF
@@ -64,46 +57,126 @@ class ImageService
             // 2. Privacy & Sanitization: Strip GPS locally
             $cleanFile = $this->sanitizeLocally($file);
 
-            // 3. Cloud Integration: Upload to ImageKit (with Graceful Local Fallback)
+            // 2.1 Fetch Album context
+            $album = null;
+            if (isset($data['album_id'])) {
+                $album = \App\Models\Album::find($data['album_id']);
+            }
+            $isPublicAlbum = !$album || $album->privacy === 'public';
+
+            // 3. Cloud & Storage Routing
             $imagekitFileId = null;
             $imagekitFilePath = null;
-            
-            try {
-                $cloudResponse = $this->uploadToCloud($cleanFile, $file->getClientOriginalName());
-                $imagekitFileId = $cloudResponse->fileId;
-                $imagekitFilePath = $cloudResponse->filePath;
-                $path = $cloudResponse->filePath;
-            } catch (\Exception $e) {
-                Log::warning("OpticVault Cloud Fallback: " . $e->getMessage() . ". Using local storage.");
-                
-                $fileName = uniqid('fallback_') . '_' . preg_replace('/[^A-Za-z0-9\-\_\.]/', '', $file->getClientOriginalName());
-                $relativePath = 'images/' . $fileName;
-                
-                // Save to public disk so asset('storage/images/...') works via symlink
-                Storage::disk('public')->put($relativePath, file_get_contents($cleanFile));
+            $path = '';
+            $originalPath = null;
+
+            if ($moderationResult['status'] === 'rejected') {
+                if (!$isPublicAlbum) {
+                    // BLOCKED: Red content in private/hidden albums is not allowed
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'image' => 'عذراً، لا يمكن رفع محتوى غير لائق في الألبومات الخاصة أو المشتركة. تم حجب العملية بالكامل.'
+                    ]);
+                }
+
+                // RED LOGIC: Secure Private Quarantine, No Cloud Upload (Public context)
+                $fileName = uniqid('rejected_') . '_' . preg_replace('/[^A-Za-z0-9\-\_\.]/', '', $file->getClientOriginalName());
+                $relativePath = 'quarantine/' . $fileName;
+                Storage::disk('local')->put($relativePath, file_get_contents($cleanFile));
                 $path = $relativePath;
+                $originalPath = $relativePath;
+            } else {
+                if ($moderationResult['is_sensitive'] ?? false) {
+                    // YELLOW LOGIC: Dual-Storage Strategy
+                    // Always save the clean original file securely (needed for privacy transitions)
+                    $originalFileName = uniqid('original_') . '_' . preg_replace('/[^A-Za-z0-9\-\_\.]/', '', $file->getClientOriginalName());
+                    $originalPath = 'secure_uploads/' . $originalFileName;
+                    Storage::disk('local')->put($originalPath, file_get_contents($cleanFile));
+
+                    if ($isPublicAlbum) {
+                        // Server-side Blur & Pixelate for public preview
+                        $img = $this->manager->read($cleanFile);
+                        $img->blur(50)->pixelate(10);
+                        $img->save($cleanFile, quality: 90);
+                    }
+                }
+
+                // GREEN/YELLOW LOGIC: Upload to ImageKit (with Graceful Local Fallback)
+                try {
+                    $cloudResponse = $this->uploadToCloud($cleanFile, $file->getClientOriginalName());
+                    $imagekitFileId = $cloudResponse->fileId;
+                    $imagekitFilePath = $cloudResponse->filePath;
+                    $path = $cloudResponse->filePath;
+                } catch (\Exception $e) {
+                    Log::warning("OpticVault Cloud Fallback: " . $e->getMessage() . ". Using local storage.");
+                    
+                    $fileName = uniqid('fallback_') . '_' . preg_replace('/[^A-Za-z0-9\-\_\.]/', '', $file->getClientOriginalName());
+                    $relativePath = 'images/' . $fileName;
+                    
+                    // Save to public disk so asset('storage/images/...') works via symlink
+                    Storage::disk('public')->put($relativePath, file_get_contents($cleanFile));
+                    $path = $relativePath;
+                }
             }
 
-            // 4. Save to Database
+
+            // 4. Save to Database — normalized over 5 tables
+
+            // 4a. Core image record
             $image = Image::create([
-                'user_id' => $userId,
-                'album_id' => $data['album_id'] ?? null,
-                'title' => $data['title'] ?? 'OpticVault',
-                'filename' => $file->getClientOriginalName(),
+                'user_id'   => $userId,
+                'album_id'  => $data['album_id'] ?? null,
+                'title'     => $data['title'] ?? 'OpticVault',
+                'filename'  => $file->getClientOriginalName(),
                 'file_type' => $file->getClientOriginalExtension(),
-                'path' => $path,
-                'imagekit_file_id' => $imagekitFileId,
-                'imagekit_file_path' => $imagekitFilePath,
-                'technical_specs' => $specs,
-                'size' => $file->getSize(),
-                'privacy' => $data['privacy'] ?? 'public',
-                'allow_download' => isset($data['allow_download']),
-                'watermark_on_download' => isset($data['watermark_on_download']),
-                'status' => $moderationResult['status'],
-                'ai_metadata' => $moderationResult['metadata'],
+                'size'      => $file->getSize(),
+                'privacy'   => $data['privacy'] ?? 'public',
             ]);
 
-            // 5. Cleanup local temporal file
+            // 4b. Storage (paths & cloud)
+            $image->storage()->updateOrCreate(['image_id' => $image->id], [
+                'path'                => $path,
+                'original_path'       => $originalPath,
+                'imagekit_file_id'    => $imagekitFileId,
+                'imagekit_file_path'  => $imagekitFilePath,
+                'md5_hash'            => $moderationResult['metadata']['hash'] ?? md5_file($file->getRealPath()),
+            ]);
+
+            // 4c. Technical EXIF/specs
+            $image->meta()->updateOrCreate(['image_id' => $image->id], [
+                'technical_specs' => $specs,
+            ]);
+
+            // 4d. Moderation status
+            $image->moderation()->updateOrCreate(['image_id' => $image->id], [
+                'status'             => $moderationResult['status'],
+                'is_sensitive'       => $moderationResult['is_sensitive'] ?? false,
+                'is_visible'         => $moderationResult['is_visible'] ?? true,
+                'sensitivity_reason' => $moderationResult['reason'] ?? null,
+                'ai_metadata'        => $moderationResult['metadata'],
+            ]);
+
+            // 4e. Settings/permissions
+            $image->settings()->updateOrCreate(['image_id' => $image->id], [
+                'allow_download'        => isset($data['allow_download']),
+                'watermark_on_download' => isset($data['watermark_on_download']),
+            ]);
+
+            // Refresh so proxy accessors work correctly
+            $image->load(['storage', 'meta', 'moderation', 'settings']);
+
+            // 5. Notify Super Admins if Quarantined
+            if ($image->status === Image::STATUS_REJECTED) {
+                try {
+                    $admins = \App\Models\User::where('role', 'super_admin')->get();
+                    if ($admins->isNotEmpty()) {
+                        \Illuminate\Support\Facades\Notification::send($admins, new \App\Notifications\HighRiskImageUploaded($image));
+                    }
+                } catch (\Exception $e) {
+                    Log::error("Failed to notify Super Admins: " . $e->getMessage());
+                }
+            }
+
+            // 6. Cleanup local temporal file
             if (file_exists($cleanFile)) {
                 @unlink($cleanFile);
             }

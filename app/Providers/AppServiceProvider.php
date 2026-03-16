@@ -22,13 +22,32 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        // Define the gate for the super admin - check the value stored in the database in the role column only
+        // ────────────────────────────────────────────────
+        // Tunnel Configuration (ngrok)
+        // ────────────────────────────────────────────────
+        if (!app()->runningInConsole()) {
+            $host = request()->getHost();
+            if (str_contains($host, 'ngrok-free')) {
+                \Illuminate\Support\Facades\URL::forceScheme('https');
+                \Illuminate\Support\Facades\URL::forceRootUrl('https://' . $host);
+                
+                // Dynamically fix Google Redirect URI for the tunnel
+                config(['services.google.redirect' => 'https://' . $host . '/auth/google/callback']);
+                
+                // Ensure session cookies work over HTTPS tunnels
+                config(['session.secure' => true]);
+                config(['session.same_site' => 'none']);
+            }
+        }
+
+        // Register Observers
+        \App\Models\AlbumSettings::observe(\App\Observers\AlbumSettingsObserver::class);
+
+        // Define the gate for the super admin
         Gate::before(function (User $user) {
             if ($user->role === 'super_admin') {
                 return true;
             }
-            
-            // If they are not a super admin, do not grant them automatic privileges based on their name!
             return null;
         });
 
@@ -36,4 +55,5 @@ class AppServiceProvider extends ServiceProvider
             return config('app.frontend_url')."/password-reset/$token?email={$notifiable->getEmailForPasswordReset()}";
         });
     }
+
 }

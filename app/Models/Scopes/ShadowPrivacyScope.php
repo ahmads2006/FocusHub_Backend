@@ -15,36 +15,47 @@ class ShadowPrivacyScope implements Scope
 {
     public function apply(Builder $builder, Model $model): void
     {
-        $user = auth()->user();
-
-        if ($user && $user->hasRole('super_admin')) {
-            return; // super_admin يرى كل شيء
-        }
-
-        $userColumn = $model->getTable() === 'albums' || $model->getTable() === 'images'
-            ? $model->getTable() . '.user_id'
-            : null;
+        $table = $model->getTable();
+        $userColumn = ($table === 'albums' || $table === 'images') ? $table . '.user_id' : null;
 
         if (!$userColumn) {
             return;
         }
 
         $hiddenCondition = fn ($q) => $q->whereHas('userStatus', fn ($s) => $s->where('is_shadow_hidden', true));
+        $user = auth()->user();
 
-        if ($user) {
-            $builder->where(function ($q) use ($user, $userColumn, $hiddenCondition) {
-                // Owner or Admin can see everything
-                $q->where($userColumn, $user->id)
-                  ->orWhere(function($sub) use ($hiddenCondition) {
-                      // Others see only APPROVED content from NON-HIDDEN users
-                      $sub->where('status', 'approved')
-                          ->whereDoesntHave('user', $hiddenCondition);
-                  });
-            });
-        } else {
-            // Guests see only APPROVED content from NON-HIDDEN users
-            $builder->where('status', 'approved')
-                    ->whereDoesntHave('user', $hiddenCondition);
-        }
+        // status values for approved content
+        $safeStatuses = ['approved', 'pending_review'];
+
+        $builder->where(function ($query) use ($user, $userColumn, $hiddenCondition, $table, $safeStatuses) {
+            // Logic for Images table (normalized status)
+            if ($table === 'images') {
+                $statusCheck = fn($q) => $q->whereHas('moderation', fn($sq) => $sq->whereIn('status', $safeStatuses));
+            } elseif ($table === 'albums') {
+                // Logic for Albums table (normalized status)
+                $statusCheck = fn($q) => $q->whereHas('settings', fn($sq) => $sq->whereIn('status', $safeStatuses));
+            } else {
+                // Default logic for other tables
+                $statusCheck = fn($q) => $q->whereIn('status', $safeStatuses);
+            }
+
+
+            if ($user) {
+                $query->where(function($sub) use ($user, $userColumn, $statusCheck) {
+                    // Owner can see their own content regardless of profile shadow status
+                    $sub->where($userColumn, $user->id);
+                    $statusCheck($sub);
+                })->orWhere(function($sub) use ($hiddenCondition, $statusCheck) {
+                    // Others see only safe content from non-hidden users
+                    $statusCheck($sub);
+                    $sub->whereDoesntHave('user', $hiddenCondition);
+                });
+            } else {
+                // Guests see only safe content from non-hidden users
+                $statusCheck($query);
+                $query->whereDoesntHave('user', $hiddenCondition);
+            }
+        });
     }
 }

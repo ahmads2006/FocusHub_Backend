@@ -17,6 +17,13 @@ class AssetDeliveryService
      */
     public function getUrl(Image $image, string $context = 'gallery'): string
     {
+        // For private albums, if authorized, always prioritize the clean original/unblurred view
+        if ($image->album && $image->album->privacy !== 'public') {
+            if ($this->canAccessOriginal($image) && in_array($context, ['gallery', 'preview', 'original', 'source'])) {
+                return $this->generateSecureOriginalUrl($image);
+            }
+        }
+
         switch ($context) {
             case 'avatar':
             case 'icon':
@@ -44,11 +51,11 @@ class AssetDeliveryService
      */
     protected function generateSecureOriginalUrl(Image $image): string
     {
-        // We use a signed URL that expires in 5 minutes
+        // Cache-busting via updated_at for fresh restoration/transition results
         return URL::temporarySignedRoute(
             'assets.original',
-            now()->addMinutes(5),
-            ['image' => $image->id]
+            now()->addMinutes(10),
+            ['image' => $image->id, 'v' => $image->updated_at->timestamp]
         );
     }
 
@@ -64,15 +71,20 @@ class AssetDeliveryService
             return true;
         }
 
-        // 2. Check if a valid shared link session exists for this image
+        // 2. Collaborators access
+        if ($user && $image->album && $image->album->is_collaborative) {
+            if ($image->album->collaborators()->where('users.id', $user->id)->exists()) {
+                return true;
+            }
+        }
+
+        // 3. Check if a valid shared link session exists for this image
         $sessionAccess = session("shared_link_access_{$image->id}");
         if ($sessionAccess !== null) {
-            // Strictly follow the shared link's permission override
-            // If the link says 'download', we allow it even if the image is globally restricted
             return $sessionAccess === 'download';
         }
 
-        // 3. Public assets are downloadable if allowed by owner
+        // 4. Public assets are downloadable if allowed by owner
         if ($image->privacy === 'public' && $image->allow_download) {
             return true;
         }

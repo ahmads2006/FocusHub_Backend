@@ -18,6 +18,18 @@
                  <span class="text-sm font-bold">{{ session('success') }}</span>
             </div>
         @endif
+        @if(session('error'))
+            <div class="bg-red-500/10 text-red-400 border border-red-500/20 px-6 py-2 rounded-2xl flex items-center gap-2 animate-bounce">
+                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                 <span class="text-sm font-bold">{{ session('error') }}</span>
+            </div>
+        @endif
+        @if(session('warning'))
+            <div class="bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 px-6 py-2 rounded-2xl flex items-center gap-2 animate-bounce">
+                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                 <span class="text-sm font-bold">{{ session('warning') }}</span>
+            </div>
+        @endif
     </div>
 
     <!-- Top Grid: Controls -->
@@ -45,7 +57,7 @@
         </div>
 
         <!-- Unified Upload Panel -->
-        <div class="lg:col-span-2 glass p-8 rounded-[40px] border-purple-500/10 border relative overflow-hidden">
+        <div class="glass p-8 rounded-[40px] border-purple-500/10 border relative overflow-hidden">
             <div class="absolute top-0 right-0 p-8 opacity-5">
                 <svg class="w-24 h-24" fill="currentColor" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"></path></svg>
             </div>
@@ -126,9 +138,36 @@
         <!-- Images Grid -->
         <div x-show="view === 'all'" x-transition class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             @foreach($images as $image)
-                <div class="glass group rounded-[32px] overflow-hidden border border-white/5 hover:border-purple-500/30 transition-all duration-500" id="image-card-{{ $image->id }}">
+                @php
+                    $imgUrl = $image->url;
+                    $cacheBuster = str_contains($imgUrl, '?') ? '&v=' : '?v=';
+                    $imgUrl .= $cacheBuster . $image->updated_at->timestamp;
+                @endphp
+                <div class="glass group rounded-[32px] overflow-hidden border border-white/5 hover:border-purple-500/30 transition-all duration-500" 
+                     x-data="{ revealed: false }"
+                     id="image-card-{{ $image->id }}">
                     <div class="relative h-48 overflow-hidden">
-                        <img src="{{ $image->url }}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000">
+                        <img src="{{ $imgUrl }}" 
+                             class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000 {{ ($image->is_sensitive || $image->status === 'rejected') ? 'blur-xl' : '' }}"
+                             :class="revealed ? 'blur-0 scale-110' : ''">
+                        
+                        {{-- Sensitive Content Overlay --}}
+                        @if($image->is_sensitive || $image->status === 'rejected')
+                            <div x-show="!revealed" 
+                                 class="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/60 backdrop-blur-2xl transition-all duration-500">
+                                <span class="text-white font-bold text-[10px] mb-2 text-center px-2">
+                                    {{ $image->status === 'rejected' ? 'Blocked Content' : 'Warning: Sensitive Content (Nudity/Violence/Other).' }}
+                                </span>
+                                <button @click="revealed = true" 
+                                        class="px-4 py-1.5 bg-white/20 hover:bg-white/30 text-white text-[10px] font-bold rounded-full backdrop-blur-md transition-all">
+                                    Show Anyway
+                                </button>
+                            </div>
+                            
+                            <div class="absolute top-3 right-3 z-30 bg-red-600/90 backdrop-blur-sm text-white text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-tighter">
+                                {{ $image->status === 'rejected' ? 'Rejected' : 'NSFW' }}
+                            </div>
+                        @endif
                         {{-- Shield badge: shown only if a protected copy is active --}}
                         @if(isset($protectedImageIds[$image->id]))
                         <div class="absolute top-3 left-3 bg-purple-500/80 backdrop-blur-md text-white text-[9px] font-bold uppercase tracking-widest px-2 py-1 rounded-lg flex items-center gap-1" title="SecureShield Active">
@@ -215,8 +254,12 @@
                         </div>
                         <div class="flex-1 min-w-0">
                             <h4 class="font-bold truncate text-lg">{{ $album->title }}</h4>
-                            <p class="text-xs text-gray-500 uppercase tracking-widest mt-1">{{ $album->images->count() }} Assets</p>
-                            <a href="{{ route('albums.show', $album) }}" class="inline-block mt-3 text-[10px] font-bold text-purple-400 hover:text-purple-300 transition-colors uppercase tracking-widest">إدارة المحتوى ←</a>
+                            <p class="text-xs text-gray-500 uppercase tracking-widest mt-1">{{ $album->images->count() }} Assets • <span class="text-purple-400/80">{{ $album->privacy }}</span></p>
+                            <div class="flex items-center gap-4 mt-3">
+                                <a href="{{ route('albums.show', $album) }}" class="text-[10px] font-bold text-gray-400 hover:text-white transition-colors uppercase tracking-widest">إدارة المحتوى</a>
+                                <button onclick="openAlbumEditModal('{{ $album->id }}', '{{ addslashes($album->title) }}', '{{ $album->privacy }}')" class="text-[10px] font-bold text-blue-400 hover:text-blue-300 transition-colors uppercase tracking-widest">تعديل</button>
+                                <button onclick="openAlbumDeleteModal('{{ $album->id }}', '{{ addslashes($album->title) }}')" class="text-[10px] font-bold text-red-400 hover:text-red-300 transition-colors uppercase tracking-widest">حذف آمن</button>
+                            </div>
                         </div>
                     </div>
                 @endforeach
@@ -412,6 +455,66 @@
         document.getElementById('report_form').action = '/images/' + imageId + '/report';
         document.getElementById('reportImageModal').classList.remove('hidden');
     }
+
+    function openAlbumEditModal(albumId, title, privacy) {
+        document.getElementById('edit_album_id_val').value = albumId;
+        document.getElementById('edit_album_form').action = '/albums/' + albumId;
+        document.getElementById('edit_album_title').value = title;
+        document.getElementById('edit_album_privacy').value = privacy;
+        document.getElementById('editAlbumModal').classList.remove('hidden');
+    }
+
+    function openAlbumDeleteModal(albumId, title) {
+        document.getElementById('delete_album_id').value = albumId;
+        document.getElementById('delete_album_title_display').innerText = title;
+        document.getElementById('otp_step').action = '/albums/' + albumId;
+        
+        // Reset modal state
+        document.getElementById('otp_step').classList.add('hidden');
+        document.getElementById('request_otp_btn').classList.remove('hidden');
+        document.getElementById('deleteAlbumModal').classList.remove('hidden');
+    }
+
+    async function sendDeleteOTP() {
+        const albumId = document.getElementById('delete_album_id').value;
+        const btn = document.getElementById('request_otp_btn');
+        const originalText = btn.innerText;
+
+        btn.innerText = 'جاري الإرسال...';
+        btn.disabled = true;
+
+        try {
+            const response = await fetch(`/albums/${albumId}/request-delete-otp`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                    'Accept': 'application/json'
+                }
+            });
+            const data = await response.json();
+
+            if (response.ok && data.success) {
+                Swal.fire({
+                    title: 'تم الإرسال!',
+                    text: data.message,
+                    icon: 'info',
+                    toast: true,
+                    position: 'top-end',
+                    showConfirmButton: false,
+                    timer: 3000
+                });
+                document.getElementById('request_otp_btn').classList.add('hidden');
+                document.getElementById('otp_step').classList.remove('hidden');
+            } else {
+                Swal.fire('خطأ', data.message || 'فشل إرسال الرمز', 'error');
+            }
+        } catch (error) {
+            Swal.fire('خطأ', 'حدث خطأ في الاتصال بالسيرفر', 'error');
+        } finally {
+            btn.innerText = originalText;
+            btn.disabled = false;
+        }
+    }
 </script>
 @endpush
 
@@ -455,31 +558,64 @@
 
 @include('shared_links._generate_modal')
 
-{{-- ========================= Report Image Modal ========================= --}}
-<div id="reportImageModal" class="hidden fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm bg-black/70" dir="rtl">
+{{-- ========================= Edit Album Modal ========================= --}}
+<div id="editAlbumModal" class="hidden fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm bg-black/70" dir="rtl">
     <div class="glass border border-white/10 rounded-[40px] p-8 w-full max-w-md shadow-2xl relative">
-        <button onclick="document.getElementById('reportImageModal').classList.add('hidden')" class="absolute top-4 left-4 text-gray-500 hover:text-white transition-colors text-2xl leading-none">&times;</button>
-        <h3 class="text-xl font-bold tracking-tight mb-2 text-red-400">التبليغ عن محتوى</h3>
-        <p class="text-xs text-gray-400 mb-6">أنت بصدد التبليغ عن الصورة: <span id="report_image_title" class="text-white"></span></p>
-        
-        <form id="report_form" method="POST" class="space-y-5">
+        <button onclick="document.getElementById('editAlbumModal').classList.add('hidden')" class="absolute top-4 left-4 text-gray-500 hover:text-white transition-colors text-2xl leading-none">&times;</button>
+        <h3 class="text-xl font-bold tracking-tight mb-6">تعديل <span class="accent-text-gradient">الألبوم</span></h3>
+        <form id="edit_album_form" method="POST" class="space-y-5">
             @csrf
-            <input type="hidden" id="report_image_id" name="image_id">
+            @method('PUT')
+            <input type="hidden" id="edit_album_id_val">
             <div class="space-y-2">
-                <label class="text-[10px] uppercase tracking-widest text-gray-400 font-bold">سبب التبليغ</label>
-                <select name="reason" required class="w-full bg-white/5 border border-white/10 rounded-2xl p-3 px-4 outline-none focus:ring-2 focus:ring-red-500/50 transition-all">
-                    <option value="محتوى غير لائق" class="bg-black">محتوى غير لائق / إباحي</option>
-                    <option value="عنف أو كراهية" class="bg-black">عنف أو كراهية</option>
-                    <option value="حقوق ملكية" class="bg-black">حقوق ملكية فكرية</option>
-                    <option value="أخرى" class="bg-black">سبب آخر</option>
+                <label class="text-[10px] uppercase tracking-widest text-gray-400 font-bold">عنوان الألبوم</label>
+                <input type="text" id="edit_album_title" name="title" required class="w-full bg-white/5 border border-white/10 rounded-2xl p-3 px-4 outline-none focus:ring-2 focus:ring-purple-500/50 transition-all">
+            </div>
+            <div class="space-y-2">
+                <label class="text-[10px] uppercase tracking-widest text-gray-400 font-bold">الخصوصية</label>
+                <select id="edit_album_privacy" name="privacy" class="w-full bg-white/5 border border-white/10 rounded-2xl p-3 px-4 outline-none focus:ring-2 focus:ring-purple-500/50 transition-all">
+                    <option value="public" class="bg-black">عام (Public)</option>
+                    <option value="private" class="bg-black">خاص (Private)</option>
+                    <option value="hidden" class="bg-black">مخفي (Hidden)</option>
                 </select>
             </div>
-            <div class="space-y-2">
-                <label class="text-[10px] uppercase tracking-widest text-gray-400 font-bold">تفاصيل إضافية</label>
-                <textarea name="details" class="w-full bg-white/5 border border-white/10 rounded-2xl p-3 px-4 outline-none focus:ring-2 focus:ring-red-500/50 transition-all h-24" placeholder="اختياري..."></textarea>
-            </div>
-            <button type="submit" class="w-full bg-red-600 hover:bg-red-700 p-4 rounded-2xl font-bold uppercase tracking-widest text-xs shadow-lg shadow-red-500/20 hover:scale-[1.02] transition-transform">إرسال البلاغ</button>
+            <button type="submit" class="w-full accent-gradient p-4 rounded-2xl font-bold uppercase tracking-widest text-xs shadow-lg shadow-purple-500/20 hover:scale-[1.02] transition-transform">حفظ التغييرات</button>
         </form>
+    </div>
+</div>
+
+{{-- ========================= Secure Delete Album Modal ========================= --}}
+<div id="deleteAlbumModal" class="hidden fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm bg-black/70" dir="rtl">
+    <div class="glass border border-white/10 rounded-[40px] p-8 w-full max-w-md shadow-2xl relative">
+        <button onclick="document.getElementById('deleteAlbumModal').classList.add('hidden')" class="absolute top-4 left-4 text-gray-500 hover:text-white transition-colors text-2xl leading-none">&times;</button>
+        <h3 class="text-xl font-bold tracking-tight mb-2 text-red-400">حذف آمن للألبوم</h3>
+        <p class="text-xs text-gray-400 mb-6 font-bold">أنت بصدد حذف الألبوم: <span id="delete_album_title_display" class="text-white"></span></p>
+        
+        <div class="space-y-6">
+            <div id="otp_request_section" class="text-center p-4 bg-white/5 rounded-3xl border border-white/10">
+                <p class="text-[10px] text-gray-500 mb-4 tracking-widest uppercase">يتطلب هذا الإجراء التحقق من هويتك</p>
+                <button type="button" id="request_otp_btn" onclick="sendDeleteOTP()" class="bg-white/10 hover:bg-white/20 text-white px-6 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all">إرسال رمز التحقق للبريد</button>
+            </div>
+
+            <form id="otp_step" method="POST" class="space-y-5 hidden">
+                @csrf
+                @method('DELETE')
+                <input type="hidden" id="delete_album_id">
+                <div class="space-y-2">
+                    <label class="text-[10px] uppercase tracking-widest text-red-400 font-bold text-center block">أدخل رمز التحقق (OTP)</label>
+                    <input type="text" name="otp" id="otp_input_field" maxlength="10" required 
+                           oninvalid="this.setCustomValidity('يرجى إدخال رمز التحقق المكون من 6 أرقام والموجود في بريدك الإلكتروني')" 
+                           oninput="this.setCustomValidity(''); this.value = this.value.replace(/\D/g, '').substring(0,6);"
+                           onpaste="event.preventDefault(); const paste = (event.clipboardData || window.clipboardData).getData('text'); this.value = paste.replace(/\D/g, '').substring(0,6);"
+                           class="w-full bg-white/5 border border-red-500/30 rounded-2xl p-4 text-center text-3xl font-mono tracking-[0.2em] focus:ring-2 focus:ring-red-500/50 outline-none transition-all text-white" 
+                           placeholder="000000">
+                </div>
+                <div class="bg-red-500/10 p-4 rounded-2xl border border-red-500/20">
+                    <p class="text-[9px] text-red-300 leading-relaxed text-center font-bold">تحذير: هذا الإجراء سيؤدي لحذف الألبوم وكافة الصور الموجودة بداخله نهائياً ولا يمكن التراجع عنه.</p>
+                </div>
+                <button type="submit" class="w-full bg-red-600 hover:bg-red-700 p-4 rounded-2xl font-bold uppercase tracking-widest text-xs shadow-lg shadow-red-500/20 hover:scale-[1.02] transition-transform">تأكيد الحذف النهائي</button>
+            </form>
+        </div>
     </div>
 </div>
 @endsection

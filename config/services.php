@@ -57,4 +57,9 @@ return [
         'api_secret' => env('SIGHTENGINE_API_SECRET'),
     ],
 
+    'scanner' => [
+        'api_key' => env('SCANNER_API_KEY'),
+    ],
+
 ];
+

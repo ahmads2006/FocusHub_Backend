@@ -14,8 +14,10 @@ class ModerationController extends Controller
     public function index()
     {
         $pendingImages = Image::withoutGlobalScopes()
-            ->whereIn('status', [Image::STATUS_PENDING_REVIEW, Image::STATUS_UNDER_REVIEW])
-            ->with('user')
+            ->whereHas('moderation', function ($query) {
+                $query->whereIn('status', [Image::STATUS_PENDING_REVIEW, Image::STATUS_UNDER_REVIEW]);
+            })
+            ->with(['user', 'moderation'])
             ->latest()
             ->paginate(20);
 
@@ -27,18 +29,57 @@ class ModerationController extends Controller
         return view('admin.moderation.index', compact('pendingImages', 'reports'));
     }
 
-    public function approve(Image $image)
+    public function approve(Request $request, Image $image)
     {
-        $image->withoutGlobalScopes()->update(['status' => Image::STATUS_APPROVED]);
-        
+        $image->loadMissing(['moderation', 'storage']);
+
+        // If image was sensitive (yellow), restore the clean original from secure_uploads
+        if ($image->is_sensitive && $image->storage?->original_path) {
+            try {
+                $originalContents = \Illuminate\Support\Facades\Storage::disk('local')
+                    ->get($image->storage->original_path);
+
+                if ($originalContents && $image->storage->path) {
+                    \Illuminate\Support\Facades\Storage::disk('public')
+                        ->put($image->storage->path, $originalContents);
+
+                    // Clear ImageKit references so it falls back to the restored local file
+                    if (!empty($image->storage->imagekit_file_path)) {
+                        $image->storage()->update([
+                            'imagekit_file_id'   => null,
+                            'imagekit_file_path' => null,
+                        ]);
+                    }
+
+                    Log::info("Admin restored original clean image from secure_uploads for: {$image->id}");
+                }
+            } catch (\Exception $e) {
+                Log::error("Failed to restore original image for {$image->id}: " . $e->getMessage());
+            }
+        }
+
+        // Update moderation status via the relationship
+        $image->moderation()->updateOrCreate(['image_id' => $image->id], [
+            'status'       => Image::STATUS_APPROVED,
+            'is_sensitive' => false,
+            'is_visible'   => true,
+        ]);
+
+        // Touch the image updated_at for cache-busting
+        $image->withoutGlobalScopes()->touch();
+
         Log::info("Admin approved image: {$image->id}");
 
-        return back()->with('success', __('تم اعتماد الصورة بنجاح.'));
+        return back()->with('success', __('تم اعتماد الصورة بنجاح. تم استعادة النسخة الأصلية النقية.'));
     }
 
     public function reject(Image $image)
     {
-        $image->withoutGlobalScopes()->update(['status' => Image::STATUS_REJECTED]);
+        $image->moderation()->updateOrCreate(['image_id' => $image->id], [
+            'status'     => Image::STATUS_REJECTED,
+            'is_visible' => false,
+        ]);
+        $image->withoutGlobalScopes()->touch();
         
         Log::info("Admin rejected image: {$image->id}");
 

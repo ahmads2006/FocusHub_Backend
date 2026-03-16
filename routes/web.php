@@ -66,6 +66,11 @@ Route::middleware(['auth', 'check.verified', 'check.banned', 'check.timeout'])->
     Route::post('/images/{image}/protect', [ImageController::class, 'protect'])->name('images.protect');
     Route::delete('/images/{image}/protection', [ImageController::class, 'revert'])->name('images.protection.revert');
 
+    // Bulk Upload System
+    Route::get('/bulk-upload', [\App\Http\Controllers\Api\AlbumUploadController::class, 'index'])->name('images.bulk');
+    Route::post('/api/upload/album', [\App\Http\Controllers\Api\AlbumUploadController::class, 'uploadAlbum'])->name('api.upload.album');
+    Route::get('/api/upload/progress/{jobId}', [\App\Http\Controllers\Api\AlbumUploadController::class, 'getUploadProgress'])->name('api.upload.progress');
+
     Route::get('/gallery', [ImageController::class, 'gallery'])->name('gallery.index');
 
     // Laboratory (Feature Testing)
@@ -76,6 +81,9 @@ Route::middleware(['auth', 'check.verified', 'check.banned', 'check.timeout'])->
 
     // Album Collaboration & Management
     Route::get('/albums/{album}', [AlbumController::class, 'show'])->name('albums.show');
+    Route::put('/albums/{album}', [AlbumController::class, 'update'])->name('albums.update');
+    Route::post('/albums/{album}/request-delete-otp', [AlbumController::class, 'requestDeleteOTP'])->name('albums.request_delete_otp');
+    Route::delete('/albums/{album}', [AlbumController::class, 'destroy'])->name('albums.destroy');
     Route::post('/albums/{album}/collaborators', [AlbumController::class, 'addCollaborator'])->name('albums.collaborators.add');
     Route::delete('/albums/{album}/collaborators/{user}', [AlbumController::class, 'removeCollaborator'])->name('albums.collaborators.remove');
     

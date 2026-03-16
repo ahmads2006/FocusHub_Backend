@@ -15,8 +15,20 @@ class ValidateSharedLink
     public function handle(Request $request, Closure $next): Response
     {
         $token = $request->route('token');
+        $tokenHash = hash('sha256', $token);
         
-        $link = SharedLink::where('token_hash', hash('sha256', $token))->first();
+        // 1. Check Redis for Ephemeral Links First
+        $ephemeralData = \Illuminate\Support\Facades\Cache::get("ephemeral_link:{$tokenHash}");
+        
+        if ($ephemeralData) {
+            $link = new SharedLink($ephemeralData);
+            // Re-set the raw token since it's used in rotation/UI
+            $link->exists = true; // Pretend it exists for logic that checks this
+            $link->token = $token;
+        } else {
+            // 2. Fallback to MySQL for Persistent Links
+            $link = SharedLink::where('token_hash', $tokenHash)->first();
+        }
 
         if (!$link || $link->isExpired() || $link->isRevoked() || $link->isLimitReached()) {
             abort(404, 'Shared link is invalid or expired.');
@@ -30,17 +42,27 @@ class ValidateSharedLink
                 // First visit: lock link to this session and rotate token
                 $newToken = \Illuminate\Support\Str::random(64);
                 
-                $link->update([
-                    'session_id' => $sessionId,
-                    'token' => $newToken,
-                ]);
+                if (!$link->id) { // Ephemeral/Redis link
+                    $newTokenHash = hash('sha256', $newToken);
+                    $link->session_id = $sessionId;
+                    $link->token = $newToken;
+                    
+                    $ttl = $link->expires_at ? now()->diffInSeconds($link->expires_at) : 3600;
+                    \Illuminate\Support\Facades\Cache::put("ephemeral_link:{$newTokenHash}", $link->toArray(), $ttl);
+                    \Illuminate\Support\Facades\Cache::forget("ephemeral_link:{$tokenHash}");
+                } else {
+                    $link->update([
+                        'session_id' => $sessionId,
+                        'token' => $newToken,
+                    ]);
+                }
 
                 // Store an indicator that we just rotated the token
                 // to avoid incrementing access count twice on redirect
-                $request->session()->flash("rotated_link_{$link->id}", true);
+                $request->session()->flash("rotated_link_" . ($link->id ?? "redis"), true);
 
                 // Redirect to the new secure URL
-                return redirect()->route('shared.link.show', $newToken);
+                return redirect()->route('shared_link.show', $newToken);
             } else {
                 // Secondary visits: verify session matches
                 if ($link->session_id !== $sessionId) {
@@ -60,9 +82,16 @@ class ValidateSharedLink
         }
 
         // Increment access count (unless we just rotated the token and redirected)
-        if (!$request->session()->has("rotated_link_{$link->id}")) {
-            $link->increment('access_count');
-            $link->update(['last_accessed_at' => now()]);
+        if (!$request->session()->has("rotated_link_" . ($link->id ?? "redis"))) {
+            if (!$link->id) {
+                $link->access_count++;
+                $link->last_accessed_at = now();
+                $ttl = $link->expires_at ? now()->diffInSeconds($link->expires_at) : 3600;
+                \Illuminate\Support\Facades\Cache::put("ephemeral_link:{$tokenHash}", $link->toArray(), $ttl);
+            } else {
+                $link->increment('access_count');
+                $link->update(['last_accessed_at' => now()]);
+            }
         }
 
         // Persist access permissions in session for the AssetAccessController/AssetDeliveryService
