@@ -35,3 +35,5 @@ Route::prefix('internal/scanner')->group(function () {
     Route::post('/report', [ScannerController::class, 'report']);
 });
 
+// ─── Diagnostic API ──────────────────────────────────────────
+Route::get('/health', [App\Http\Controllers\Api\SystemHealthController::class, 'index']);

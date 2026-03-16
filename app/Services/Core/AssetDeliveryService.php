@@ -17,10 +17,18 @@ class AssetDeliveryService
      */
     public function getUrl(Image $image, string $context = 'gallery'): string
     {
-        // For private albums, if authorized, always prioritize the clean original/unblurred view
-        if ($image->album && $image->album->privacy !== 'public') {
-            if ($this->canAccessOriginal($image) && in_array($context, ['gallery', 'preview', 'original', 'source'])) {
-                return $this->generateSecureOriginalUrl($image);
+        // 🚀 SMART ROUTING (v4.0): Force secure signed routes for anything non-public or rejected.
+        // This ensures rejected images (on local disk) and private images are served via the secure pipeline.
+        if ($image->privacy !== 'public' || $image->isRejected() || ($image->album && $image->album->privacy !== 'public')) {
+            if ($this->canAccessOriginal($image)) {
+                // For gallery/thumbnail display → use inline preview route (renders in <img> tags)
+                // For download contexts → use original route (forces download)
+                if (in_array($context, ['gallery', 'preview', 'thumbnail', 'avatar', 'icon', 'square'])) {
+                    return $this->generateSecurePreviewUrl($image);
+                }
+                if (in_array($context, ['original', 'source'])) {
+                    return $this->generateSecureOriginalUrl($image);
+                }
             }
         }
 
@@ -47,7 +55,7 @@ class AssetDeliveryService
     }
 
     /**
-     * Generate a masked, temporary secure URL for the original high-res file.
+     * Generate a masked, temporary secure URL for the original high-res file (download).
      */
     protected function generateSecureOriginalUrl(Image $image): string
     {
@@ -55,6 +63,19 @@ class AssetDeliveryService
         return URL::temporarySignedRoute(
             'assets.original',
             now()->addMinutes(10),
+            ['image' => $image->id, 'v' => $image->updated_at->timestamp]
+        );
+    }
+
+    /**
+     * Generate a masked, temporary secure URL for inline preview display in <img> tags.
+     * Uses the assets.preview route which serves with Content-Disposition: inline.
+     */
+    protected function generateSecurePreviewUrl(Image $image): string
+    {
+        return URL::temporarySignedRoute(
+            'assets.preview',
+            now()->addMinutes(30),  // Longer TTL for gallery caching
             ['image' => $image->id, 'v' => $image->updated_at->timestamp]
         );
     }

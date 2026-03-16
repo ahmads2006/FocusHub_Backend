@@ -53,13 +53,17 @@ class ProcessImageJob implements ShouldQueue
             $manager = new ImageManager(extension_loaded('imagick') ? new ImagickDriver() : new GdDriver());
             $img = $manager->read($absolutePath);
 
-            // Add simple watermark
-            $img->text('OpticVault', $img->width() / 2, $img->height() / 2, function($font) use ($img) {
-                $font->color([255, 255, 255, 0.4]);
-                $font->align('center');
-                $font->valign('middle');
-                $font->size(max(24, intval($img->width() / 20))); // dynamic size based on width
-            });
+            // Add simple watermark (Wrapped in try-catch to prevent technical failure if GD font is missing)
+            try {
+                $img->text('OpticVault', $img->width() / 2, $img->height() / 2, function($font) use ($img) {
+                    $font->color('ffffff'); // Simple white
+                    $font->align('center');
+                    $font->valign('middle');
+                    $font->size(max(24, intval($img->width() / 20))); 
+                });
+            } catch (Exception $e) {
+                \Illuminate\Support\Facades\Log::warning("Watermark failed for {$this->imagePath}, skipping: " . $e->getMessage());
+            }
 
             // 1. Dual-Storage Strategy
             $cleanPath = null;
@@ -90,6 +94,9 @@ class ProcessImageJob implements ShouldQueue
             }
 
             // 3. Save DB Record
+            $album = \App\Models\Album::find($this->albumId);
+            $inheritedPrivacy = $album ? $album->privacy : 'private';
+
             $imageDb = Image::create([
                 'album_id' => $this->albumId,
                 'user_id' => $this->userId,
@@ -97,7 +104,7 @@ class ProcessImageJob implements ShouldQueue
                 'filename' => $filename,
                 'file_type' => strtolower(pathinfo($filename, PATHINFO_EXTENSION)),
                 'size' => filesize($absolutePath),
-                'privacy' => ($this->status === 'rejected') ? 'private' : 'private', // Default to private in bulk
+                'privacy' => ($this->status === 'rejected') ? 'private' : $inheritedPrivacy, 
             ]);
 
             $imageDb->storage()->updateOrCreate(['image_id' => $imageDb->id], [

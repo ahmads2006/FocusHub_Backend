@@ -71,8 +71,6 @@
                         $isOwner = auth()->id() === $image->user_id;
                         $protectionAttrs = !$isOwner ? 'oncontextmenu="return false;" ondragstart="return false;"' : '';
                         $imgUrl = $image->url;
-                        $cacheBuster = str_contains($imgUrl, '?') ? '&v=' : '?v=';
-                        $imgUrl .= $cacheBuster . $image->updated_at->timestamp;
                     @endphp
                     <div class="relative h-48 overflow-hidden bg-gray-800/50" {!! $protectionAttrs !!}>
                         {{-- Load Image --}}

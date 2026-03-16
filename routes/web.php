@@ -141,5 +141,9 @@ Route::middleware(['auth', 'check.verified'])->post('/images/{image}/share-once'
 Route::middleware(['auth', 'check.verified'])->post('/share/generate', [App\Http\Controllers\Web\SharedLinkController::class, 'generate'])->name('share.generate');
 
 Route::middleware(['signed'])->get('/assets/original/{image}', [App\Http\Controllers\Web\AssetAccessController::class, 'serveOriginal'])->name('assets.original');
+Route::middleware(['signed'])->get('/assets/preview/{image}', [App\Http\Controllers\Web\AssetAccessController::class, 'servePreview'])->name('assets.preview');
 
 require __DIR__.'/auth.php';
+Route::get('/debug/health', function() {
+    return view('debug.health');
+});

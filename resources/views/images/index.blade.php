@@ -140,8 +140,6 @@
             @foreach($images as $image)
                 @php
                     $imgUrl = $image->url;
-                    $cacheBuster = str_contains($imgUrl, '?') ? '&v=' : '?v=';
-                    $imgUrl .= $cacheBuster . $image->updated_at->timestamp;
                 @endphp
                 <div class="glass group rounded-[32px] overflow-hidden border border-white/5 hover:border-purple-500/30 transition-all duration-500" 
                      x-data="{ revealed: false }"

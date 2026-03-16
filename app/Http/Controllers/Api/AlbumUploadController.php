@@ -45,7 +45,7 @@ class AlbumUploadController extends Controller
             $album = \App\Models\Album::create([
                 'user_id' => $user->id,
                 'title' => $request->album_name ?: 'Bulk Upload ' . date('Y-m-d H:i'),
-                'privacy' => 'private',
+                'privacy' => 'public', // Default to public so images show in gallery
             ]);
             $albumId = $album->id;
         }

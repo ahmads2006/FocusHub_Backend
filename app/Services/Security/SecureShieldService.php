@@ -44,14 +44,14 @@ class SecureShieldService
         $text     = $settings['watermark_text'];
         $logoPath = $settings['logo_path'] ?? null;
 
-        // --- Smart disk resolution: try 'public' then 'local' ---
-        $absolutePath = $this->resolveAbsolutePath($image->path);
-        if (!$absolutePath) {
-            throw new \RuntimeException("Image file not found on any disk: {$image->path}");
+        // --- Resolve image data from any disk ---
+        $imageData = $this->resolveImageData($image->path);
+        if (!$imageData) {
+            throw new \RuntimeException("Image data could not be retrieved from any disk: {$image->path}");
         }
 
         // 1. Check for existing protected copy (by hash + settings)
-        $fileHash = md5_file($absolutePath);
+        $fileHash = md5($imageData);
         $existing = ProtectedImage::where('hash', $fileHash)
             ->whereNull('reverted_at')
             ->where('image_id', $image->id)
@@ -62,7 +62,7 @@ class SecureShieldService
         }
 
         // 2. Load & Process
-        $interventionImage = $this->manager->read($absolutePath);
+        $interventionImage = $this->manager->read($imageData);
         $analysis          = $this->analyzeImage($image);
 
         if ($mode === 'grid') {
@@ -92,25 +92,24 @@ class SecureShieldService
     }
 
     /**
-     * Resolve the absolute filesystem path for an image, checking public then local disk.
+     * Resolve the image data from any available disk (public, local, s3).
+     * Returns the binary data of the image.
      */
-    protected function resolveAbsolutePath(string $relativePath): ?string
+    protected function resolveImageData(string $relativePath): ?string
     {
-        // 1. Try the public disk first (new fallback uploads: images/fallback_*.*)
-        $publicPath = Storage::disk('public')->path($relativePath);
-        if (file_exists($publicPath)) {
-            return $publicPath;
+        // 1. Try the public disk
+        if (Storage::disk('public')->exists($relativePath)) {
+            return Storage::disk('public')->get($relativePath);
         }
 
-        // 2. Try the local (private) disk (old quarantine/ uploads)
-        $localPath = Storage::disk('local')->path($relativePath);
-        if (file_exists($localPath)) {
-            return $localPath;
+        // 2. Try the local (private) disk
+        if (Storage::disk('local')->exists($relativePath)) {
+            return Storage::disk('local')->get($relativePath);
         }
 
-        // 3. Try as an absolute path
-        if (file_exists($relativePath)) {
-            return $relativePath;
+        // 3. Try the s3 disk (Cloud individual uploads)
+        if (Storage::disk('s3')->exists($relativePath)) {
+            return Storage::disk('s3')->get($relativePath);
         }
 
         return null;

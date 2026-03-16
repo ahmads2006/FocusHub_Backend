@@ -35,6 +35,8 @@ class AssetAccessController extends Controller
      */
     public function serveOriginal(Request $request, Image $image)
     {
+        \Illuminate\Support\Facades\Log::info("AssetAccess: serveOriginal called for image {$image->id}. Signature valid: " . ($request->hasValidSignature() ? 'YES' : 'NO'));
+        
         // 1. Verify the signature
         if (!$request->hasValidSignature()) {
             abort(403, 'Unauthorized access or expired link.');
@@ -42,13 +44,16 @@ class AssetAccessController extends Controller
 
         // 2. Authorization check
         if (!$this->deliveryService->canAccessOriginal($image)) {
+            \Illuminate\Support\Facades\Log::info("AssetAccess: Authorization failed for user " . auth()->id());
             abort(403, 'You do not have permission to download the original file.');
         }
 
         // 3. Determine whether watermark should be applied
-        $isOwner              = auth()->id() === $image->user_id;
+        $isOwner              = Auth::check() && Auth::id() === $image->user_id;
         $sessionLinkWatermark = session("shared_link_watermark_{$image->id}");
         $sessionLinkAccess    = session("shared_link_access_{$image->id}");
+
+        \Illuminate\Support\Facades\Log::info("AssetAccess: isOwner: " . ($isOwner ? 'YES' : 'NO') . " (User ID: " . Auth::id() . ", Image Owner: " . $image->user_id . ")");
 
         if ($sessionLinkWatermark !== null) {
             // Shared-link session override takes priority (even for owner testing)
@@ -63,6 +68,8 @@ class AssetAccessController extends Controller
         } else {
             $shouldWatermark = (bool) ($image->user->dynamic_watermark ?? false);
         }
+
+        \Illuminate\Support\Facades\Log::info("AssetAccess: final shouldWatermark: " . ($shouldWatermark ? 'YES' : 'NO'));
 
         // 4a. No watermark needed → serve original
         if (!$shouldWatermark) {
@@ -105,60 +112,88 @@ class AssetAccessController extends Controller
     }
 
     /**
-     * Helper to stream a file from the public disk.
+     * Serve a preview image inline (for use in <img> src tags).
+     * Uses Content-Disposition: inline so the browser renders it directly.
      */
-    protected function streamImageFile(Image $image): \Symfony\Component\HttpFoundation\StreamedResponse
+    public function servePreview(Request $request, Image $image)
     {
-        // Smart disk resolution - same as SecureShieldService
-        $publicPath = Storage::disk('public')->path($image->path);
-        $localPath  = Storage::disk('local')->path($image->path);
-
-        if (file_exists($publicPath)) {
-            return $this->streamFile($image->path, $image->filename);
+        if (!$request->hasValidSignature()) {
+            abort(403, 'Unauthorized access or expired link.');
         }
 
-        if (file_exists($localPath)) {
-            // Stream directly from private local disk
-            $mime = Storage::disk('local')->mimeType($image->path);
-            $size = Storage::disk('local')->size($image->path);
-            return response()->stream(function () use ($image) {
-                $stream = Storage::disk('local')->readStream($image->path);
-                if ($stream) { fpassthru($stream); fclose($stream); }
-            }, 200, [
-                'Content-Type'        => $mime,
-                'Content-Length'      => $size,
-                'Content-Disposition' => 'attachment; filename="' . $image->filename . '"',
-                'Cache-Control'       => 'no-cache, private',
-            ]);
+        // Only the owner or authorized users can see private previews
+        $isOwner = \Illuminate\Support\Facades\Auth::check() && \Illuminate\Support\Facades\Auth::id() === $image->user_id;
+        if (!$isOwner && $image->privacy !== 'public') {
+            abort(403, 'You do not have permission to view this image.');
         }
 
-        abort(404, 'Image file not found.');
+        return $this->streamImageFile($image, 'inline');
     }
 
     /**
-     * Helper to stream a file with path masking and security headers.
+     * Helper to stream a file from the appropriate storage disk.
      */
-    protected function streamFile(string $path, string $filename)
+    protected function streamImageFile(Image $image, string $disposition = 'attachment'): \Symfony\Component\HttpFoundation\StreamedResponse
     {
-        if (!Storage::disk('public')->exists($path)) {
-            abort(404, 'File not found in secure vault.');
+        \Illuminate\Support\Facades\Log::info("AssetAccess: streamImageFile called for ID {$image->id}. Path: {$image->path}, Disposition: {$disposition}");
+
+        // 1. Try public disk (Bulk uploads / Public previews)
+        if (Storage::disk('public')->exists($image->path)) {
+            \Illuminate\Support\Facades\Log::info("AssetAccess: Found on public disk.");
+            return $this->streamFromDisk('public', $image->path, $image->filename, $disposition);
         }
 
-        $size = Storage::disk('public')->size($path);
-        $mime = Storage::disk('public')->mimeType($path);
+        // 2. Try local disk (Private/Quarantined bulk uploads)
+        if (Storage::disk('local')->exists($image->path)) {
+            \Illuminate\Support\Facades\Log::info("AssetAccess: Found on local disk.");
+            return $this->streamFromDisk('local', $image->path, $image->filename, $disposition);
+        }
 
-        return response()->stream(function () use ($path) {
-            $stream = Storage::disk('public')->readStream($path);
+        // 3. Try s3 disk (Cloud individual uploads)
+        if (Storage::disk('s3')->exists($image->path)) {
+            \Illuminate\Support\Facades\Log::info("AssetAccess: Found on s3 disk.");
+            return $this->streamFromDisk('s3', $image->path, $image->filename, $disposition);
+        }
+
+        \Illuminate\Support\Facades\Log::error("AssetAccess: File not found on any disk for image {$image->id} at path: {$image->path}");
+        abort(404, 'Image file not found in any vault storage.');
+    }
+
+    protected function streamFromDisk(string $disk, string $path, string $filename, string $disposition = 'attachment'): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        $storage = Storage::disk($disk);
+        $size = $storage->size($path);
+        $mime = $storage->mimeType($path);
+        
+        \Illuminate\Support\Facades\Log::info("AssetAccess: Streaming from {$disk}. Path: {$path}, Mime: {$mime}, Size: {$size}, Disposition: {$disposition}");
+
+        // For inline display (gallery/preview), use inline disposition so browsers render the image
+        $contentDisposition = $disposition === 'inline'
+            ? 'inline; filename="' . $filename . '"'
+            : 'attachment; filename="' . $filename . '"';
+
+        return response()->stream(function () use ($storage, $path, $disk) {
+            $stream = $storage->readStream($path);
             if ($stream) {
                 fpassthru($stream);
                 fclose($stream);
+            } else {
+                \Illuminate\Support\Facades\Log::error("AssetAccess: readStream failed for disk {$disk} at path: {$path}");
             }
         }, 200, [
             'Content-Type' => $mime,
             'Content-Length' => $size,
-            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            'Content-Disposition' => $contentDisposition,
             'X-Content-Type-Options' => 'nosniff',
             'Cache-Control' => 'no-cache, private',
         ]);
+    }
+
+    /**
+     * Legacy helper kept for backward compatibility if needed within the class.
+     */
+    protected function streamFile(string $path, string $filename)
+    {
+        return $this->streamFromDisk('public', $path, $filename);
     }
 }
