@@ -56,15 +56,17 @@ class ModerateImageJob implements ShouldQueue
 
         try {
             $result = $safetyService->validate($uploadedFile);
-            $status = $result['status'] ?? 'red';
+            $status = $result['status'] ?? 'rejected';
             $isSensitive = $result['is_sensitive'] ?? false;
+            $reason = $result['reason'] ?? null;
 
-            if ($status === 'red') {
-                $this->markAsFailed();
-            } else {
-                ProcessImageJob::dispatch($this->imagePath, $this->jobId, $this->albumId, $this->userId, $status, $isSensitive);
-            }
+            // ✅ FIX: Always dispatch ProcessImageJob for ALL statuses (approved, pending_review, rejected).
+            // Previously, 'rejected' images were silently dropped — this meant 0 DB records and empty albums.
+            // Now we save all images, mirroring the behavior of the single-upload ImageService pipeline.
+            ProcessImageJob::dispatch($this->imagePath, $this->jobId, $this->albumId, $this->userId, $status, $isSensitive, $reason);
+
         } catch (Exception $e) {
+            \Illuminate\Support\Facades\Log::error("ModerateImageJob failed: " . $e->getMessage());
             $this->markAsFailed();
         }
     }

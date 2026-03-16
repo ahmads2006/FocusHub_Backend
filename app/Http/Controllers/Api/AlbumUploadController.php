@@ -61,6 +61,7 @@ class AlbumUploadController extends Controller
         Redis::set($redisKey, json_encode([
             'total_items' => 0,
             'processed_items' => 0,
+            'rejected_items' => 0,
             'failed_items' => 0,
             'status' => 'extracting'
         ]), 'EX', 86400);
@@ -95,11 +96,12 @@ class AlbumUploadController extends Controller
         
         $total = $decoded['total_items'] ?? 0;
         $processed = $decoded['processed_items'] ?? 0;
+        $rejected = $decoded['rejected_items'] ?? 0;
         $failed = $decoded['failed_items'] ?? 0;
         
         $percentage = 0;
         if ($total > 0) {
-            $percentage = round((($processed + $failed) / $total) * 100);
+            $percentage = round((($processed + $rejected + $failed) / $total) * 100);
         }
 
         $decoded['percentage'] = $percentage;

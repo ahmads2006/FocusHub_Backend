@@ -24,12 +24,13 @@ class ProcessImageJob implements ShouldQueue
     protected $albumId;
     protected $userId;
     protected $status;
+    protected $reason;
     protected $isSensitive;
 
     /**
      * Create a new job instance.
      */
-    public function __construct(string $imagePath, string $jobId, string $albumId, string $userId, string $status, bool $isSensitive)
+    public function __construct(string $imagePath, string $jobId, string $albumId, string $userId, string $status, bool $isSensitive, string $reason = null)
     {
         $this->imagePath = $imagePath;
         $this->jobId = $jobId;
@@ -37,6 +38,7 @@ class ProcessImageJob implements ShouldQueue
         $this->userId = $userId;
         $this->status = $status;
         $this->isSensitive = $isSensitive;
+        $this->reason = $reason;
     }
 
     /**
@@ -59,20 +61,35 @@ class ProcessImageJob implements ShouldQueue
                 $font->size(max(24, intval($img->width() / 20))); // dynamic size based on width
             });
 
-            // 1. Save Clean Original for dual-storage in storage/app/secure_uploads
-            $cleanDir = 'secure_uploads/' . date('Y/m');
-            Storage::disk('local')->makeDirectory($cleanDir);
-            $uid = Str::uuid()->toString();
-            $cleanPath = $cleanDir . '/' . $uid . '_' . $filename;
-            Storage::disk('local')->put($cleanPath, file_get_contents($absolutePath));
+            // 1. Dual-Storage Strategy
+            $cleanPath = null;
+            $publicPath = null;
+            $storagePath = '';
+            
+            if ($this->status === 'rejected') {
+                // RED LOGIC: Secure Private Quarantine, No Cloud/Public Upload
+                $uid = Str::uuid()->toString();
+                $cleanPath = 'quarantine/' . $uid . '_' . $filename;
+                Storage::disk('local')->put($cleanPath, file_get_contents($absolutePath));
+                $storagePath = $cleanPath;
+                // No public preview for rejected content
+            } else {
+                // NORMAL/YELLOW LOGIC: Save Clean Original in storage/app/secure_uploads
+                $cleanDir = 'secure_uploads/' . date('Y/m');
+                Storage::disk('local')->makeDirectory($cleanDir);
+                $uid = Str::uuid()->toString();
+                $cleanPath = $cleanDir . '/' . $uid . '_' . $filename;
+                Storage::disk('local')->put($cleanPath, file_get_contents($absolutePath));
 
-            // 2. Save Public Preview/Watermarked
-            $publicDir = 'images/' . date('Y/m');
-            Storage::disk('public')->makeDirectory($publicDir);
-            $publicPath = $publicDir . '/' . $uid . '_' . $filename;
-            $img->save(Storage::disk('public')->path($publicPath), quality: 80);
+                // Save Public Preview (usually with watermark)
+                $publicDir = 'images/' . date('Y/m');
+                Storage::disk('public')->makeDirectory($publicDir);
+                $publicPath = $publicDir . '/' . $uid . '_' . $filename;
+                $img->save(Storage::disk('public')->path($publicPath), quality: 80);
+                $storagePath = $publicPath;
+            }
 
-            // 3. Save DB Record referencing the Album and saving Paths
+            // 3. Save DB Record
             $imageDb = Image::create([
                 'album_id' => $this->albumId,
                 'user_id' => $this->userId,
@@ -80,18 +97,20 @@ class ProcessImageJob implements ShouldQueue
                 'filename' => $filename,
                 'file_type' => strtolower(pathinfo($filename, PATHINFO_EXTENSION)),
                 'size' => filesize($absolutePath),
-                'privacy' => 'private',
+                'privacy' => ($this->status === 'rejected') ? 'private' : 'private', // Default to private in bulk
             ]);
 
             $imageDb->storage()->updateOrCreate(['image_id' => $imageDb->id], [
                 'original_path' => $cleanPath,
-                'path' => $publicPath, // public URL accessible location
+                'path' => $storagePath, 
                 'md5_hash' => md5_file($absolutePath),
             ]);
 
             $imageDb->moderation()->updateOrCreate(['image_id' => $imageDb->id], [
-                'status' => $this->status, // 'approved', 'rejected', 'pending_review'
+                'status' => $this->status,
                 'is_sensitive' => $this->isSensitive,
+                'is_visible' => ($this->status !== 'rejected'),
+                'sensitivity_reason' => $this->reason,
             ]);
 
             $imageDb->meta()->updateOrCreate(['image_id' => $imageDb->id], [
@@ -106,6 +125,9 @@ class ProcessImageJob implements ShouldQueue
 
             $this->markAsProcessed();
         } catch (Exception $e) {
+            \Illuminate\Support\Facades\Log::error("ProcessImageJob Failed for {$this->imagePath}: " . $e->getMessage(), [
+                'exception' => $e
+            ]);
             $this->markAsFailed();
         }
     }
@@ -115,7 +137,11 @@ class ProcessImageJob implements ShouldQueue
         $redisKey = 'opticvault:upload_progress:' . $this->jobId;
         $data = json_decode(Redis::get($redisKey), true);
         if ($data) {
-            $data['processed_items']++;
+            if ($this->status === 'rejected') {
+                $data['rejected_items'] = ($data['rejected_items'] ?? 0) + 1;
+            } else {
+                $data['processed_items']++;
+            }
             $this->checkIfCompleted($data, $redisKey);
         }
     }

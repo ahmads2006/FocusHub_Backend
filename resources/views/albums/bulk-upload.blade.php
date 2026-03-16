@@ -262,7 +262,7 @@
                 if (data.status === 'extracting') {
                     statusMsg.innerText = 'جاري المعالجة السحابية والفلترة الذكية...';
                 } else {
-                    statusMsg.innerText = `النجاح: ${data.processed_items} | المرفوض: ${data.failed_items}`;
+                    statusMsg.innerHTML = `النجاح: <span class="text-green-400">${data.processed_items}</span> | المرفوض (ذكاء اصطناعي): <span class="text-red-400">${data.rejected_items || 0}</span> | فشل فني: ${data.failed_items}`;
                 }
 
                 if (data.status === 'completed') {
