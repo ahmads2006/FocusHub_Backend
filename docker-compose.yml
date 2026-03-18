@@ -1,0 +1,24 @@
+services:
+  localstack:
+    container_name: opticvault_localstack
+    image: localstack/localstack-pro:latest
+    ports:
+      - "127.0.0.1:4566:4566"            # LocalStack Edge Port
+      - "127.0.0.1:4510-4559:4510-4559"  # External services port range
+    environment:
+      - LOCALSTACK_AUTH_TOKEN=${LOCALSTACK_AUTH_TOKEN:-} # Pass your Pro token here
+      - DEBUG=${DEBUG:-0}
+      - PERSISTENCE=1
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - EXTRA_CORS_ALLOWED_ORIGINS=https://app.localstack.cloud
+      - ENFORCE_IAM=1
+      - AWS_DEFAULT_REGION=us-east-1
+    volumes:
+      - "./localstack_data:/var/lib/localstack"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    networks:
+      - opticvault_network
+
+networks:
+  opticvault_network:
+    driver: bridge

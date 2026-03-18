@@ -150,9 +150,13 @@ class AssetAccessController extends Controller
         }
 
         // 3. Try s3 disk (Cloud individual uploads)
-        if (Storage::disk('s3')->exists($image->path)) {
-            \Illuminate\Support\Facades\Log::info("AssetAccess: Found on s3 disk.");
-            return $this->streamFromDisk('s3', $image->path, $image->filename, $disposition);
+        try {
+            if (Storage::disk('s3')->exists($image->path)) {
+                \Illuminate\Support\Facades\Log::info("AssetAccess: Found on s3 disk.");
+                return $this->streamFromDisk('s3', $image->path, $image->filename, $disposition);
+            }
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::warning("AssetAccess: S3 check failed for image {$image->id}: " . $e->getMessage());
         }
 
         \Illuminate\Support\Facades\Log::error("AssetAccess: File not found on any disk for image {$image->id} at path: {$image->path}");

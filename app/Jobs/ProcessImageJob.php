@@ -26,11 +26,12 @@ class ProcessImageJob implements ShouldQueue
     protected $status;
     protected $reason;
     protected $isSensitive;
+    protected $driver;
 
     /**
      * Create a new job instance.
      */
-    public function __construct(string $imagePath, string $jobId, string $albumId, string $userId, string $status, bool $isSensitive, string $reason = null)
+    public function __construct(string $imagePath, string $jobId, string $albumId, string $userId, string $status, bool $isSensitive, string $reason = null, string $driver = 'unknown')
     {
         $this->imagePath = $imagePath;
         $this->jobId = $jobId;
@@ -39,6 +40,7 @@ class ProcessImageJob implements ShouldQueue
         $this->status = $status;
         $this->isSensitive = $isSensitive;
         $this->reason = $reason;
+        $this->driver = $driver;
     }
 
     /**
@@ -122,6 +124,13 @@ class ProcessImageJob implements ShouldQueue
 
             $imageDb->meta()->updateOrCreate(['image_id' => $imageDb->id], [
                 'technical_specs' => [] // Stubbed for processing
+            ]);
+
+            // Save AI Metadata
+            $imageDb->aiMetadata()->create([
+                'driver_name' => $this->driver,
+                'is_sensitive' => $this->isSensitive,
+                'extracted_tags' => explode(',', $this->reason),
             ]);
 
             // Dispatch other related processing such as thumbnails if the system logic allows

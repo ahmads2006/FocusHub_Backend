@@ -97,6 +97,79 @@ class SharedLinkController extends Controller
         abort(404, 'Shareable content type is not supported.');
     }
 
+    public function downloadAlbum(Request $request, $token)
+    {
+        $link = $request->attributes->get('shared_link');
+        $shareable = $link->shareable;
+
+        if (!$shareable instanceof Album) {
+            abort(404, 'الرابط لا يشير إلى ألبوم.');
+        }
+
+        if ($link->permission !== 'download') {
+            abort(403, 'غير مصرح بتنزيل هذا الألبوم.');
+        }
+
+        $items = $shareable->photos ?? $shareable->images ?? collect();
+        if ($items->isEmpty()) {
+            abort(404, 'الألبوم فارغ ولا يوجد ما يمكن تنزيله.');
+        }
+
+        $zipFileName = 'Album_' . \Illuminate\Support\Str::slug($shareable->title) . '_' . time() . '.zip';
+        $tempDir = storage_path('app/temp');
+        if (!\Illuminate\Support\Facades\File::exists($tempDir)) {
+            \Illuminate\Support\Facades\File::makeDirectory($tempDir, 0755, true);
+        }
+        
+        $zipFilePath = $tempDir . '/' . $zipFileName;
+        $zip = new \ZipArchive();
+        
+        if ($zip->open($zipFilePath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) === true) {
+            $tempFiles = [];
+            
+            foreach ($items as $index => $image) {
+                // Determine storage disk and path
+                $disk = $image->storage->disk ?? 'public';
+                $path = $image->storage->path ?? null;
+                
+                if ($path && \Illuminate\Support\Facades\Storage::disk($disk)->exists($path)) {
+                    $stream = \Illuminate\Support\Facades\Storage::disk($disk)->readStream($path);
+                    if ($stream) {
+                        $tempFile = tempnam(sys_get_temp_dir(), 'album_img_');
+                        $out = fopen($tempFile, 'wb');
+                        stream_copy_to_stream($stream, $out);
+                        fclose($out);
+                        fclose($stream);
+                        
+                        $tempFiles[] = $tempFile;
+                        
+                        // Define a clean name for the ZIP
+                        $ext = pathinfo($image->filename ?? $path, PATHINFO_EXTENSION);
+                        if (!$ext) $ext = 'jpg';
+                        $baseName = \Illuminate\Support\Str::slug($image->title ?: 'image_' . ($index + 1));
+                        $nameInZip = sprintf('%03d', $index + 1) . '_' . $baseName . '.' . $ext;
+                        
+                        $zip->addFile($tempFile, $nameInZip);
+                    }
+                }
+            }
+            $zip->close();
+            
+            // Clean up temporary local files downloaded from cloud/disk
+            foreach ($tempFiles as $tempFile) {
+                if (file_exists($tempFile)) {
+                    @unlink($tempFile);
+                }
+            }
+            
+            if (file_exists($zipFilePath)) {
+                return response()->download($zipFilePath)->deleteFileAfterSend(true);
+            }
+        }
+
+        abort(500, 'فشل في إنشاء ملف الألبوم (ZIP).');
+    }
+
     public function verifyPassword(Request $request, $token)
     {
         $link = SharedLink::where('token_hash', hash('sha256', $token))->firstOrFail();

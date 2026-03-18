@@ -56,6 +56,14 @@
                     </div>
                 </div>
             </div>
+            @if($link->permission === 'download')
+                <div class="pt-6">
+                    <a href="{{ route('shared_link.download_album', ['token' => $link->token ?? request()->route('token')]) }}" class="inline-flex items-center gap-2 accent-gradient text-white px-8 py-3 rounded-2xl font-bold uppercase tracking-widest text-sm shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50 hover:-translate-y-1 transition-all">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                        تنزيل الألبوم بالكامل (ZIP)
+                    </a>
+                </div>
+            @endif
         </header>
 
         <!-- Gallery Grid -->

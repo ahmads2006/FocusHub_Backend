@@ -6,30 +6,37 @@
 <div class="space-y-8" dir="rtl" x-data="{ view: '{{ request()->query('view', 'all') }}' }">
     
     <!-- Page Header -->
-    <div class="flex justify-between items-center">
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
             <h2 class="text-3xl font-bold tracking-tight">إدارة <span class="accent-text-gradient">الأصول</span></h2>
             <p class="text-gray-400 mt-1">تنظيم وحماية مكتبتك الفوتوغرافية.</p>
         </div>
         
-        @if(session('success'))
-            <div class="bg-green-500/10 text-green-400 border border-green-500/20 px-6 py-2 rounded-2xl flex items-center gap-2 animate-bounce">
-                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-                 <span class="text-sm font-bold">{{ session('success') }}</span>
-            </div>
-        @endif
-        @if(session('error'))
-            <div class="bg-red-500/10 text-red-400 border border-red-500/20 px-6 py-2 rounded-2xl flex items-center gap-2 animate-bounce">
-                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
-                 <span class="text-sm font-bold">{{ session('error') }}</span>
-            </div>
-        @endif
-        @if(session('warning'))
-            <div class="bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 px-6 py-2 rounded-2xl flex items-center gap-2 animate-bounce">
-                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
-                 <span class="text-sm font-bold">{{ session('warning') }}</span>
-            </div>
-        @endif
+        <div class="flex flex-wrap items-center gap-4">
+            <a href="{{ route('appeals.history') }}" class="bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 border border-purple-500/20 px-5 py-2 rounded-2xl flex items-center gap-2 transition-all">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                <span class="text-sm font-bold tracking-widest uppercase">المتابعات (Appeals)</span>
+            </a>
+
+            @if(session('success'))
+                <div class="bg-green-500/10 text-green-400 border border-green-500/20 px-6 py-2 rounded-2xl flex items-center gap-2 animate-bounce">
+                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                     <span class="text-sm font-bold">{{ session('success') }}</span>
+                </div>
+            @endif
+            @if(session('error'))
+                <div class="bg-red-500/10 text-red-400 border border-red-500/20 px-6 py-2 rounded-2xl flex items-center gap-2 animate-bounce">
+                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                     <span class="text-sm font-bold">{{ session('error') }}</span>
+                </div>
+            @endif
+            @if(session('warning'))
+                <div class="bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 px-6 py-2 rounded-2xl flex items-center gap-2 animate-bounce">
+                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                     <span class="text-sm font-bold">{{ session('warning') }}</span>
+                </div>
+            @endif
+        </div>
     </div>
 
     <!-- Top Grid: Controls -->
@@ -146,24 +153,106 @@
                      id="image-card-{{ $image->id }}">
                     <div class="relative h-48 overflow-hidden">
                         <img src="{{ $imgUrl }}" 
-                             class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000 {{ ($image->is_sensitive || $image->status === 'rejected') ? 'blur-xl' : '' }}"
+                             class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000 {{ ($image->is_sensitive || $image->status === 'rejected' || $image->status === 'pending_review') ? 'blur-md' : '' }}"
                              :class="revealed ? 'blur-0 scale-110' : ''">
                         
                         {{-- Sensitive Content Overlay --}}
-                        @if($image->is_sensitive || $image->status === 'rejected')
+                        @if($image->is_sensitive || $image->status === 'rejected' || $image->status === 'pending_review')
                             <div x-show="!revealed" 
-                                 class="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/60 backdrop-blur-2xl transition-all duration-500">
-                                <span class="text-white font-bold text-[10px] mb-2 text-center px-2">
-                                    {{ $image->status === 'rejected' ? 'Blocked Content' : 'Warning: Sensitive Content (Nudity/Violence/Other).' }}
-                                </span>
-                                <button @click="revealed = true" 
-                                        class="px-4 py-1.5 bg-white/20 hover:bg-white/30 text-white text-[10px] font-bold rounded-full backdrop-blur-md transition-all">
-                                    Show Anyway
-                                </button>
+                                 class="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/40 backdrop-blur-md transition-all duration-500">
+                                @if($image->status === 'pending_review')
+                                    <div class="bg-yellow-500/20 p-2 rounded-full mb-2">
+                                        <svg class="w-6 h-6 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                        </svg>
+                                    </div>
+                                    <span class="text-white font-bold text-[10px] mb-2 text-center px-2">
+                                        قيد المراجعة — قد يحتوي على محتوى حساس.
+                                    </span>
+                                @else
+                                    <span class="text-white font-bold text-[10px] mb-2 text-center px-2">
+                                        {{ $image->status === 'rejected' ? 'Blocked Content' : 'Warning: Sensitive Content (Nudity/Violence/Other).' }}
+                                    </span>
+                                @endif
+                                <div class="mt-4 flex flex-col gap-2 w-full px-4">
+                                    <button @click="revealed = true" 
+                                            class="w-full px-4 py-1.5 bg-white/20 hover:bg-white/30 text-white text-[10px] font-bold rounded-full backdrop-blur-md transition-all">
+                                        Show Anyway
+                                    </button>
+                                    
+                                    @if($image->status === 'rejected')
+                                        @php
+                                            $pendingAppeal = $image->appeals()->where('status', 'pending')->first();
+                                        @endphp
+                                        @if($pendingAppeal)
+                                            <div class="w-full px-4 py-1.5 bg-yellow-500/20 border border-yellow-500/50 text-yellow-400 text-[10px] font-bold rounded-full transition-transform text-center cursor-not-allowed">
+                                                طلب مراجعة قيد الانتظار
+                                            </div>
+                                        @else
+                                            <button @click="$dispatch('open-appeal-modal-main', { id: '{{ $image->id }}' })" 
+                                                    class="w-full px-4 py-1.5 bg-transparent border border-white hover:bg-white/10 text-white text-[10px] font-bold rounded-full transition-transform">
+                                                طلب مراجعة (Appeal)
+                                            </button>
+                                        @endif
+                                    @endif
+                                </div>
                             </div>
                             
-                            <div class="absolute top-3 right-3 z-30 bg-red-600/90 backdrop-blur-sm text-white text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-tighter">
-                                {{ $image->status === 'rejected' ? 'Rejected' : 'NSFW' }}
+                            {{-- Appeal Modal Fragment for Index View --}}
+                            @if($image->status === 'rejected')
+                                <div x-data="{ open: false, id: '' }"
+                                     @open-appeal-modal-main.window="if ($event.detail.id === '{{ $image->id }}') open = true"
+                                     x-show="open" 
+                                     class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+                                     x-cloak>
+                                    <div @click.away="open = false" class="bg-[#1a1a24] border border-white/10 rounded-2xl w-full max-w-md overflow-hidden relative" dir="rtl">
+                                        <div class="p-4 border-b border-white/10 flex justify-between items-center bg-white/5">
+                                            <h3 class="text-white font-bold">طلب مراجعة الصورة</h3>
+                                            <button @click="open = false" class="text-gray-400 hover:text-white">
+                                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                                            </button>
+                                        </div>
+                                        <form action="{{ route('images.appeal', $image) }}" method="POST" class="p-6 space-y-4">
+                                            @csrf
+                                            <div>
+                                                <label class="block text-sm text-gray-400 mb-1">الاسم الكامل</label>
+                                                <input type="text" name="contact_name" value="{{ auth()->user()->name }}" required class="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-white focus:border-purple-500 outline-none">
+                                            </div>
+                                            <div>
+                                                <label class="block text-sm text-gray-400 mb-1">البريد الإلكتروني للرد</label>
+                                                <input type="email" name="contact_email" value="{{ auth()->user()->email }}" required class="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-white focus:border-purple-500 outline-none">
+                                            </div>
+                                            <div>
+                                                <label class="block text-sm text-gray-400 mb-1">مبررات الطلب</label>
+                                                <textarea name="reason" required minlength="10" rows="4" class="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-white focus:border-purple-500 outline-none"></textarea>
+                                            </div>
+                                            <div class="pt-2">
+                                                <button type="submit" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-purple-500/20">
+                                                    إرسال طلب المراجعة
+                                                </button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            @endif
+                            
+                            @php
+                                $reasons = explode(',', $image->sensitivity_reason ?? '');
+                                $badgeStyle = 'bg-yellow-500/90';
+                                $badgeText = '⏳ Pending';
+                                if ($image->status === 'rejected') {
+                                    $badgeStyle = 'bg-red-600/90';
+                                    $badgeText = 'Rejected';
+                                } else {
+                                    if (in_array('nudity', $reasons)) { $badgeStyle = 'bg-red-500/90'; $badgeText = 'NSFW'; }
+                                    elseif (in_array('weapon', $reasons) || in_array('violence', $reasons)) { $badgeStyle = 'bg-orange-500/90'; $badgeText = 'Violence'; }
+                                    elseif (in_array('alcohol', $reasons) || in_array('drugs', $reasons)) { $badgeStyle = 'bg-blue-500/90'; $badgeText = 'Substances'; }
+                                    elseif (in_array('offensive_text', $reasons)) { $badgeStyle = 'bg-gray-800/90'; $badgeText = 'Offensive'; }
+                                    elseif (in_array('pii', $reasons)) { $badgeStyle = 'bg-purple-500/90'; $badgeText = 'PII'; }
+                                }
+                            @endphp
+                            <div class="absolute top-3 right-3 z-30 {{ $badgeStyle }} backdrop-blur-sm text-white text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-tighter">
+                                {{ $badgeText }}
                             </div>
                         @endif
                         {{-- Shield badge: shown only if a protected copy is active --}}
@@ -221,15 +310,22 @@
                             <h4 class="font-bold text-sm truncate max-w-[120px]">{{ $image->title ?? 'Untitled' }}</h4>
                             <span class="text-[8px] font-bold uppercase px-2 py-0.5 rounded bg-white/5 border border-white/10 text-gray-500">{{ $image->file_type }}</span>
                         </div>
-                        <div class="flex items-center gap-2">
+                        <div class="flex items-center gap-2 flex-wrap">
                             @php
                                 $statusColor = 'bg-gray-500';
                                 if ($image->status === 'approved') $statusColor = 'bg-green-500';
                                 elseif ($image->status === 'pending_review') $statusColor = 'bg-yellow-500';
                                 elseif ($image->status === 'rejected') $statusColor = 'bg-red-500';
                             @endphp
-                            <div class="w-1.5 h-1.5 rounded-full {{ $statusColor }}" title="Moderation Status: {{ $image->status }}"></div>
-                            <span class="text-[10px] text-gray-400 uppercase tracking-widest font-bold">{{ $image->privacy }} @if($image->status !== 'approved') <span class="text-gray-600">({{ $image->status }})</span> @endif</span>
+                            <div class="flex items-center gap-1.5">
+                                <div class="w-1.5 h-1.5 rounded-full {{ $statusColor }}" title="Moderation Status: {{ $image->status }}"></div>
+                                <span class="text-[10px] text-gray-400 uppercase tracking-widest font-bold">{{ $image->privacy }}</span>
+                            </div>
+                            
+                            @if($image->analyzer_name)
+                                <span class="text-[8px] bg-purple-500/10 text-purple-400 px-2 py-0.5 rounded-md border border-purple-500/20 font-bold uppercase tracking-tighter">AI: {{ $image->analyzer_name }}</span>
+                            @endif
+
                             <span class="text-gray-700 mx-1">•</span>
                             <span class="text-[10px] text-gray-600 font-mono">{{ number_format($image->size / 1024 / 1024, 2) }} MB</span>
                         </div>

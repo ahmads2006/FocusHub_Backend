@@ -100,29 +100,40 @@ class ImageService
                     }
                 }
 
-                // GREEN/YELLOW LOGIC: Upload to ImageKit (with Graceful S3 LocalStack Fallback)
+                // GREEN/YELLOW LOGIC: Upload to ImageKit (with Graceful Fallback)
                 try {
                     $cloudResponse = $this->uploadToCloud($cleanFile, $file->getClientOriginalName());
                     $imagekitFileId = $cloudResponse->fileId;
                     $imagekitFilePath = $cloudResponse->filePath;
                     $path = $cloudResponse->filePath;
 
-                    // ── Also push to LocalStack S3 for background Python scanner ──
+                    // ── Optional: Also push to LocalStack S3 for background Python scanner ──
                     try {
-                        $s3Key = 'uploads/' . uniqid() . '_' . preg_replace('/[^A-Za-z0-9\-\_\.]/', '', $file->getClientOriginalName());
+                        $s3Key = 'images/' . date('Y/m') . '/' . uniqid('mirror_') . '_' . preg_replace('/[^A-Za-z0-9\-\_\.]/', '', $file->getClientOriginalName());
                         Storage::disk('s3')->put($s3Key, file_get_contents($cleanFile), 'public');
-                        Log::info("LocalStack S3 mirror upload: {$s3Key}");
                     } catch (\Exception $s3e) {
-                        Log::warning("LocalStack S3 mirror failed (non-critical): " . $s3e->getMessage());
+                        // Mirror failure is non-critical
                     }
 
                 } catch (\Exception $e) {
-                    Log::warning("OpticVault Cloud Fallback: " . $e->getMessage() . ". Uploading to LocalStack S3.");
+                    Log::warning("OpticVault Cloud Failed: " . $e->getMessage() . ". Attempting secondary storages.");
+                    
+                    $fileName = uniqid('fallback_') . '_' . preg_replace('/[^A-Za-z0-9\-\_\.]/', '', $file->getClientOriginalName());
+                    $relativePath = 'images/' . date('Y/m') . '/' . $fileName;
 
-                    $s3Key = 'uploads/' . uniqid() . '_' . preg_replace('/[^A-Za-z0-9\-\_\.]/', '', $file->getClientOriginalName());
-                    Storage::disk('s3')->put($s3Key, file_get_contents($cleanFile), 'public');
-                    $path = $s3Key;
-                    Log::info("Fallback upload to LocalStack S3: {$s3Key}");
+                    // 1. Try S3 (LocalStack)
+                    try {
+                        Storage::disk('s3')->put($relativePath, file_get_contents($cleanFile), 'public');
+                        $path = $relativePath;
+                        Log::info("Fallback upload to LocalStack S3 successful: {$relativePath}");
+                    } catch (\Exception $s3e) {
+                        Log::warning("LocalStack S3 fallback failed: " . $s3e->getMessage() . ". Final fallback to LOCAL Public disk.");
+                        
+                        // 2. Final Fallback: Store on local public disk for instant visibility
+                        Storage::disk('public')->put($relativePath, file_get_contents($cleanFile));
+                        $path = $relativePath;
+                        Log::info("Final local fallback successful: {$relativePath}");
+                    }
                 }
             }
 

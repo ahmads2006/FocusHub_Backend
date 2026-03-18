@@ -17,10 +17,11 @@ class AssetDeliveryService
      */
     public function getUrl(Image $image, string $context = 'gallery'): string
     {
-        // 🚀 SMART ROUTING (v4.0): Force secure signed routes for anything non-public or rejected.
-        // This ensures rejected images (on local disk) and private images are served via the secure pipeline.
-        if ($image->privacy !== 'public' || $image->isRejected() || ($image->album && $image->album->privacy !== 'public')) {
-            if ($this->canAccessOriginal($image)) {
+        // 🚀 SMART ROUTING (v4.0): Force secure signed routes for anything non-public, rejected, or NOT in ImageKit.
+        // This ensures cloud-fallback assets (S3/local) are found correctly.
+        $isInCloud = !empty($image->storage->imagekit_file_id);
+        if (!$isInCloud || $image->privacy !== 'public' || $image->isRejected() || ($image->album && $image->album->privacy !== 'public')) {
+            if ($this->canAccessOriginal($image) || $image->privacy === 'public') {
                 // For gallery/thumbnail display → use inline preview route (renders in <img> tags)
                 // For download contexts → use original route (forces download)
                 if (in_array($context, ['gallery', 'preview', 'thumbnail', 'avatar', 'icon', 'square'])) {

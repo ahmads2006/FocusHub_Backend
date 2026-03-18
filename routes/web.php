@@ -87,8 +87,13 @@ Route::middleware(['auth', 'check.verified', 'check.banned', 'check.timeout'])->
     Route::post('/albums/{album}/collaborators', [AlbumController::class, 'addCollaborator'])->name('albums.collaborators.add');
     Route::delete('/albums/{album}/collaborators/{user}', [AlbumController::class, 'removeCollaborator'])->name('albums.collaborators.remove');
     
-    // Image Reporting
+    // Image Reporting & Appeals
     Route::post('/images/{image}/report', [App\Http\Controllers\Web\ReportController::class, 'image'])->name('images.report');
+    
+    // Appeals Routes
+    Route::get('/appeals', [App\Http\Controllers\Web\AppealController::class, 'index'])->name('appeals.history');
+    Route::get('/images/{image}/appeal', [App\Http\Controllers\Web\AppealController::class, 'create'])->name('images.appeal.create');
+    Route::post('/images/{image}/appeal', [App\Http\Controllers\Web\AppealController::class, 'store'])->name('images.appeal');
 });
 
 // ─── لوحة الإدارة (super-admin only) ─────────────────────────────
@@ -111,6 +116,11 @@ Route::middleware(['auth', 'check.verified', 'ProtectAdminPanel'])->prefix('admi
     Route::post('/users/{user}/ban-system', [App\Http\Controllers\Web\Admin\ModerationController::class, 'banUser'])->name('users.ban_system');
     Route::post('/reports/{report}/resolve/{action}', [App\Http\Controllers\Web\Admin\ModerationController::class, 'resolveReport'])->name('reports.resolve');
     
+    // Appeals Management
+    Route::get('/appeals', [App\Http\Controllers\Web\Admin\AppealController::class, 'index'])->name('appeals.index');
+    Route::post('/appeals/{appeal}/approve', [App\Http\Controllers\Web\Admin\AppealController::class, 'approve'])->name('appeals.approve');
+    Route::post('/appeals/{appeal}/reject', [App\Http\Controllers\Web\Admin\AppealController::class, 'reject'])->name('appeals.reject');
+
     Route::get('/photos', [App\Http\Controllers\Web\Admin\PhotoController::class, 'index'])->name('photos.index');
     Route::post('/photos/{image}/visibility', [App\Http\Controllers\Web\Admin\PhotoController::class, 'toggleVisibility'])->name('photos.visibility');
     Route::delete('/photos/{image}', [App\Http\Controllers\Web\Admin\PhotoController::class, 'destroy'])->name('photos.destroy');
@@ -131,6 +141,7 @@ Route::get('/logout', function () {
 // ─── Shared Links (Public Access with Token) ─────────────────────
 Route::middleware(\App\Http\Middleware\ValidateSharedLink::class)->group(function () {
     Route::get('/s/{token}', [App\Http\Controllers\Web\SharedLinkController::class, 'show'])->name('shared_link.show');
+    Route::get('/s/{token}/download-all', [App\Http\Controllers\Web\SharedLinkController::class, 'downloadAlbum'])->name('shared_link.download_album');
     Route::post('/s/{token}/verify', [App\Http\Controllers\Web\SharedLinkController::class, 'verifyPassword'])->name('shared_link.verify');
 });
 

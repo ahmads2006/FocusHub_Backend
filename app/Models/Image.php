@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use App\Models\ImageAppeal;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 use Spatie\Tags\HasTags;
@@ -117,6 +118,17 @@ class Image extends Model implements HasMedia
         return $this->hasMany(ImageReport::class);
     }
 
+    public function appeals(): HasMany
+    {
+        return $this->hasMany(ImageAppeal::class);
+    }
+
+    /** AI Analysis Metadata (polymorphic) */
+    public function aiMetadata(): HasOne
+    {
+        return $this->hasOne(MediaAiMetadata::class, 'media_id');
+    }
+
     // ───────────────────────── Proxy Accessors (backward compat) ─────────────────────────
 
     /** @deprecated Use $image->moderation->status */
@@ -129,6 +141,12 @@ class Image extends Model implements HasMedia
     public function getIsSensitiveAttribute(): bool
     {
         return (bool) ($this->moderation?->is_sensitive ?? false);
+    }
+
+    /** Returns the comma-separated sensitivity reason tags stored by ContentSafetyService */
+    public function getSensitivityReasonAttribute(): ?string
+    {
+        return $this->moderation?->sensitivity_reason;
     }
 
     /** @deprecated Use $image->moderation->is_visible */
@@ -159,6 +177,14 @@ class Image extends Model implements HasMedia
     public function getAllowDownloadAttribute(): bool
     {
         return (bool) ($this->settings?->allow_download ?? true);
+    }
+
+    /**
+     * Get the name of the AI driver that analyzed this image.
+     */
+    public function getAnalyzerNameAttribute(): string
+    {
+        return $this->aiMetadata?->driver_name ?? 'N/A';
     }
 
     // ───────────────────────── Status Helpers ─────────────────────────
