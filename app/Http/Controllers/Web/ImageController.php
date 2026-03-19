@@ -255,7 +255,20 @@ class ImageController extends Controller
      */
     public function gallery()
     {
-        $images = Image::where('privacy', 'public')->latest()->paginate(12);
-        return view('images.gallery', compact('images'));
+        $images = Image::where('privacy', 'public')
+            ->withCount('likes')
+            ->latest()
+            ->paginate(12);
+
+        // Fetch which of these images the current user has already liked
+        $likedImageIds = [];
+        if (auth()->check()) {
+            $likedImageIds = \App\Models\Like::where('user_id', auth()->id())
+                ->whereIn('image_id', $images->pluck('id'))
+                ->pluck('image_id')
+                ->toArray();
+        }
+
+        return view('images.gallery', compact('images', 'likedImageIds'));
     }
 }

@@ -30,12 +30,22 @@ class GoogleVisionAnalyzer implements MediaAnalyzerInterface
         }
 
         try {
-            $url = $media->getPublicUrl() ?? $media->url;
+            // Fix: Google cannot reach local 127.0.0.1 URLs. We MUST send the file content directly.
+            $path = $media->path; // Uses proxy accessor to ImageStorage->path
+            
+            if (!$path || !\Illuminate\Support\Facades\Storage::disk('public')->exists($path)) {
+                // If not local public, try fetching from the absolute URL or S3
+                $content = file_get_contents($media->url); 
+            } else {
+                $content = \Illuminate\Support\Facades\Storage::disk('public')->get($path);
+            }
+
+            $base64Image = base64_encode($content);
 
             $response = Http::post("https://vision.googleapis.com/v1/images:annotate?key={$apiKey}", [
                 'requests' => [
                     [
-                        'image' => ['source' => ['imageUri' => $url]],
+                        'image' => ['content' => $base64Image],
                         'features' => [
                             ['type' => 'LABEL_DETECTION', 'maxResults' => 10],
                             ['type' => 'SAFE_SEARCH_DETECTION'],

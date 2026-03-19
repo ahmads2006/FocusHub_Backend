@@ -71,10 +71,16 @@ class ValidateSharedLink
             }
         }
 
+        // Use token hash as fallback ID for ephemeral links
+        $authId = $link->id ?? $tokenHash;
+
         // Handle password protection
-        if ($link->password && !$request->session()->get("link_auth_{$link->id}")) {
+        if ($link->password && !$request->session()->get("link_auth_{$authId}")) {
             // If it's the POST request for password verification, let it through to controller
             if ($request->isMethod('post') && $request->has('password')) {
+                // Store link in request for controller usage
+                $request->attributes->set('shared_link', $link);
+                $request->attributes->set('shared_link_auth_id', $authId);
                 return $next($request);
             }
             

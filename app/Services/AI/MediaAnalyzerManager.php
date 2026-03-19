@@ -21,11 +21,11 @@ class MediaAnalyzerManager extends Manager implements MediaAnalyzerInterface
     /**
      * The order of failover.
      */
-    protected array $failoverOrder = ['imagekit', 'sightengine', 'google_vision', 'cloudinary'];
+    protected array $failoverOrder = ['google_vision', 'cloudinary', 'sightengine', 'imagekit'];
 
     public function getDefaultDriver()
     {
-        return $this->config->get('ai.analyzer.default', 'imagekit');
+        return $this->config->get('ai.analyzer.default', 'google_vision');
     }
 
     public function getName(): string
@@ -39,6 +39,7 @@ class MediaAnalyzerManager extends Manager implements MediaAnalyzerInterface
     public function analyze(Model $media, string $mediaType = 'image'): AnalysisResult
     {
         $errors = [];
+        $lastFailedDriver = null;
 
         foreach ($this->failoverOrder as $driverName) {
             // 1. Check if driver is known to be depleted (Quota Exceeded Cache)
@@ -48,6 +49,14 @@ class MediaAnalyzerManager extends Manager implements MediaAnalyzerInterface
             }
 
             try {
+                if ($lastFailedDriver) {
+                    Log::channel('datadog')->warning("AI Failover Event", [
+                        'failed_service' => $lastFailedDriver,
+                        'current_service' => $driverName,
+                        'media_id' => $media->id,
+                    ]);
+                }
+
                 Log::info("AI Failover: Attempting analysis with {$driverName}...");
                 
                 $driver = $this->driver($driverName);
@@ -58,15 +67,17 @@ class MediaAnalyzerManager extends Manager implements MediaAnalyzerInterface
 
             } catch (QuotaExceededException $e) {
                 Log::error("AI Failover: {$driverName} Quota Exceeded. Marking as depleted.");
-                // Cache depletion for 1 hour to avoid hits
                 Cache::put("ai_quota_depleted:{$driverName}", true, now()->addHour());
                 $errors[$driverName] = $e->getMessage();
+                $lastFailedDriver = $driverName;
             } catch (AnalyzerException $e) {
                 Log::error("AI Failover: {$driverName} Failed: " . $e->getMessage());
                 $errors[$driverName] = $e->getMessage();
+                $lastFailedDriver = $driverName;
             } catch (\Exception $e) {
                 Log::error("AI Failover: Unexpected error in {$driverName}: " . $e->getMessage());
                 $errors[$driverName] = $e->getMessage();
+                $lastFailedDriver = $driverName;
             }
         }
 

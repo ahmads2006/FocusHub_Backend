@@ -30,28 +30,68 @@ class GoogleAuthController extends Controller
         try {
             $googleUser = Socialite::driver('google')->user();
 
-            $user = User::where('google_id', $googleUser->id)
-                ->orWhere('email', $googleUser->email)
+            // Find user by OAuth google_id or by email
+            $user = User::where('email', $googleUser->email)
+                ->orWhereHas('oauth', function ($q) use ($googleUser) {
+                    $q->where('google_id', $googleUser->id);
+                })
                 ->first();
 
             if ($user) {
-                // Update existing user with Google info if not already set
-                $user->update([
-                    'google_id' => $googleUser->id,
-                    'avatar' => $googleUser->avatar,
-                    'provider_token' => $googleUser->token,
-                ]);
+                // Update existing user with Google info
+                if (!$user->oauth) {
+                    $user->oauth()->create([
+                        'google_id' => $googleUser->id,
+                        'provider_token' => $googleUser->token,
+                    ]);
+                } else {
+                    $user->oauth()->update([
+                        'google_id' => $googleUser->id,
+                        'provider_token' => $googleUser->token,
+                    ]);
+                }
+
+                // Update Profile
+                if ($user->profile) {
+                    $user->profile()->update([
+                        'avatar' => $googleUser->avatar
+                    ]);
+                } else {
+                    $user->profile()->create([
+                        'name' => $googleUser->name,
+                        'avatar' => $googleUser->avatar
+                    ]);
+                }
+
             } else {
-                // Create a new user
+                // Create a completely new user
                 $user = User::create([
-                    'name' => $googleUser->name,
                     'email' => $googleUser->email,
-                    'google_id' => $googleUser->id,
-                    'avatar' => $googleUser->avatar,
-                    'provider_token' => $googleUser->token,
                     'password' => \Illuminate\Support\Facades\Hash::make(\Illuminate\Support\Str::random(16)), // Placeholder password
-                    'is_verified' => true, // Google accounts are considered verified
                 ]);
+
+                // Manually fulfill verification status since it's Google
+                $user->verification()->create([
+                    'is_verified' => true,
+                    'verified_at' => now(),
+                ]);
+
+                // Create profile
+                $user->profile()->create([
+                    'name' => $googleUser->name,
+                    'avatar' => $googleUser->avatar,
+                ]);
+
+                // Create OAuth connection
+                $user->oauth()->create([
+                    'google_id' => $googleUser->id,
+                    'provider_token' => $googleUser->token,
+                ]);
+
+                // Create default status to prevent null relation issues
+                if (class_exists(\App\Models\UserStatus::class)) {
+                    $user->userStatus()->firstOrCreate([], ['status' => 'active']);
+                }
             }
 
             Auth::login($user);
@@ -59,7 +99,7 @@ class GoogleAuthController extends Controller
             return redirect()->intended(route('dashboard'));
 
         } catch (Exception $e) {
-            \Illuminate\Support\Facades\Log::error('Google Auth Error: ' . $e->getMessage());
+            \Illuminate\Support\Facades\Log::error('Google Auth Error: ' . $e->getMessage() . "\n" . $e->getTraceAsString());
             return redirect()->route('login')->with('error', 'Authentication failed. Please try again.');
         }
     }

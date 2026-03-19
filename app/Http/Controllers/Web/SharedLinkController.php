@@ -42,6 +42,7 @@ class SharedLinkController extends Controller
             'shareable_id' => 'required|string',
             'shareable_type' => 'required|string|in:App\Models\Image,App\Models\Album',
             'expires_in'        => 'nullable|integer', // hours
+            'password'          => 'nullable|string|min:4',
             'permission'         => 'nullable|in:view,download',
             'max_access'         => 'nullable|integer|min:1',
             'auto_rotate'        => 'nullable|boolean',
@@ -58,13 +59,14 @@ class SharedLinkController extends Controller
         $expiry = $request->expires_in ? now()->addHours((int) $request->expires_in) : null;
         $permission = $request->permission ?? 'view';
         $maxAccess = $request->max_access ? (int) $request->max_access : null;
+        $password = $request->password ?: null;
         $autoRotate = $request->input('auto_rotate', false);
 
         $requireWatermark = $request->has('require_watermark')
             ? (bool) $request->input('require_watermark')
             : null;
 
-        $link = $this->service->generate($model, $expiry, null, $maxAccess, $permission, $autoRotate, $requireWatermark);
+        $link = $this->service->generate($model, $expiry, $password, $maxAccess, $permission, $autoRotate, $requireWatermark);
         $url = $this->service->getFullUrl($link);
 
         return response()->json([
@@ -172,15 +174,20 @@ class SharedLinkController extends Controller
 
     public function verifyPassword(Request $request, $token)
     {
-        $link = SharedLink::where('token_hash', hash('sha256', $token))->firstOrFail();
+        $link = $request->attributes->get('shared_link');
+        $authId = $request->attributes->get('shared_link_auth_id');
+
+        if (!$link) {
+            abort(404, 'Shared link is invalid or expired.');
+        }
         
         $request->validate([
             'password' => 'required|string',
         ]);
 
         if (Hash::check($request->password, $link->password)) {
-            $request->session()->put("link_auth_{$link->id}", true);
-            return redirect()->route('shared.link.show', $token);
+            $request->session()->put("link_auth_{$authId}", true);
+            return redirect()->route('shared_link.show', $token);
         }
 
         return back()->withErrors(['password' => 'كلمة المرور غير صحيحة.']);

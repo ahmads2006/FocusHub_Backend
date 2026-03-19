@@ -127,6 +127,24 @@ return [
             'path' => storage_path('logs/laravel.log'),
         ],
 
+        'datadog' => [
+            'driver' => 'monolog',
+            'level' => env('LOG_LEVEL', 'debug'),
+            'handler' => StreamHandler::class,
+            'handler_with' => [
+                'stream' => storage_path('logs/datadog.log'),
+            ],
+            'formatter' => \Monolog\Formatter\JsonFormatter::class,
+            'formatter_with' => [
+                'appendNewline' => true,
+            ],
+            'processors' => [PsrLogMessageProcessor::class],
+            'with' => [
+                'env' => env('DATADOG_ENV', 'dev'),
+                'service' => env('DATADOG_SERVICE', 'opticvault'),
+            ],
+        ],
+
     ],
 
 ];

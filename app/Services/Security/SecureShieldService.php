@@ -28,6 +28,8 @@ class SecureShieldService
      */
     public function protect(Image $image, array $settings): string
     {
+        $startTime = microtime(true);
+
         // Settings defaults
         $settings['smart_positioning'] = $settings['smart_positioning'] ?? true;
         $settings['dynamic_blending']  = $settings['dynamic_blending']  ?? true;
@@ -88,7 +90,16 @@ class SecureShieldService
             ]);
         }
 
-        return Storage::disk('public')->url($filename);
+        $url = Storage::disk('public')->url($filename);
+
+        $duration = (microtime(true) - $startTime) * 1000; // in milliseconds
+        Log::channel('datadog')->info("SecureShield Watermarking Completed", [
+            'image_id' => $image->id,
+            'duration_ms' => round($duration, 2),
+            'mode' => $settings['mode'] ?? 'signature',
+        ]);
+
+        return $url;
     }
 
     /**

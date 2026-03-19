@@ -3,6 +3,7 @@
 namespace App\Services\Core;
 
 use App\Models\Image;
+use App\Jobs\AnalyzeImageLabelsJob;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -195,7 +196,15 @@ class ImageService
                 }
             }
 
-            // 6. Cleanup local temporal file
+            // 6. Dispatch AI Classification Job (non-blocking, background)
+            // Only for approved / pending_review images (not quarantined ones)
+            if ($image->status !== Image::STATUS_REJECTED) {
+                AnalyzeImageLabelsJob::dispatch($image->id)
+                    ->onQueue('default')
+                    ->delay(now()->addSeconds(5)); // Small delay so DB is fully committed
+            }
+
+            // 7. Cleanup local temporal file
             if (file_exists($cleanFile)) {
                 @unlink($cleanFile);
             }

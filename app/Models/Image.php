@@ -60,12 +60,15 @@ class Image extends Model implements HasMedia
         'title',
         'description',
         'filename',
-        'file_type',
+        'path',
         'size',
         'privacy',
+        'labels',
     ];
 
-    protected $casts = [];
+    protected $casts = [
+        'labels' => 'array',
+    ];
 
     // ───────────────────────── Relations ─────────────────────────
 
@@ -103,6 +106,12 @@ class Image extends Model implements HasMedia
         return $this->hasOne(ImageSettings::class);
     }
 
+    /** AI Labels classification */
+    public function labels(): HasOne
+    {
+        return $this->hasOne(ImageLabel::class);
+    }
+
     public function analytics(): HasMany
     {
         return $this->hasMany(Analytics::class);
@@ -121,6 +130,11 @@ class Image extends Model implements HasMedia
     public function appeals(): HasMany
     {
         return $this->hasMany(ImageAppeal::class);
+    }
+
+    public function likes(): HasMany
+    {
+        return $this->hasMany(Like::class);
     }
 
     /** AI Analysis Metadata (polymorphic) */

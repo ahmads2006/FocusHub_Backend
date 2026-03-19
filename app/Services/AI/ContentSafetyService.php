@@ -49,7 +49,7 @@ class ContentSafetyService
             return array_merge($cachedResult, ['metadata' => array_merge($metadata, ['cached_redis' => true])]);
         }
 
-        // LAYER 2: Failover AI Analysis
+            // LAYER 2: Failover AI Analysis
         try {
             /** @var \App\Services\AI\Contracts\MediaAnalyzerInterface $analyzer */
             $analyzer = app(\App\Services\AI\Contracts\MediaAnalyzerInterface::class);
@@ -66,10 +66,23 @@ class ContentSafetyService
             
             $status = $analysisResult->isSensitive ? 'pending_review' : 'approved';
             $reason = $analysisResult->isSensitive ? 'AI Flagged (Sensitive)' : 'Safe';
+
+            if ($analysisResult->isSensitive) {
+                Log::channel('datadog')->warning("Image Flagged (Sensitive Contents)", [
+                    'hash' => $fileHash,
+                    'driver' => $analysisResult->driverName,
+                    'scores' => $analysisResult->rawResults,
+                ]);
+            }
             
             // If it's a critical reject (e.g. from Sightengine or Google Vision)
             if (isset($analysisResult->rawResults['status']) && $analysisResult->rawResults['status'] === 'rejected') {
                 $status = 'rejected';
+                Log::channel('datadog')->error("Image Rejected (Critical Violation)", [
+                    'hash' => $fileHash,
+                    'driver' => $analysisResult->driverName,
+                    'details' => $analysisResult->rawResults,
+                ]);
                 $this->banHash($fileHash, "AI Rejected: {$analysisResult->driverName}", $analysisResult->rawResults);
             }
 

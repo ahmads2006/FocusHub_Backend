@@ -85,8 +85,14 @@
                     </div>
                     <div class="space-y-2">
                         <label class="text-[10px] uppercase tracking-widest text-gray-400 font-bold">مرات الدخول</label>
-                        <input type="number" name="max_access" placeholder="غير محدود" class="w-full bg-white/5 border border-white/10 rounded-2xl p-3 outline-none focus:border-purple-500/50 transition-all text-sm">
+                        <input type="number" min="1" name="max_access" placeholder="غير محدود" class="w-full bg-white/5 border border-white/10 rounded-2xl p-3 outline-none focus:border-purple-500/50 transition-all text-sm">
                     </div>
+                </div>
+
+                <!-- Password Field -->
+                <div class="space-y-2">
+                    <label class="text-[10px] uppercase tracking-widest text-gray-400 font-bold">كلمة السر (اختياري)</label>
+                    <input type="text" name="password" placeholder="اتركه فارغاً لرابط مفتوح..." autocomplete="off" class="w-full bg-white/5 border border-white/10 rounded-2xl p-3 outline-none focus:border-purple-500/50 transition-all text-sm font-mono placeholder-gray-500">
                 </div>
 
                 <!-- Auto Rotate Toggle -->
@@ -170,6 +176,7 @@
                     permission: form.allow_download && form.allow_download.checked ? 'download' : 'view',
                     expires_in: form.expires_in ? (form.expires_in.value || null) : null,
                     max_access: form.max_access ? (form.max_access.value || null) : null,
+                    password: form.password ? (form.password.value || null) : null,
                     _token: '{{ csrf_token() }}'
                 };
 

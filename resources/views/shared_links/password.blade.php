@@ -29,7 +29,7 @@
                 <p class="text-sm text-gray-400 mt-2 leading-relaxed">هذا الرابط مـؤمن بكلمة مـرور. يرجى إدخال مـفتاح الوصول للمـتابعة.</p>
             </div>
 
-            <form method="POST" action="{{ route('shared.link.verify', $link->token) }}" class="space-y-6">
+            <form method="POST" action="{{ route('shared_link.verify', $link->token) }}" class="space-y-6">
                 @csrf
                 <div class="space-y-2">
                     <input 

@@ -32,14 +32,36 @@ class CloudinaryAnalyzer implements MediaAnalyzerInterface
         }
 
         try {
-            $publicId = $media->cloudinary_public_id ?? $media->id;
+            $path = $media->path;
+            if (!$path || !\Illuminate\Support\Facades\Storage::disk('public')->exists($path)) {
+                $content = file_get_contents($media->url); 
+            } else {
+                $content = \Illuminate\Support\Facades\Storage::disk('public')->get($path);
+            }
+
+            $timestamp = time();
+            // Request AI tags from AWS Rekognition add-on
+            $paramsToSign = [
+                'auto_tagging' => '0.6',
+                'categorization' => 'aws_rek_tagging',
+                'timestamp' => $timestamp
+            ];
             
-            // This is a conceptual API call for Cloudinary Google Tagging or Amazon Rekognition
-            // URL format: https://<api_key>:<api_secret>@api.cloudinary.com/v1_1/<cloud_name>/resources/image/upload/<public_id>?tags=true
-            $response = Http::withBasicAuth($apiKey, $apiSecret)
-                ->get("https://api.cloudinary.com/v1_1/{$cloudName}/resources/image/upload/{$publicId}", [
-                    'image_metadata' => true,
-                    'colors' => true,
+            ksort($paramsToSign);
+            $strToSign = '';
+            foreach ($paramsToSign as $k => $v) {
+                $strToSign .= "{$k}={$v}&";
+            }
+            $strToSign = rtrim($strToSign, '&') . $apiSecret;
+            $signature = sha1($strToSign);
+
+            $response = Http::attach('file', $content, $media->filename ?? 'image.jpg')
+                ->post("https://api.cloudinary.com/v1_1/{$cloudName}/image/upload", [
+                    'api_key' => $apiKey,
+                    'timestamp' => $timestamp,
+                    'signature' => $signature,
+                    'auto_tagging' => '0.6',
+                    'categorization' => 'aws_rek_tagging',
                 ]);
 
             if ($response->failed()) {
@@ -51,14 +73,23 @@ class CloudinaryAnalyzer implements MediaAnalyzerInterface
 
             $data = $response->json();
             
-            // Note: Cloudinary returns tags if 'google_tagging' or similar was enabled on upload.
+            // Cloudinary standard tags returned upon upload if any rules or auto-tagging is enabled on the cloud
             $tags = $data['tags'] ?? [];
+            if (isset($data['info']['categorization'])) {
+                foreach ($data['info']['categorization'] as $engine => $result) {
+                    foreach ($result['data'] ?? [] as $category) {
+                        if (($category['confidence'] ?? 0) > 0.5) {
+                            $tags[] = $category['tag'] ?? $category['name'] ?? '';
+                        }
+                    }
+                }
+            }
 
             return new ImageAnalysisResult(
                 driverName: $this->getName(),
                 rawResults: $data,
-                tags: $tags,
-                isSensitive: false // Simple simulation
+                tags: array_unique(array_filter($tags)),
+                isSensitive: false // Cloudinary doesn't do native moderation on standard upload without add-ons
             );
 
         } catch (QuotaExceededException $e) {

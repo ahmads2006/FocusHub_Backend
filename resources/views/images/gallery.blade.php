@@ -187,12 +187,33 @@
     transition: border-color .25s, background .25s;
   }
   .list-row:hover { border-color: var(--border-hi); background: var(--ink-3); }
+
+  /* Like Button */
+  .like-btn {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px; font-weight: 700;
+    letter-spacing: .1em;
+    color: var(--text-dim);
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    cursor: pointer;
+  }
+  .like-btn:hover {
+    color: #e8637a;
+    border-color: rgba(232,99,122,0.3);
+    background: rgba(232,99,122,0.06);
+  }
+  .like-btn.liked {
+    color: #e8637a;
+    border-color: rgba(232,99,122,0.4);
+    background: rgba(232,99,122,0.1);
+  }
 </style>
 @endpush
 
 @section('content')
 <div class="font-body space-y-8 h-full flex flex-col"
-     x-data="{ view: 'grid', loading: false }"
+     x-data="galleryPage()"
      @resize.window.debounce="() => {}">
 
   {{-- ── Header ── --}}
@@ -430,17 +451,59 @@
           </div>
 
           {{-- Card footer --}}
-          <div class="p-4 flex flex-col gap-1" style="border-top:1px solid var(--border);">
+          <div class="p-4 flex flex-col gap-2" style="border-top:1px solid var(--border);">
             <h4 class="font-body font-medium text-sm truncate" style="color:var(--text);" title="{{ $image->title }}">
               {{ $image->title ?: 'Untitled' }}
             </h4>
+
+            {{-- AI Classification Label --}}
+            @php
+              $aiLabel = null;
+              // Try inline JSON column first, fallback to relationship
+              $rawLabels = $image->labels;
+              if (empty($rawLabels) && $image->relationLoaded('labels')) {
+                $rawLabels = optional($image->labels)->labels;
+              }
+              if (!empty($rawLabels)) {
+                $firstLabel = is_array($rawLabels) ? ($rawLabels[0] ?? null) : null;
+                if (is_array($firstLabel) && isset($firstLabel['description'])) {
+                  $aiLabel = $firstLabel['description'];
+                } elseif (is_string($firstLabel)) {
+                  $aiLabel = $firstLabel;
+                }
+              }
+            @endphp
+            @if($aiLabel)
+              <div class="flex items-center gap-1.5">
+                <svg class="w-3 h-3 flex-shrink-0" style="color:var(--violet)" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                <span class="font-mono-alt text-[9px] tracking-wide uppercase truncate" style="color:var(--violet);">{{ $aiLabel }}</span>
+              </div>
+            @endif
+
             <div class="flex justify-between items-center">
               <time datetime="{{ $image->created_at->toIso8601String() }}" class="font-mono-alt text-[10px]" style="color:var(--text-dim);">
                 {{ $image->created_at->format('M d, Y') }}
               </time>
-              <span class="font-mono-alt text-[9px] tracking-widest uppercase" style="color:var(--gold);opacity:.7;">
-                {{ $image->privacy }}
-              </span>
+              <div class="flex items-center gap-2">
+                <span class="font-mono-alt text-[9px] tracking-widest uppercase" style="color:var(--gold);opacity:.7;">
+                  {{ $image->privacy }}
+                </span>
+                {{-- Like Button --}}
+                @auth
+                <button
+                  @click="toggleLike('{{ $image->id }}')"
+                  class="like-btn flex items-center gap-1 px-2.5 py-1 rounded-full transition-all duration-200"
+                  :class="isLiked('{{ $image->id }}') ? 'liked' : ''"
+                  aria-label="Like this image"
+                  title="Like"
+                >
+                  <svg class="w-3.5 h-3.5" :class="isLiked('{{ $image->id }}') ? 'fill-current' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
+                  </svg>
+                  <span class="font-mono-alt text-[9px] tracking-widest" x-text="likeCount('{{ $image->id }}', {{ $image->likes_count ?? 0 }})"></span>
+                </button>
+                @endauth
+              </div>
             </div>
           </div>
         </div>
@@ -506,10 +569,38 @@
                 <span class="status-pill" style="background:rgba(232,99,122,0.08);color:#e8637a;border:1px solid rgba(232,99,122,0.2);"><span class="status-dot"></span> Rejected</span>
               @endif
             @endif
+            {{-- AI Label (inline) --}}
+            @php
+              $rawLabels = $image->labels;
+              $listAiLabel = null;
+              if (!empty($rawLabels)) {
+                $fl = is_array($rawLabels) ? ($rawLabels[0] ?? null) : null;
+                $listAiLabel = is_array($fl) ? ($fl['description'] ?? null) : (is_string($fl) ? $fl : null);
+              }
+            @endphp
+            @if($listAiLabel)
+              <span class="inline-flex items-center gap-1 font-mono-alt text-[9px] tracking-wide uppercase px-2 py-0.5 rounded-full" style="color:var(--violet);background:rgba(139,124,248,0.1);border:1px solid rgba(139,124,248,0.2);">
+                <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                {{ $listAiLabel }}
+              </span>
+            @endif
           </div>
         </div>
         <div class="flex items-center gap-2 flex-shrink-0">
           <span class="content-badge font-mono-alt" style="color:var(--text-dim);background:var(--ink-3);border:1px solid var(--border);">{{ strtoupper($image->file_type) }}</span>
+          @auth
+          <button
+            @click="toggleLike('{{ $image->id }}')"
+            class="like-btn flex items-center gap-1 px-2.5 py-1 rounded-full transition-all duration-200"
+            :class="isLiked('{{ $image->id }}') ? 'liked' : ''"
+            aria-label="Like"
+          >
+            <svg class="w-3 h-3" :class="isLiked('{{ $image->id }}') ? 'fill-current' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
+            </svg>
+            <span class="font-mono-alt text-[9px]" x-text="likeCount('{{ $image->id }}', {{ $image->likes_count ?? 0 }})"></span>
+          </button>
+          @endauth
           @if($isOwner)
             <a href="{{ $image->getOriginalUrl() }}" class="action-btn dl-owner" aria-label="Download original" download>
               <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
@@ -555,6 +646,79 @@ document.addEventListener('DOMContentLoaded', function () {
   } else {
     document.querySelectorAll('img.lazy').forEach(img => { img.src = img.dataset.src; });
   }
+});
+
+document.addEventListener('alpine:init', () => {
+  // Pre-load liked image IDs from server for instant correct initial state
+  const initialLikedIds = new Set(@json($likedImageIds ?? []));
+
+  Alpine.data('galleryPage', () => ({
+    view: 'grid',
+    loading: false,
+    likedIds: new Set(initialLikedIds),
+    localCounts: {},
+
+    isLiked(id) {
+      return this.likedIds.has(id);
+    },
+
+    likeCount(id, initialCount) {
+      if (this.localCounts[id] === undefined) {
+        this.localCounts[id] = initialCount;
+      }
+      return this.localCounts[id] > 0 ? this.localCounts[id] : '';
+    },
+
+    async toggleLike(id) {
+      const wasLiked = this.likedIds.has(id);
+
+      // Optimistic Update
+      if (wasLiked) {
+        this.likedIds.delete(id);
+        this.localCounts[id] = Math.max(0, (this.localCounts[id] || 0) - 1);
+      } else {
+        this.likedIds.add(id);
+        this.localCounts[id] = (this.localCounts[id] || 0) + 1;
+      }
+
+      // Force Alpine to re-evaluate
+      this.likedIds = new Set(this.likedIds);
+
+      try {
+        const csrf = document.querySelector('meta[name="csrf-token"]').content;
+        const res = await fetch(`/images/${id}/like`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf }
+        });
+
+        if (res.status === 429) {
+          // Revert optimistic update
+          if (wasLiked) { this.likedIds.add(id); this.localCounts[id]++; }
+          else { this.likedIds.delete(id); this.localCounts[id]--; }
+          this.likedIds = new Set(this.likedIds);
+          if (typeof Swal !== 'undefined') {
+            Swal.fire({ toast: true, position: 'bottom-end', timer: 2500, icon: 'warning', title: 'مهلاً! أنت تعجب بسرعة كبيرة.', showConfirmButton: false });
+          }
+          return;
+        }
+
+        const json = await res.json();
+        if (!json.success) throw new Error(json.message);
+
+        // Correct any drift after server response
+        if (json.action === 'like') { this.likedIds.add(id); }
+        else { this.likedIds.delete(id); }
+        this.likedIds = new Set(this.likedIds);
+
+      } catch (e) {
+        console.error('Like failed:', e);
+        // Revert
+        if (wasLiked) { this.likedIds.add(id); this.localCounts[id]++; }
+        else { this.likedIds.delete(id); this.localCounts[id]--; }
+        this.likedIds = new Set(this.likedIds);
+      }
+    }
+  }));
 });
 </script>
 @endpush

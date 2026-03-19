@@ -66,6 +66,11 @@ Route::middleware(['auth', 'check.verified', 'check.banned', 'check.timeout'])->
     Route::post('/images/{image}/protect', [ImageController::class, 'protect'])->name('images.protect');
     Route::delete('/images/{image}/protection', [ImageController::class, 'revert'])->name('images.protection.revert');
 
+    // Discovery Algorithm & Recommendations
+    Route::get('/for-you', [\App\Http\Controllers\Web\FeedController::class, 'index'])->name('feed.index');
+    Route::get('/feed/for-you', [\App\Http\Controllers\Web\FeedController::class, 'forYou'])->name('feed.api.for_you');
+    Route::post('/images/{image}/like', [\App\Http\Controllers\Web\FeedController::class, 'like'])->middleware('throttle:likes')->name('images.like');
+
     // Bulk Upload System
     Route::get('/bulk-upload', [\App\Http\Controllers\Api\AlbumUploadController::class, 'index'])->name('images.bulk');
     Route::post('/api/upload/album', [\App\Http\Controllers\Api\AlbumUploadController::class, 'uploadAlbum'])->name('api.upload.album');
