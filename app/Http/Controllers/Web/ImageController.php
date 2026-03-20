@@ -79,16 +79,12 @@ class ImageController extends Controller
 
         // Auto-apply SecureShield watermark if the user enabled it at upload time
         if ($request->has('watermark_on_download')) {
-            try {
-                $this->secureShield->protect($image, [
-                    'mode'              => 'signature',
-                    'watermark_text'    => Auth::user()->name,
-                    'digital_archiving' => true,
-                ]);
-            } catch (\Exception $e) {
-                // Non-fatal: log and continue. The watermark will be generated on-the-fly at download.
-                \Illuminate\Support\Facades\Log::warning('Auto SecureShield failed after upload: ' . $e->getMessage());
-            }
+            // v4.0: Move to background job to keep upload response times low.
+            \App\Jobs\GenerateProtectedImageJob::dispatch($image, [
+                'mode'              => 'signature',
+                'watermark_text'    => Auth::user()->name,
+                'digital_archiving' => true,
+            ])->onQueue('default')->delay(now()->addSeconds(10)); // Delay to ensure labels job has a head start
         }
 
         if ($image->status === 'rejected') {

@@ -88,11 +88,32 @@ class ImageIntelligenceService
             // 3. Store in separate table (legacy support)
             $this->storeLabels($image, $result->tags);
 
+            // 4. Store full AI analysis metadata for future use (e.g. Smart Watermarking)
+            $this->storeAiMetadata($image, $result);
+
             Log::info("ImageIntelligence: Successfully analyzed and tagged image {$image->id}");
 
         } catch (\Exception $e) {
             Log::error("ImageIntelligence Error: " . $e->getMessage());
         }
+    }
+
+    /**
+     * Store full AI analysis result in the media_ai_metadata table.
+     */
+    protected function storeAiMetadata(Image $image, ImageAnalysisResult $result): void
+    {
+        \App\Models\MediaAiMetadata::updateOrCreate(
+            ['media_id' => $image->id, 'media_type' => get_class($image)],
+            [
+                'driver_name'      => $result->driverName,
+                'raw_results'      => $result->rawResults,
+                'extracted_tags'   => $result->tags,
+                'ocr_text'         => $result->ocrText,
+                'is_sensitive'     => $result->isSensitive,
+                'confidence_score' => $result->confidenceScore,
+            ]
+        );
     }
 
     /**

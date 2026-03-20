@@ -14,13 +14,15 @@ return new class extends Migration
         // Since we want to ensure no auto-increment and proper UUIDs
         // In a fresh-ish project, we can drop and recreate if needed, 
         // but here we just modify to ensure constraints are correct.
-        Schema::table('album_user', function (Blueprint $table) {
-            // The previous migration already used foreignUuid, 
-            // but we'll make sure there's no auto-increment ID if it exists.
-            if (Schema::hasColumn('album_user', 'id')) {
-                $table->dropColumn('id');
-            }
-        });
+        if (config('database.default') !== 'sqlite') {
+            Schema::table('album_user', function (Blueprint $table) {
+                // The previous migration already used foreignUuid,
+                // but we'll make sure there's no auto-increment ID if it exists.
+                if (Schema::hasColumn('album_user', 'id')) {
+                    $table->dropColumn('id');
+                }
+            });
+        }
     }
 
     /**

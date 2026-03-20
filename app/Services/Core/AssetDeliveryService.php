@@ -17,10 +17,22 @@ class AssetDeliveryService
      */
     public function getUrl(Image $image, string $context = 'gallery'): string
     {
-        // 🚀 SMART ROUTING (v4.0): Force secure signed routes for anything non-public, rejected, or NOT in ImageKit.
-        // This ensures cloud-fallback assets (S3/local) are found correctly.
+        // 🚀 SMART ROUTING (v4.0): Use Cloud CDN (ImageKit) whenever possible for speed.
+        // Direct CDN URLs bypass PHP entirely, which is much faster.
         $isInCloud = !empty($image->storage->imagekit_file_id);
-        if (!$isInCloud || $image->privacy !== 'public' || $image->isRejected() || ($image->album && $image->album->privacy !== 'public')) {
+
+        // We only force secure PHP-signed routes if:
+        // 1. The image is NOT in the cloud (fallback storage like S3/local).
+        // 2. The image is Rejected or Sensitive (requires blurring/blocking logic in PHP).
+        // 3. The image is Private/Hidden (requires auth checks in PHP).
+        $requiresSecureRoute = !$isInCloud ||
+                               $image->isRejected() ||
+                               $image->isPendingReview() ||
+                               $image->getIsSensitiveAttribute() ||
+                               $image->privacy !== 'public' ||
+                               ($image->album && $image->album->privacy !== 'public');
+
+        if ($requiresSecureRoute) {
             if ($this->canAccessOriginal($image) || $image->privacy === 'public') {
                 // For gallery/thumbnail display → use inline preview route (renders in <img> tags)
                 // For download contexts → use original route (forces download)
@@ -33,6 +45,7 @@ class AssetDeliveryService
             }
         }
 
+        // Use ImageKit CDN for everything else (Public images in cloud)
         switch ($context) {
             case 'avatar':
             case 'icon':
