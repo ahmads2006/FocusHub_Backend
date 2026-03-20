@@ -48,7 +48,9 @@ return new class extends Migration
         });
 
         // إضافة editor إلى enum role
-        DB::statement("ALTER TABLE users MODIFY COLUMN role ENUM('super_admin', 'user', 'photographer', 'editor') DEFAULT 'user'");
+        if (config('database.default') !== 'sqlite') {
+            DB::statement("ALTER TABLE users MODIFY COLUMN role ENUM('super_admin', 'user', 'photographer', 'editor') DEFAULT 'user'");
+        }
     }
 
     public function down(): void
@@ -67,7 +69,9 @@ return new class extends Migration
             ]);
         }
 
-        DB::statement("ALTER TABLE users MODIFY COLUMN role ENUM('super_admin', 'user', 'photographer') DEFAULT 'user'");
+        if (config('database.default') !== 'sqlite') {
+            DB::statement("ALTER TABLE users MODIFY COLUMN role ENUM('super_admin', 'user', 'photographer') DEFAULT 'user'");
+        }
         Schema::dropIfExists('user_statuses');
     }
 };

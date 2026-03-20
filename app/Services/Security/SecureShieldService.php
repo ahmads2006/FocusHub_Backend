@@ -321,14 +321,33 @@ class SecureShieldService
 
     /**
      * Google Vision Analysis (Kept from v1 for Smart Positioning)
+     * v4.0: Now checks for pre-existing AI metadata to avoid redundant API calls.
      */
     private function analyzeImage(Image $image): array
     {
+        // 1. Efficiency: Check if we already have this data stored from previous background analysis
+        $stored = $image->aiMetadata;
+        if ($stored && !empty($stored->raw_results)) {
+            Log::info("SecureShield: Reusing stored AI metadata for image {$image->id}");
+            $res = $stored->raw_results;
+            return [
+                'text'    => $res['textAnnotations'] ?? [],
+                'logos'   => $res['logoAnnotations'] ?? [],
+                'objects' => $res['localizedObjectAnnotations'] ?? [],
+            ];
+        }
+
+        // 2. Fallback: Perform synchronous analysis if missing (legacy or first-time)
         $apiKey = env('GOOGLE_CLOUD_VISION_KEY');
         if (empty($apiKey)) return ['text' => [], 'logos' => [], 'objects' => []];
 
         try {
-            $imageContent = base64_encode(Storage::disk('public')->get($image->path));
+            Log::info("SecureShield: Performing synchronous Google Vision analysis for image {$image->id}");
+
+            $imageData = $this->resolveImageData($image->path);
+            if (!$imageData) return ['text' => [], 'logos' => [], 'objects' => []];
+
+            $imageContent = base64_encode($imageData);
             $response = Http::timeout(10)->post("https://vision.googleapis.com/v1/images:annotate?key={$apiKey}", [
                 'requests' => [['image' => ['content' => $imageContent], 'features' => [['type' => 'TEXT_DETECTION'], ['type' => 'LOGO_DETECTION'], ['type' => 'OBJECT_LOCALIZATION']]]]
             ]);
