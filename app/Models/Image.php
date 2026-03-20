@@ -70,6 +70,8 @@ class Image extends Model implements HasMedia
         'labels' => 'array',
     ];
 
+    protected $with = ['settings'];
+
     // ───────────────────────── Relations ─────────────────────────
 
     public function user(): BelongsTo
@@ -191,6 +193,12 @@ class Image extends Model implements HasMedia
     public function getAllowDownloadAttribute(): bool
     {
         return (bool) ($this->settings?->allow_download ?? true);
+    }
+
+    /** @deprecated Use $image->settings->watermark_on_download */
+    public function getWatermarkOnDownloadAttribute(): bool
+    {
+        return (bool) ($this->settings?->watermark_on_download ?? false);
     }
 
     /**

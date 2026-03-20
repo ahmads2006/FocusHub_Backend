@@ -58,7 +58,7 @@
                 <span class="font-medium text-sm">Professional Bulk Lab</span>
             </a>
            
-            <a href="{{ route('gallery.index') }}" class="flex items-center gap-4 p-3 px-4 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white transition-all {{ request()->routeIs('gallery.index') ? 'nav-item-active' : '' }}">
+            <a href="{{ route('images.gallery') }}" class="flex items-center gap-4 p-3 px-4 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white transition-all {{ request()->routeIs('images.gallery') ? 'nav-item-active' : '' }}">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
                 <span class="font-medium text-sm">Public Gallery</span>
             </a>

@@ -278,7 +278,7 @@
                                         <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6a3 3 0 100-2.684m0 2.684l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"></path></svg>
                                     </button>
                                     {{-- Edit Button --}}
-                                    <button onclick="openEditModal('{{ $image->id }}', '{{ addslashes($image->title ?? '') }}', '{{ $image->album_id }}', '{{ $image->privacy }}', {{ $image->allow_download ? 'true' : 'false' }})" class="p-2 bg-blue-500/20 backdrop-blur-md rounded-xl hover:bg-blue-500/40 transition-all" title="تعديل">
+                                    <button onclick="openEditModal('{{ $image->id }}', '{{ addslashes($image->title ?? '') }}', '{{ $image->album_id }}', '{{ $image->privacy }}', {{ $image->allow_download ? 'true' : 'false' }}, {{ $image->watermark_on_download ? 'true' : 'false' }})" class="p-2 bg-blue-500/20 backdrop-blur-md rounded-xl hover:bg-blue-500/40 transition-all" title="تعديل">
                                         <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
                                     </button>
                                 </div>
@@ -533,13 +533,14 @@
         }
     }
 
-    function openEditModal(imageId, title, albumId, privacy, allowDownload) {
+    function openEditModal(imageId, title, albumId, privacy, allowDownload, watermarkOnDownload) {
         document.getElementById('edit_image_id').value = imageId;
         document.getElementById('edit_form').action = '/manage-my-vault/' + imageId;
         document.getElementById('edit_title').value = title;
         document.getElementById('edit_album_id').value = albumId || '';
         document.getElementById('edit_privacy').value = privacy;
         document.getElementById('edit_allow_download').checked = allowDownload;
+        document.getElementById('edit_watermark_on_download').checked = watermarkOnDownload;
         document.getElementById('editImageModal').classList.remove('hidden');
     }
 
@@ -641,9 +642,15 @@
                     <option value="private" class="bg-black">خاصة (Private)</option>
                 </select>
             </div>
-            <div class="flex items-center justify-between p-3 bg-purple-500/5 rounded-2xl border border-white/5">
-                <label for="edit_allow_download" class="text-[10px] uppercase tracking-widest text-purple-400 font-bold cursor-pointer">السماح بالتنزيل</label>
-                <input type="checkbox" id="edit_allow_download" name="allow_download" value="1" class="w-4 h-4 accent-purple-500 cursor-pointer">
+            <div class="grid grid-cols-2 gap-4">
+                <div class="flex items-center justify-between p-3 bg-purple-500/5 rounded-2xl border border-white/5">
+                    <label for="edit_allow_download" class="text-[10px] uppercase tracking-widest text-purple-400 font-bold cursor-pointer">سماح بالتحميل</label>
+                    <input type="checkbox" id="edit_allow_download" name="allow_download" value="1" class="w-4 h-4 accent-purple-500 cursor-pointer">
+                </div>
+                <div class="flex items-center justify-between p-3 bg-white/5 rounded-2xl border border-white/5">
+                    <label for="edit_watermark_on_download" class="text-[10px] uppercase tracking-widest text-gray-400 font-bold cursor-pointer">علامة مائية</label>
+                    <input type="checkbox" id="edit_watermark_on_download" name="watermark_on_download" value="1" class="w-4 h-4 accent-purple-500 cursor-pointer">
+                </div>
             </div>
             <button type="submit" class="w-full accent-gradient p-4 rounded-2xl font-bold uppercase tracking-widest text-xs shadow-lg shadow-purple-500/20 hover:scale-[1.02] transition-transform">حفظ التغييرات</button>
         </form>

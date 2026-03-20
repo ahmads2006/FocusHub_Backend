@@ -52,8 +52,6 @@ Route::middleware(['auth', 'check.verified', 'check.banned', 'check.timeout'])->
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
-    Route::get('/tasks', [TaskController::class, 'index'])->name('tasks.index');
-    Route::get('/timer', [TimerController::class, 'index'])->name('timer.index');
     Route::get('/activities', [ActivityController::class, 'index'])->middleware('permission:view-activity-logs')->name('activities.index');
 
     // إدارة الصور والألبومات (Consolidated)
@@ -76,7 +74,8 @@ Route::middleware(['auth', 'check.verified', 'check.banned', 'check.timeout'])->
     Route::post('/api/upload/album', [\App\Http\Controllers\Api\AlbumUploadController::class, 'uploadAlbum'])->name('api.upload.album');
     Route::get('/api/upload/progress/{jobId}', [\App\Http\Controllers\Api\AlbumUploadController::class, 'getUploadProgress'])->name('api.upload.progress');
 
-    Route::get('/gallery', [ImageController::class, 'gallery'])->name('gallery.index');
+    Route::get('/gallery', [ImageController::class, 'gallery'])->name('images.gallery');
+    
 
     // Laboratory (Feature Testing)
     Route::get('/lab', function() {

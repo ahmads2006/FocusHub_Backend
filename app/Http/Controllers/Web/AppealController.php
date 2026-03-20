@@ -31,17 +31,17 @@ class AppealController extends Controller
 
         // Check if image is actually rejected
         if ($image->status !== 'rejected') {
-            return redirect()->route('gallery.index')->with('error', 'هذه الصورة ليست محظورة لطلب مراجعتها.');
+            return redirect()->route('images.gallery')->with('error', 'هذه الصورة ليست محظورة لطلب مراجعتها.');
         }
 
         // Check if there is already a pending appeal
         if ($image->appeals()->where('status', 'pending')->exists()) {
-            return redirect()->route('gallery.index')->with('warning', 'يوجد طلب مراجعة قيد الانتظار حالياً لهذه الصورة.');
+            return redirect()->route('images.gallery')->with('warning', 'يوجد طلب مراجعة قيد الانتظار حالياً لهذه الصورة.');
         }
 
         // Check if there is already a rejected appeal (One-Appeal Limit)
         if ($image->appeals()->where('status', 'rejected')->exists()) {
-            return redirect()->route('gallery.index')->with('error', 'تم رفض طلب المراجعة مسبقاً لهذه الصورة. قرار الإدارة نهائي ولا يمكن تقديم طلب آخر.');
+            return redirect()->route('images.gallery')->with('error', 'تم رفض طلب المراجعة مسبقاً لهذه الصورة. قرار الإدارة نهائي ولا يمكن تقديم طلب آخر.');
         }
 
         return view('appeals.create', compact('image'));

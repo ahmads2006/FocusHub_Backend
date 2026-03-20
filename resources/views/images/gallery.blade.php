@@ -208,6 +208,39 @@
     border-color: rgba(232,99,122,0.4);
     background: rgba(232,99,122,0.1);
   }
+
+  /* Filter Pills */
+  .filter-pill {
+    padding: 8px 20px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+    border: 1px solid var(--border);
+    background: var(--ink-2);
+    color: var(--text-mid);
+    transition: all .3s cubic-bezier(.23,1,.32,1);
+    font-family: 'DM Mono', monospace;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .filter-pill:hover {
+    border-color: var(--border-hi);
+    color: var(--text);
+    transform: translateY(-2px);
+    background: var(--ink-3);
+  }
+  .filter-pill.active {
+    background: var(--gold-dim);
+    border-color: var(--gold);
+    color: var(--gold);
+    box-shadow: 0 0 20px rgba(200,169,110,0.15);
+  }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 </style>
 @endpush
 
@@ -243,6 +276,21 @@
   </div>
 
   <div class="gold-line"></div>
+
+  {{-- ── Filter Pills ── --}}
+  <div class="flex items-center gap-3 overflow-x-auto py-2 no-scrollbar">
+    <a href="{{ route('images.gallery') }}" 
+       class="filter-pill {{ !$selectedTag ? 'active' : '' }}">
+      <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><path d="M1 3h8M1 5h8M1 7h8"/></svg>
+      All
+    </a>
+    @foreach($categories as $tag => $label)
+      <a href="{{ route('images.gallery', ['tag' => $tag]) }}" 
+         class="filter-pill {{ $selectedTag === $tag ? 'active' : '' }}">
+        {{ $label }}
+      </a>
+    @endforeach
+  </div>
 
   {{-- ── Grid View ── --}}
   <div class="vault-scroll flex-1 min-h-0 overflow-y-auto pr-1"

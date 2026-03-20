@@ -9,7 +9,7 @@ class ImagePolicy
 {
     public function view(?User $user, Image $image): bool
     {
-        if ($image->visibility === 'public') {
+        if ($image->privacy === 'public') {
             return true;
         }
         return $user && $user->id === $image->user_id;
@@ -23,7 +23,7 @@ class ImagePolicy
         }
 
         // Public download is allowed only if the owner enabled it general settings
-        return $image->visibility === 'public' && $image->allow_download;
+        return $image->privacy === 'public' && $image->allow_download;
     }
 
     public function update(User $user, Image $image): bool

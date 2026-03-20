@@ -32,7 +32,7 @@ class ImageController extends Controller
     public function manage()
     {
         $user = Auth::user();
-        $images = $user->images()->withoutGlobalScope('visible')->latest()->get();
+        $images = $user->images()->with('settings')->withoutGlobalScope('visible')->latest()->get();
         $ownedAlbums = $user->ownedAlbums()->latest()->get();
         $sharedAlbums = $user->collaborativeAlbums()->latest()->get();
 
@@ -138,9 +138,11 @@ class ImageController extends Controller
 
         $validated = $request->validate([
             'title' => 'nullable|string|max:255',
+            'base_title' => 'nullable|string|max:255',
             'album_id' => 'nullable|exists:albums,id',
             'privacy' => 'nullable|in:public,private',
             'allow_download' => 'nullable|boolean',
+            'watermark_on_download' => 'nullable|boolean',
         ]);
 
         if ($request->filled('album_id')) {
@@ -156,9 +158,14 @@ class ImageController extends Controller
             'privacy' => $validated['privacy'] ?? $image->privacy,
         ]);
 
-        if ($request->has('allow_download')) {
-            $image->settings()->update(['allow_download' => $request->boolean('allow_download')]);
-        }
+        // Checkboxes: handle both checked (sent) and unchecked (not sent)
+        $image->settings()->updateOrCreate(
+            ['image_id' => $image->id],
+            [
+                'allow_download' => $request->boolean('allow_download'),
+                'watermark_on_download' => $request->boolean('watermark_on_download'),
+            ]
+        );
 
         return back()->with('success', 'تم تحديث معلومات الصورة بنجاح!');
     }
@@ -253,12 +260,19 @@ class ImageController extends Controller
     /**
      * عرض المعرض العام
      */
-    public function gallery()
+    public function gallery(Request $request)
     {
-        $images = Image::where('privacy', 'public')
-            ->withCount('likes')
-            ->latest()
-            ->paginate(12);
+        $selectedTag = $request->query('tag');
+        
+        $query = Image::where('privacy', 'public')
+            ->with(['settings', 'user'])
+            ->withCount('likes');
+
+        if ($selectedTag) {
+            $query->whereRaw('JSON_CONTAINS(labels, ?)', [json_encode($selectedTag)]);
+        }
+
+        $images = $query->latest()->paginate(12);
 
         // Fetch which of these images the current user has already liked
         $likedImageIds = [];
@@ -269,6 +283,21 @@ class ImageController extends Controller
                 ->toArray();
         }
 
-        return view('images.gallery', compact('images', 'likedImageIds'));
+        $categories = [
+            'nature' => 'طبيعة',
+            'mountains' => 'جبال',
+            'technology' => 'تكنولوجيا',
+            'houses' => 'منازل',
+            'forests' => 'غابات',
+            'ocean' => 'بحر',
+            'architecture' => 'عمارة',
+            'electronics' => 'إلكترونيات',
+            'humans' => 'اشخاص',
+            // ... more categories
+        ];
+        $categories = collect($categories)->sortKeys();
+        
+
+        return view('images.gallery', compact('images', 'likedImageIds', 'categories', 'selectedTag'));
     }
 }
