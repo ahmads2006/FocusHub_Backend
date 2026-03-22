@@ -12,12 +12,14 @@ class UserSetting extends Model
 
     protected $fillable = [
         'user_id',
+        'watermark_text',
         'dynamic_watermark',
         'watermark_text_color',
         'watermark_neon_color',
         'watermark_opacity',
         'auto_orient_default',
         'stay_logged_in',
+        'is_public_profile',
     ];
 
     protected $casts = [
@@ -25,6 +27,7 @@ class UserSetting extends Model
         'watermark_opacity' => 'float',
         'auto_orient_default' => 'boolean',
         'stay_logged_in' => 'boolean',
+        'is_public_profile' => 'boolean',
     ];
 
     public function user(): BelongsTo

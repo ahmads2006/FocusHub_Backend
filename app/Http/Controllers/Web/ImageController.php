@@ -82,7 +82,10 @@ class ImageController extends Controller
             try {
                 $this->secureShield->protect($image, [
                     'mode'              => 'signature',
-                    'watermark_text'    => Auth::user()->name,
+                    'watermark_text'    => Auth::user()->watermark_text ?? Auth::user()->name,
+                    'watermark_text_color' => Auth::user()->watermark_text_color ?? '#ffffff',
+                    'watermark_neon_color' => Auth::user()->watermark_neon_color ?? '#800080',
+                    'watermark_opacity'    => Auth::user()->watermark_opacity ?? 0.8,
                     'digital_archiving' => true,
                 ]);
             } catch (\Exception $e) {
@@ -265,7 +268,7 @@ class ImageController extends Controller
         $selectedTag = $request->query('tag');
         
         $query = Image::where('privacy', 'public')
-            ->with(['settings', 'user'])
+            ->with(['settings', 'user', 'labels'])
             ->withCount('likes');
 
         if ($selectedTag) {

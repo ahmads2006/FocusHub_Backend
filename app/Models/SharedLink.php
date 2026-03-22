@@ -26,6 +26,8 @@ class SharedLink extends Model
         'require_watermark',
     ];
 
+    protected $appends = ['is_active', 'status_text'];
+
     protected $hidden = [
         'password',
     ];
@@ -69,5 +71,27 @@ class SharedLink extends Model
     public function isLimitReached(): bool
     {
         return $this->max_access && $this->access_count >= $this->max_access;
+    }
+
+    /**
+     * Frontend-aware status flags
+     */
+    public function getIsActiveAttribute(): bool
+    {
+        return !$this->isExpired() && !$this->isRevoked() && !$this->isLimitReached();
+    }
+
+    public function getStatusTextAttribute(): string
+    {
+        if ($this->isRevoked()) {
+            return 'Revoked';
+        }
+        if ($this->isExpired()) {
+            return 'Expired';
+        }
+        if ($this->isLimitReached()) {
+            return 'Limit Reached';
+        }
+        return 'Active';
     }
 }

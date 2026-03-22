@@ -50,9 +50,11 @@ class Album extends Model implements HasMedia
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
+            ->useLogName('album')
             ->logAll()
             ->logOnlyDirty()
-            ->dontSubmitEmptyLogs();
+            ->dontSubmitEmptyLogs()
+            ->setDescriptionForEvent(fn(string $eventName) => "Album '{$this->title}' was {$eventName}");
     }
 
     protected $fillable = [
@@ -64,6 +66,8 @@ class Album extends Model implements HasMedia
         'cover_image',      // Kept for mass-assignment proxying
         'status',           // Kept for mass-assignment proxying
     ];
+
+    protected $appends = ['can_edit', 'can_delete', 'can_upload'];
 
     protected $casts = [];
 
@@ -113,6 +117,24 @@ class Album extends Model implements HasMedia
     public function getIsPrivateAttribute(): bool
     {
         return $this->getPrivacyAttribute() === 'private';
+    }
+
+    /**
+     * Frontend-aware capability flags
+     */
+    public function getCanEditAttribute(): bool
+    {
+        return auth()->user() ? auth()->user()->can('update', $this) : false;
+    }
+
+    public function getCanDeleteAttribute(): bool
+    {
+        return auth()->user() ? auth()->user()->can('delete', $this) : false;
+    }
+
+    public function getCanUploadAttribute(): bool
+    {
+        return auth()->user() ? auth()->user()->can('uploadPhoto', $this) : false;
     }
 
     public function owner(): BelongsTo

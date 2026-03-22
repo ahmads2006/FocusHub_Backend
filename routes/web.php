@@ -4,6 +4,7 @@ use App\Http\Controllers\Web\ProfileController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\Auth\VerifyCodeController;
 use App\Http\Controllers\Web\ImageController;
+use App\Http\Controllers\Web\DownloadController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Admin\RoleController as AdminRoleController;
@@ -64,9 +65,14 @@ Route::middleware(['auth', 'check.verified', 'check.banned', 'check.timeout'])->
     Route::post('/manage-my-vault', [ImageController::class, 'store'])->name('images.store');
     Route::put('/manage-my-vault/{image}', [ImageController::class, 'update'])->name('images.update');
     Route::delete('/manage-my-vault/{image}', [ImageController::class, 'destroy'])->name('images.destroy');
-    Route::get('/download/{image}', [ImageController::class, 'download'])->name('images.download');
     Route::post('/manage-albums', [ImageController::class, 'storeAlbum'])->name('albums.store');
     Route::post('/images/{image}/protect', [ImageController::class, 'protect'])->name('images.protect');
+    
+    // Download Flow
+    Route::get('/download/{image}', [DownloadController::class, 'download'])->name('images.download');
+    Route::get('/images/{image}/download-original', [DownloadController::class, 'downloadOriginal'])
+         ->name('images.download.original')
+         ->middleware('signed');
     Route::delete('/images/{image}/protection', [ImageController::class, 'revert'])->name('images.protection.revert');
 
     // Discovery Algorithm & Recommendations
@@ -106,6 +112,9 @@ Route::middleware(['auth', 'check.verified', 'check.banned', 'check.timeout'])->
     Route::get('/appeals', [App\Http\Controllers\Web\AppealController::class, 'index'])->name('appeals.history');
     Route::get('/images/{image}/appeal', [App\Http\Controllers\Web\AppealController::class, 'create'])->name('images.appeal.create');
     Route::post('/images/{image}/appeal', [App\Http\Controllers\Web\AppealController::class, 'store'])->name('images.appeal');
+    // Connection & Following
+    Route::post('/connect/{user}', [\App\Http\Controllers\Web\ConnectionController::class, 'toggle'])->name('connect.toggle');
+    Route::get('/connect/{user}/status', [\App\Http\Controllers\Web\ConnectionController::class, 'status'])->name('connect.status');
 });
 
 // ─── لوحة الإدارة (super-admin only) ─────────────────────────────

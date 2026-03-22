@@ -2,6 +2,7 @@
 
 return [
     App\Providers\AppServiceProvider::class,
-    Resend\Laravel\ResendServiceProvider::class,
     App\Providers\MediaAnalyzerServiceProvider::class,
+    App\Providers\ObserverServiceProvider::class,
+    Resend\Laravel\ResendServiceProvider::class,
 ];

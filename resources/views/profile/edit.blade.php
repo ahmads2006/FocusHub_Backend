@@ -112,25 +112,79 @@
                         <h3 class="text-xl font-bold">تفضيلات المعالجة الذكية</h3>
                         <p class="text-gray-500 text-xs mt-1">كيف يتعامل النظام مع صورك الاحترافية تلقائياً.</p>
                     </div>
-                    <div class="p-3 rounded-2xl bg-purple-500/10 text-purple-400">
+                        <div class="p-3 rounded-2xl bg-purple-500/10 text-purple-400">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path></svg>
                     </div>
                 </div>
-                <div class="p-8 space-y-6">
+
+                <div x-data="{ 
+                    watermarkText: '{{ auth()->user()->watermark_text ?? auth()->user()->name }}',
+                    textColor: '{{ auth()->user()->watermark_text_color ?? '#ffffff' }}',
+                    neonColor: '{{ auth()->user()->watermark_neon_color ?? '#800080' }}',
+                    opacity: {{ auth()->user()->watermark_opacity ?? 0.8 }}
+                }" class="p-8 space-y-8">
+
+                    <!-- Live Watermark Preview -->
+                    <div class="relative h-48 rounded-[30px] overflow-hidden border border-white/10 bg-black/40 group">
+                        <div class="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?q=80&w=800&auto=format&fit=crop')] bg-cover bg-center opacity-50"></div>
+                        <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                            <div class="p-4 rounded-xl border border-white/10 backdrop-blur-md flex items-center gap-3"
+                                 :style="`background: rgba(255,255,255,0.05); opacity: ${opacity}; border-left: 4px solid ${neonColor}`">
+                                <div class="w-8 h-8 rounded-lg flex items-center justify-center font-black text-xl" :style="`color: ${neonColor}`">V</div>
+                                <span class="font-bold tracking-tight text-lg" :style="`color: ${textColor}; text-shadow: 0 0 10px ${neonColor}44;`" x-text="watermarkText"></span>
+                            </div>
+                        </div>
+                        <div class="absolute bottom-4 left-4 bg-black/60 backdrop-blur-sm px-3 py-1 rounded-full text-[10px] text-gray-400 font-bold uppercase tracking-widest">معاينة العلامة المائية (Live Preview)</div>
+                    </div>
+
                     <form method="post" action="{{ route('profile.photography.update') }}" class="space-y-8">
                         @csrf
                         @method('put')
 
                         <!-- Watermark Toggle -->
-                        <div class="flex items-center justify-between p-6 rounded-[30px] bg-white/5 hover:bg-white/10 transition-all border border-white/5 group">
-                            <div>
-                                <p class="text-lg font-bold">تفعيل العلامة المائية الديناميكية</p>
-                                <p class="text-sm text-gray-500">حماية الصور عند التحميل بواسطة الزوار عبر رابط آمن.</p>
+                        <div class="p-6 rounded-[30px] bg-white/5 border border-white/5 space-y-6">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-lg font-bold">تفعيل العلامة المائية الديناميكية</p>
+                                    <p class="text-sm text-gray-500">حماية الصور عند التحميل بواسطة الزوار عبر رابط آمن.</p>
+                                </div>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" name="dynamic_watermark" value="1" class="sr-only peer" {{ auth()->user()->dynamic_watermark ? 'checked' : '' }}>
+                                    <div class="w-14 h-7 bg-white/5 border border-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-purple-500 shadow-inner"></div>
+                                </label>
                             </div>
-                            <label class="relative inline-flex items-center cursor-pointer">
-                                <input type="checkbox" name="dynamic_watermark" value="1" class="sr-only peer" {{ auth()->user()->dynamic_watermark ? 'checked' : '' }}>
-                                <div class="w-14 h-7 bg-white/5 border border-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-purple-500 shadow-inner"></div>
-                            </label>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6 border-t border-white/5">
+                                <div class="space-y-2">
+                                    <label class="text-xs text-gray-400 font-bold uppercase tracking-wider">نص العلامة المائية</label>
+                                    <input type="text" name="watermark_text" x-model="watermarkText"
+                                           class="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-purple-500/50" 
+                                           placeholder="مثلاً: FocusHub / اسمك">
+                                </div>
+                                <div class="space-y-2">
+                                    <label class="text-xs text-gray-400 font-bold uppercase tracking-wider">درجة الشفافية (<span x-text="opacity"></span>)</label>
+                                    <input type="range" name="watermark_opacity" min="0" max="1" step="0.1" x-model="opacity"
+                                           class="w-full accent-purple-500">
+                                </div>
+                                <div class="space-y-2">
+                                    <label class="text-xs text-gray-400 font-bold uppercase tracking-wider">لون النص الأساسي</label>
+                                    <div class="flex gap-3">
+                                        <input type="color" name="watermark_text_color" x-model="textColor"
+                                               class="h-11 w-20 bg-transparent border-none p-0 cursor-pointer">
+                                        <input type="text" x-model="textColor" readonly 
+                                               class="flex-1 bg-white/5 border border-white/10 rounded-xl p-3 text-sm font-mono text-gray-400">
+                                    </div>
+                                </div>
+                                <div class="space-y-2">
+                                    <label class="text-xs text-gray-400 font-bold uppercase tracking-wider">لون توهج النيون</label>
+                                    <div class="flex gap-3">
+                                        <input type="color" name="watermark_neon_color" x-model="neonColor"
+                                               class="h-11 w-20 bg-transparent border-none p-0 cursor-pointer">
+                                        <input type="text" x-model="neonColor" readonly 
+                                               class="flex-1 bg-white/5 border border-white/10 rounded-xl p-3 text-sm font-mono text-gray-400">
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Orientation Toggle (Persistent preference) -->
@@ -141,6 +195,18 @@
                             </div>
                             <label class="relative inline-flex items-center cursor-pointer">
                                 <input type="checkbox" name="auto_orient_default" value="1" class="sr-only peer" {{ auth()->user()->auto_orient_default ? 'checked' : '' }}>
+                                <div class="w-14 h-7 bg-white/5 border border-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-purple-500 shadow-inner"></div>
+                            </label>
+                        </div>
+
+                        <!-- Profile Privacy Toggle -->
+                        <div class="flex items-center justify-between p-6 rounded-[30px] bg-white/5 hover:bg-white/10 transition-all border border-white/5 border-purple-500/20">
+                            <div>
+                                <p class="text-lg font-bold text-purple-300">جعل الملف الشخصي عاماً</p>
+                                <p class="text-sm text-gray-500">عند تفعيل هذا الخيار، سيتمكن الجميع من زيارة رابط ملفك ومشاهدة صورك العامة وإحصائياتك.</p>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" name="is_public_profile" value="1" class="sr-only peer" {{ auth()->user()->is_public_profile ? 'checked' : '' }}>
                                 <div class="w-14 h-7 bg-white/5 border border-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-purple-500 shadow-inner"></div>
                             </label>
                         </div>

@@ -18,7 +18,12 @@ class AlbumPolicy
             return true;
         }
 
-        // Hidden albums are only accessible via shared link (handled in controller/middleware)
+        // Check if user has temporary session access via shared link
+        if (session()->has("shared_link_access_album_{$album->id}")) {
+            return true;
+        }
+
+        // Hidden albums are only accessible via shared link (handled above by session)
         // or by owner/collaborators
         if ($album->privacy === 'hidden') {
             if ($user && ($user->id === $album->user_id || $album->collaborators->contains($user))) {
@@ -38,37 +43,47 @@ class AlbumPolicy
     /**
      * Determine whether the user can update the album.
      */
-    public function update(User $user, Album $album): bool
+    public function update(User $user, Album $album): Response
     {
         // Owner always can
         if ($user->id === $album->user_id) {
-            return true;
+            return Response::allow();
         }
 
         // Admin collaborators can update
         $collaborator = $album->collaborators()->where('user_id', $user->id)->first();
-        return $collaborator && $collaborator->pivot->role === 'admin';
+        if ($collaborator && $collaborator->pivot->role === 'admin') {
+            return Response::allow();
+        }
+
+        return Response::deny('You do not have permission to update this album.');
     }
 
     /**
      * Determine whether the user can upload photos to the album.
      */
-    public function uploadPhoto(User $user, Album $album): bool
+    public function uploadPhoto(User $user, Album $album): Response
     {
         if ($user->id === $album->user_id) {
-            return true;
+            return Response::allow();
         }
 
         $collaborator = $album->collaborators()->where('user_id', $user->id)->first();
-        return $collaborator && in_array($collaborator->pivot->role, ['admin', 'contributor']);
+        if ($collaborator && in_array($collaborator->pivot->role, ['admin', 'contributor'])) {
+            return Response::allow();
+        }
+
+        return Response::deny('You do not have permission to upload photos to this album.');
     }
 
     /**
      * Determine whether the user can delete the album.
      */
-    public function delete(User $user, Album $album): bool
+    public function delete(User $user, Album $album): Response
     {
         // Only owner can delete
-        return $user->id === $album->user_id;
+        return $user->id === $album->user_id
+            ? Response::allow()
+            : Response::deny('Only the album owner can delete this album.');
     }
 }

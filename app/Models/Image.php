@@ -49,9 +49,14 @@ class Image extends Model implements HasMedia
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
+            ->useLogName('image')
             ->logAll()
             ->logOnlyDirty()
-            ->dontSubmitEmptyLogs();
+            ->dontSubmitEmptyLogs()
+            ->setDescriptionForEvent(function (string $eventName) {
+                $albumName = $this->album ? $this->album->title : 'Universal';
+                return "Photo '{$this->title}' in album '{$albumName}' was {$eventName}";
+            });
     }
 
     protected $fillable = [
@@ -71,6 +76,7 @@ class Image extends Model implements HasMedia
     ];
 
     protected $with = ['settings'];
+    protected $appends = ['can_edit', 'can_delete', 'can_download'];
 
     // ───────────────────────── Relations ─────────────────────────
 
@@ -207,6 +213,24 @@ class Image extends Model implements HasMedia
     public function getAnalyzerNameAttribute(): string
     {
         return $this->aiMetadata?->driver_name ?? 'N/A';
+    }
+
+    /**
+     * Frontend-aware capability flags
+     */
+    public function getCanEditAttribute(): bool
+    {
+        return auth()->user() ? auth()->user()->can('update', $this) : false;
+    }
+
+    public function getCanDeleteAttribute(): bool
+    {
+        return auth()->user() ? auth()->user()->can('delete', $this) : false;
+    }
+
+    public function getCanDownloadAttribute(): bool
+    {
+        return auth()->user() ? auth()->user()->can('download', $this) : false;
     }
 
     // ───────────────────────── Status Helpers ─────────────────────────

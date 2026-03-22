@@ -28,7 +28,10 @@ class AlbumController extends Controller
 
         $album->load(['images.user', 'collaborators']);
         
-        return view('albums.show', compact('album'));
+        // Fetch accepted connections for the dropdown
+        $acceptedConnections = Auth::user()->acceptedConnections()->get();
+        
+        return view('albums.show', compact('album', 'acceptedConnections'));
     }
 
     /**

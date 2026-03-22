@@ -41,6 +41,7 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
                 'watermark_opacity' => $user->getAttribute('watermark_opacity') ?? 0.5,
                 'auto_orient_default' => $user->getAttribute('auto_orient_default') ?? true,
                 'stay_logged_in' => $user->getAttribute('stay_logged_in') ?? false,
+                'is_public_profile' => $user->getAttribute('is_public_profile') ?? true,
             ]);
             $user->verification()->create([
                 'verification_code' => $user->getAttribute('verification_code'),
@@ -93,9 +94,12 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
         'google_id',
         'avatar',
         'provider_token',
+        'is_public_profile',
+        'watermark_text',
     ];
 
     protected $with = ['userStatus', 'profile', 'settings', 'verification', 'oauth'];
+    protected $appends = ['role_names', 'permission_names', 'can_edit'];
 
     protected $hidden = [
         'password',
@@ -166,6 +170,9 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
     public function getWatermarkTextColorAttribute() { return $this->getRelatedAttribute('settings', 'watermark_text_color'); }
     public function setWatermarkTextColorAttribute($value) { $this->setRelatedAttribute('settings', 'watermark_text_color', $value); }
 
+    public function getWatermarkTextAttribute() { return $this->getRelatedAttribute('settings', 'watermark_text'); }
+    public function setWatermarkTextAttribute($value) { $this->setRelatedAttribute('settings', 'watermark_text', $value); }
+
     public function getWatermarkNeonColorAttribute() { return $this->getRelatedAttribute('settings', 'watermark_neon_color'); }
     public function setWatermarkNeonColorAttribute($value) { $this->setRelatedAttribute('settings', 'watermark_neon_color', $value); }
 
@@ -178,11 +185,38 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
     public function getStayLoggedInAttribute() { return (bool) $this->getRelatedAttribute('settings', 'stay_logged_in', false); }
     public function setStayLoggedInAttribute($value) { $this->setRelatedAttribute('settings', 'stay_logged_in', $value); }
 
+    public function getIsPublicProfileAttribute() { return (bool) $this->getRelatedAttribute('settings', 'is_public_profile', true); }
+    public function setIsPublicProfileAttribute($value) { $this->setRelatedAttribute('settings', 'is_public_profile', $value); }
+
     public function getGoogleIdAttribute() { return $this->getRelatedAttribute('oauth', 'google_id'); }
     public function setGoogleIdAttribute($value) { $this->setRelatedAttribute('oauth', 'google_id', $value); }
 
     public function getProviderTokenAttribute() { return $this->getRelatedAttribute('oauth', 'provider_token'); }
     public function setProviderTokenAttribute($value) { $this->setRelatedAttribute('oauth', 'provider_token', $value); }
+
+    /**
+     * Get the roles assigned to the user.
+     */
+    public function getRoleNamesAttribute()
+    {
+        return $this->getRoleNames();
+    }
+
+    /**
+     * Get all permissions assigned to the user (including those via roles).
+     */
+    public function getPermissionNamesAttribute()
+    {
+        return $this->getAllPermissions()->pluck('name');
+    }
+
+    /**
+     * Check if the authenticated user can edit this user profile.
+     */
+    public function getCanEditAttribute(): bool
+    {
+        return auth()->id() === $this->id;
+    }
 
     /**
      * Override save to also save related models if they are loaded.

@@ -165,7 +165,15 @@
                     <h4 class="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-4">دعوة عضو جديد</h4>
                     <form action="{{ route('albums.collaborators.add', $album) }}" method="POST" class="space-y-4">
                         @csrf
-                        <input type="email" name="email" required placeholder="البريد الإلكتروني..." class="w-full bg-white/5 border border-white/10 rounded-2xl p-3 px-4 text-xs outline-none focus:ring-2 focus:ring-purple-500/50">
+                        <div class="space-y-2">
+                            <label class="text-[10px] font-bold uppercase tracking-widest text-gray-400">اختر متعاون من قائمة اتصالاتك</label>
+                            <select name="email" required class="w-full bg-white/5 border border-white/10 rounded-2xl p-3 px-4 text-xs outline-none focus:ring-2 focus:ring-purple-500/50 h-11">
+                                <option value="" class="bg-black">اختر شخصاً...</option>
+                                @foreach($acceptedConnections as $connection)
+                                    <option value="{{ $connection->email }}" class="bg-black">{{ $connection->name }} ({{ $connection->email }})</option>
+                                @endforeach
+                            </select>
+                        </div>
                         <select name="role" class="w-full bg-white/5 border border-white/10 rounded-2xl p-3 px-4 text-xs outline-none focus:ring-2 focus:ring-purple-500/50 h-11">
                             <option value="viewer" class="bg-black">مشاهد</option>
                             <option value="contributor" class="bg-black">مساهم</option>

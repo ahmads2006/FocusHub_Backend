@@ -328,23 +328,59 @@
         <div class="vault-card fade-up" x-data="{ revealed: false }" key="image-{{ $image->id }}">
 
           {{-- Image area --}}
-          <div class="relative overflow-hidden shimmer" style="height:220px;background:var(--ink-3);" {!! $protAttrs !!}>
+          <div class="relative overflow-hidden shimmer cursor-pointer group" 
+               style="height:220px;background:var(--ink-3);" 
+               {!! $protAttrs !!}
+               @click="openModal({
+                            id: '{{ $image->id }}',
+                            title: '{{ $image->title ?: 'Untitled' }}',
+                            description: '{{ $image->description ?: 'No description' }}',
+                            url: '{{ $image->url }}',
+                            user: {
+                                id: '{{ $image->user->id }}',
+                                name: '{{ $image->user->name }}',
+                                avatar: '{{ $image->user->avatar }}'
+                            },
+                            status: '{{ $image->status }}',
+                            is_sensitive: {{ $image->is_sensitive ? 'true' : 'false' }},
+                            labels: @json($image->labels ? $image->labels->labels : []),
+                            likes_count: {{ $image->likes_count ?? 0 }},
+                            allow_download: {{ $image->allow_download ? 'true' : 'false' }},
+                            download_url: '{{ $image->allow_download ? route('images.download', $image) : '#' }}'
+                          })">
 
             <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
                  data-src="{{ $imgUrl }}"
                  alt="{{ $image->title ?: 'Photograph' }}"
-                 class="card-img w-full h-full object-cover lazy select-none {{ $isSensitive ? 'blur-xl' : '' }}"
+                 class="card-img w-full h-full object-cover lazy select-none transition-transform duration-700 group-hover:scale-110 {{ $isSensitive ? 'blur-xl' : '' }}"
                  :class="revealed ? '!blur-0' : ''"
                  width="400" height="300" loading="lazy">
 
             {{-- Hover overlay --}}
-            <div class="card-overlay absolute inset-0 z-10 flex flex-col justify-end p-4">
+            <div class="card-overlay absolute inset-0 z-10 flex flex-col justify-end p-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
               <div class="flex justify-between items-center">
                 <span class="content-badge" style="background:rgba(0,0,0,0.5);color:var(--text-mid);border:1px solid var(--border-hi);">
                   {{ strtoupper($image->file_type) }}
                 </span>
                 <div class="flex gap-2">
-                  <button class="action-btn" aria-label="Image details" @click="alert('{{ $image->title }}')">
+                  <button class="action-btn" aria-label="Image details" 
+                          @click="openModal({
+                            id: '{{ $image->id }}',
+                            title: '{{ $image->title ?: 'Untitled' }}',
+                            description: '{{ $image->description ?: 'No description' }}',
+                            url: '{{ $image->url }}',
+                            user: {
+                                id: '{{ $image->user->id }}',
+                                name: '{{ $image->user->name }}',
+                                avatar: '{{ $image->user->avatar }}'
+                            },
+                            status: '{{ $image->status }}',
+                            is_sensitive: {{ $image->is_sensitive ? 'true' : 'false' }},
+                            labels: @json($image->labels ? $image->labels->labels : []),
+                            likes_count: {{ $image->likes_count ?? 0 }},
+                            allow_download: {{ $image->allow_download ? 'true' : 'false' }},
+                            download_url: '{{ $image->allow_download ? route('images.download', $image) : '#' }}'
+                          })">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
@@ -594,11 +630,28 @@
 
     @forelse($images as $image)
       @php $isOwner = auth()->id() === $image->user_id; $imgUrl = $image->url; @endphp
-      <div class="list-row fade-up">
-        <div class="rounded-xl overflow-hidden flex-shrink-0" style="width:72px;height:56px;background:var(--ink-3);">
+      <div class="list-row fade-up cursor-pointer group"
+           @click="openModal({
+                    id: '{{ $image->id }}',
+                    title: '{{ $image->title ?: 'Untitled' }}',
+                    description: '{{ $image->description ?: 'No description' }}',
+                    url: '{{ $image->url }}',
+                    user: {
+                        id: '{{ $image->user->id }}',
+                        name: '{{ $image->user->name }}',
+                        avatar: '{{ $image->user->avatar }}'
+                    },
+                    status: '{{ $image->status }}',
+                    is_sensitive: {{ $image->is_sensitive ? 'true' : 'false' }},
+                    labels: @json($image->labels ? $image->labels->labels : []),
+                    likes_count: {{ $image->likes_count ?? 0 }},
+                    allow_download: {{ $image->allow_download ? 'true' : 'false' }},
+                    download_url: '{{ $image->allow_download ? route('images.download', $image) : '#' }}'
+                  })">
+        <div class="rounded-xl overflow-hidden flex-shrink-0 group-hover:ring-2 ring-purple-500/50 transition-all" style="width:72px;height:56px;background:var(--ink-3);">
           <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
                data-src="{{ $imgUrl }}" alt="{{ $image->title }}"
-               class="lazy w-full h-full object-cover {{ $image->is_sensitive ? 'blur-md' : '' }}"
+               class="lazy w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 {{ $image->is_sensitive ? 'blur-md' : '' }}"
                loading="lazy">
         </div>
         <div class="min-w-0">
@@ -635,6 +688,29 @@
           </div>
         </div>
         <div class="flex items-center gap-2 flex-shrink-0">
+          <button class="action-btn" aria-label="Image details" 
+                  @click="openModal({
+                    id: '{{ $image->id }}',
+                    title: '{{ $image->title ?: 'Untitled' }}',
+                    description: '{{ $image->description ?: 'No description' }}',
+                    url: '{{ $image->url }}',
+                    user: {
+                        id: '{{ $image->user->id }}',
+                        name: '{{ $image->user->name }}',
+                        avatar: '{{ $image->user->avatar }}'
+                    },
+                    status: '{{ $image->status }}',
+                    is_sensitive: {{ $image->is_sensitive ? 'true' : 'false' }},
+                    labels: @json($image->labels ? $image->labels->labels : []),
+                    likes_count: {{ $image->likes_count ?? 0 }},
+                    allow_download: {{ $image->allow_download ? 'true' : 'false' }},
+                    download_url: '{{ $image->allow_download ? route('images.download', $image) : '#' }}'
+                  })">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+            </svg>
+          </button>
           <span class="content-badge font-mono-alt" style="color:var(--text-dim);background:var(--ink-3);border:1px solid var(--border);">{{ strtoupper($image->file_type) }}</span>
           @auth
           <button
@@ -673,6 +749,9 @@
     @endif
   </div>
 
+  {{-- ── Image Details Modal ── --}}
+  @include('images._detail_modal')
+
 </div>
 @endsection
 
@@ -705,6 +784,54 @@ document.addEventListener('alpine:init', () => {
     loading: false,
     likedIds: new Set(initialLikedIds),
     localCounts: {},
+    selectedImage: null,
+    showModal: false,
+    isFollowing: false,
+
+    openModal(data) {
+        this.selectedImage = data;
+        this.showModal = true;
+        this.checkFollowStatus(data.user.id);
+        document.body.style.overflow = 'hidden';
+    },
+
+    closeModal() {
+        this.showModal = false;
+        document.body.style.overflow = 'auto';
+    },
+
+    isNature() {
+        return this.selectedImage?.labels.some(l => 
+            ['nature', 'mountain', 'landscape', 'forest', 'water', 'sky', 'tree', 'sea', 'ocean'].includes(l.description.toLowerCase())
+        );
+    },
+
+    async checkFollowStatus(userId) {
+        try {
+            const res = await fetch(`/connect/${userId}/status`);
+            const data = await res.json();
+            this.isFollowing = data.connected && data.status === 'accepted';
+        } catch (e) {
+            this.isFollowing = false;
+        }
+    },
+
+    async toggleFollow(userId) {
+        try {
+            const csrf = document.querySelector('meta[name="csrf-token"]').content;
+            const res = await fetch(`/connect/${userId}`, {
+                method: 'POST',
+                headers: { 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' }
+            });
+            const data = await res.json();
+            if (data.success) {
+                this.isFollowing = data.status === 'followed';
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire({ toast: true, position: 'bottom-end', timer: 2500, icon: 'success', title: data.status === 'followed' ? 'تمت المتابعة' : 'تم إلغاء المتابعة', showConfirmButton: false });
+                }
+            }
+        } catch (e) {}
+    },
 
     isLiked(id) {
       return this.likedIds.has(id);

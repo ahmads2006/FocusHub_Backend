@@ -36,7 +36,7 @@ class SecureShieldService
         $settings['digital_archiving'] = $settings['digital_archiving'] ?? true;
 
         // Normalization & User Preference Integration
-        $settings['watermark_text']        = $settings['watermark_text']        ?? ($image->user->name              ?? 'FocusHub');
+        $settings['watermark_text']        = $settings['watermark_text']        ?? ($image->user->watermark_text ?? $image->user->name ?? 'FocusHub');
         $settings['watermark_text_color']  = $settings['watermark_text_color']  ?? ($image->user->watermark_text_color ?? '#ffffff');
         $settings['watermark_neon_color']  = $settings['watermark_neon_color']  ?? ($image->user->watermark_neon_color ?? '#800080');
         $settings['watermark_opacity']     = (float)($settings['watermark_opacity'] ?? ($image->user->watermark_opacity ?? 0.8));

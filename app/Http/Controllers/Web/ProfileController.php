@@ -57,8 +57,26 @@ class ProfileController extends Controller
     public function updatePhotography(Request $request): RedirectResponse
     {
         $user = $request->user();
+        
+        $validated = $request->validate([
+            'dynamic_watermark' => 'boolean',
+            'auto_orient_default' => 'boolean',
+            'is_public_profile' => 'boolean',
+            'watermark_text' => 'nullable|string|max:50',
+            'watermark_text_color' => 'nullable|string|regex:/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/',
+            'watermark_neon_color' => 'nullable|string|regex:/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/',
+            'watermark_opacity' => 'nullable|numeric|between:0,1',
+        ]);
+
         $user->dynamic_watermark = $request->has('dynamic_watermark');
         $user->auto_orient_default = $request->has('auto_orient_default');
+        $user->is_public_profile = $request->has('is_public_profile');
+        
+        if ($request->filled('watermark_text')) $user->watermark_text = $validated['watermark_text'];
+        if ($request->filled('watermark_text_color')) $user->watermark_text_color = $validated['watermark_text_color'];
+        if ($request->filled('watermark_neon_color')) $user->watermark_neon_color = $validated['watermark_neon_color'];
+        if ($request->has('watermark_opacity')) $user->watermark_opacity = $validated['watermark_opacity'];
+
         $user->save();
 
         return Redirect::route('profile.edit')->with('status', 'photography-updated');
@@ -124,25 +142,51 @@ class ProfileController extends Controller
      */
     public function show(\App\Models\User $user): View
     {
+        $isOwner = Auth::id() === $user->id;
+        $isPublic = (bool) $user->is_public_profile;
+        $isFollowing = false;
+
+        if (Auth::check() && !$isOwner) {
+            $isFollowing = \App\Models\Connection::where('user_id', Auth::id())
+                ->where('connected_user_id', $user->id)
+                ->where('status', 'accepted')
+                ->exists();
+        }
+
         // Fetch stats from Redis if exist, else default to 0
         $redisPrefix = "user:{$user->id}:stats";
         $totalLikes = (int) \Illuminate\Support\Facades\Redis::get("{$redisPrefix}:likes") ?: 0;
         $totalPhotos = (int) \Illuminate\Support\Facades\Redis::get("{$redisPrefix}:photos") ?: 0;
         $totalConnections = (int) \Illuminate\Support\Facades\Redis::get("{$redisPrefix}:connections") ?: 0;
 
-        // Fetch images where is_public = true (privacy = public) and moderation_status = 'approved'
-        $images = $user->images()
-            ->where('privacy', 'public')
-            ->whereHas('moderation', function ($q) {
-                $q->where('status', \App\Models\Image::STATUS_APPROVED);
-            })
-            ->with(['likes', 'labels'])
-            ->latest()
-            ->paginate(24);
+        $images = collect();
+        if ($isOwner || $isPublic) {
+            // Fetch images where privacy = public and moderation_status = 'approved'
+            $images = $user->images()
+                ->where('privacy', 'public')
+                ->whereHas('moderation', function ($q) {
+                    $q->where('status', \App\Models\Image::STATUS_APPROVED);
+                })
+                ->with(['likes', 'labels'])
+                ->latest()
+                ->paginate(24);
+        }
+
+        $likedImageIds = [];
+        if (Auth::check()) {
+            $likedImageIds = \App\Models\Like::where('user_id', Auth::id())
+                ->whereIn('image_id', $images->pluck('id'))
+                ->pluck('image_id')
+                ->toArray();
+        }
 
         return view('profile.show', [
             'profileUser' => $user,
             'images' => $images,
+            'isOwner' => $isOwner,
+            'isPublic' => $isPublic,
+            'isFollowing' => $isFollowing,
+            'likedImageIds' => $likedImageIds,
             'stats' => [
                 'likes' => $totalLikes,
                 'photos' => $totalPhotos,
