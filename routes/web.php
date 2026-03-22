@@ -34,6 +34,11 @@ Route::middleware('guest')->group(function () {
 });
 
 // ────────────────────────────────────────────────
+// Public Profile Gallery
+// ────────────────────────────────────────────────
+Route::get('/photographer/{user}', [ProfileController::class, 'show'])->name('profile.show');
+
+// ────────────────────────────────────────────────
 // Email verification routes
 // ──────────────────────────────────────────────── 
 Route::get('/verify-code', [VerifyCodeController::class, 'show'])->name('verify.code');
@@ -90,6 +95,9 @@ Route::middleware(['auth', 'check.verified', 'check.banned', 'check.timeout'])->
     Route::delete('/albums/{album}', [AlbumController::class, 'destroy'])->name('albums.destroy');
     Route::post('/albums/{album}/collaborators', [AlbumController::class, 'addCollaborator'])->name('albums.collaborators.add');
     Route::delete('/albums/{album}/collaborators/{user}', [AlbumController::class, 'removeCollaborator'])->name('albums.collaborators.remove');
+    // Album Invitation Accept/Decline
+    Route::post('/albums/{album}/invitation/accept', [AlbumController::class, 'acceptInvitation'])->name('albums.invitation.accept');
+    Route::post('/albums/{album}/invitation/decline', [AlbumController::class, 'declineInvitation'])->name('albums.invitation.decline');
     
     // Image Reporting & Appeals
     Route::post('/images/{image}/report', [App\Http\Controllers\Web\ReportController::class, 'image'])->name('images.report');

@@ -55,17 +55,8 @@ class ProcessImageJob implements ShouldQueue
             $manager = new ImageManager(extension_loaded('imagick') ? new ImagickDriver() : new GdDriver());
             $img = $manager->read($absolutePath);
 
-            // Add simple watermark (Wrapped in try-catch to prevent technical failure if GD font is missing)
-            try {
-                $img->text('OpticVault', $img->width() / 2, $img->height() / 2, function($font) use ($img) {
-                    $font->color('ffffff'); // Simple white
-                    $font->align('center');
-                    $font->valign('middle');
-                    $font->size(max(24, intval($img->width() / 20))); 
-                });
-            } catch (Exception $e) {
-                \Illuminate\Support\Facades\Log::warning("Watermark failed for {$this->imagePath}, skipping: " . $e->getMessage());
-            }
+            // Watermark is NOT applied here — it's handled at CDN delivery time
+            // via ImageKit URL transformations (see ImageKitService::getWatermarkedUrl)
 
             // 1. Dual-Storage Strategy
             $cleanPath = null;
@@ -87,7 +78,7 @@ class ProcessImageJob implements ShouldQueue
                 $cleanPath = $cleanDir . '/' . $uid . '_' . $filename;
                 Storage::disk('local')->put($cleanPath, file_get_contents($absolutePath));
 
-                // Save Public Preview (usually with watermark)
+                // Save Public Preview (clean, watermark applied at CDN delivery time)
                 $publicDir = 'images/' . date('Y/m');
                 Storage::disk('public')->makeDirectory($publicDir);
                 $publicPath = $publicDir . '/' . $uid . '_' . $filename;
@@ -121,6 +112,14 @@ class ProcessImageJob implements ShouldQueue
                 'is_visible' => ($this->status !== 'rejected'),
                 'sensitivity_reason' => $this->reason,
             ]);
+
+            // STAGE 3: Store safety result in Redis Pipeline Cache
+            $safetyCacheKey = "opticvault:safety:{$imageDb->id}";
+            Redis::setex($safetyCacheKey, 3600, json_encode([
+                'status' => $this->status,
+                'is_sensitive' => $this->isSensitive,
+                'timestamp' => time()
+            ]));
 
             $imageDb->meta()->updateOrCreate(['image_id' => $imageDb->id], [
                 'technical_specs' => [] // Stubbed for processing

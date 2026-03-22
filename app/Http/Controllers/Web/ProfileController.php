@@ -118,4 +118,36 @@ class ProfileController extends Controller
         $message = 'إبقاء الجلسة نشطة دائماً يعني أن حسابك سيبقى مسجلاً دون تسجيل خروج تلقائي. يمكنك إلغاء ذلك في أي وقت بتعطيل هذا الخيار.';
         return response()->json(['message' => $message]);
     }
+
+    /**
+     * Display the public profile gallery of a selected user.
+     */
+    public function show(\App\Models\User $user): View
+    {
+        // Fetch stats from Redis if exist, else default to 0
+        $redisPrefix = "user:{$user->id}:stats";
+        $totalLikes = (int) \Illuminate\Support\Facades\Redis::get("{$redisPrefix}:likes") ?: 0;
+        $totalPhotos = (int) \Illuminate\Support\Facades\Redis::get("{$redisPrefix}:photos") ?: 0;
+        $totalConnections = (int) \Illuminate\Support\Facades\Redis::get("{$redisPrefix}:connections") ?: 0;
+
+        // Fetch images where is_public = true (privacy = public) and moderation_status = 'approved'
+        $images = $user->images()
+            ->where('privacy', 'public')
+            ->whereHas('moderation', function ($q) {
+                $q->where('status', \App\Models\Image::STATUS_APPROVED);
+            })
+            ->with(['likes', 'labels'])
+            ->latest()
+            ->paginate(24);
+
+        return view('profile.show', [
+            'profileUser' => $user,
+            'images' => $images,
+            'stats' => [
+                'likes' => $totalLikes,
+                'photos' => $totalPhotos,
+                'connections' => $totalConnections,
+            ]
+        ]);
+    }
 }

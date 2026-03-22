@@ -7,6 +7,7 @@ use App\Models\ImageLabel;
 use App\Services\AI\Contracts\MediaAnalyzerInterface;
 use App\Services\AI\DTOs\ImageAnalysisResult;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Redis;
 
 class ImageIntelligenceService
 {
@@ -69,15 +70,26 @@ class ImageIntelligenceService
     }
 
     /**
-     * Analyze the image and perform automated tagging.
+     * Analyze the image and perform automated tagging, quality grading, and category classification.
      */
     public function analyzeAndTag(Image $image): void
     {
         try {
             Log::info("ImageIntelligence: Starting analysis for image {$image->id}");
 
-            /** @var ImageAnalysisResult $result */
-            $result = $this->analyzer->analyze($image, 'image');
+            // Stage 3: Check Redis Pipeline Cache for existing safety result
+            $safetyCacheKey = "opticvault:safety:{$image->id}";
+            $cachedSafety = Redis::get($safetyCacheKey);
+            
+            if ($cachedSafety) {
+                Log::info("AI Intelligence: Safety verified via Redis cache for {$image->id}. Running TAGGING ONLY.");
+                // Stage 2: Tagging Specialization (Google Vision → Cloudinary)
+                $result = $this->analyzer->analyzeTags($image, 'image');
+            } else {
+                Log::info("AI Intelligence: No safety cache found for {$image->id}. Running FULL analysis.");
+                // Fallback: full analysis if cache expired or missing
+                $result = $this->analyzer->analyze($image, 'image');
+            }
 
             // 1. Update Tags (Spatie Tags)
             $this->updateImageTags($image, $result->tags);
@@ -88,7 +100,32 @@ class ImageIntelligenceService
             // 3. Store in separate table (legacy support)
             $this->storeLabels($image, $result->tags);
 
-            Log::info("ImageIntelligence: Successfully analyzed and tagged image {$image->id}");
+            // 4. Store quality grade and category in AI metadata
+            $image->aiMetadata()->updateOrCreate(
+                [], // MorphOne automatically scopes to media_id and media_type
+                [
+                    'driver_name' => $result->driverName,
+                    'is_sensitive' => $result->isSensitive,
+                    'extracted_tags' => $result->tags,
+                    'quality_grade' => $result->qualityGrade,
+                    'category' => $result->category,
+                ]
+            );
+
+            Log::info("ImageIntelligence: Successfully analyzed image {$image->id}", [
+                'quality_grade' => $result->qualityGrade,
+                'category' => $result->category,
+                'tags_count' => count($result->tags),
+            ]);
+
+            // 5. Dispatch enhancement job if quality is below high_quality
+            if ($result->qualityGrade !== 'high_quality') {
+                \App\Jobs\EnhanceImageJob::dispatch($image->id)
+                    ->onQueue('default')
+                    ->delay(now()->addSeconds(3));
+
+                Log::info("ImageIntelligence: Dispatched EnhanceImageJob for image {$image->id} (grade: {$result->qualityGrade})");
+            }
 
         } catch (\Exception $e) {
             Log::error("ImageIntelligence Error: " . $e->getMessage());

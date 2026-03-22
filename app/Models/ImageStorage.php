@@ -18,6 +18,7 @@ class ImageStorage extends Model
         'original_path',
         'imagekit_file_id',
         'imagekit_file_path',
+        'enhanced_url',
         'md5_hash',
     ];
 

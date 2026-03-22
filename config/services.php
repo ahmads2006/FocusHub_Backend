@@ -52,6 +52,7 @@ return [
         'public_key' => env('IMAGEKIT_PUBLIC_KEY'),
         'private_key' => env('IMAGEKIT_PRIVATE_KEY'),
         'url_endpoint' => env('IMAGEKIT_URL_ENDPOINT'),
+        'webhook_secret' => env('IMAGEKIT_WEBHOOK_SECRET'),
     ],
 
     'content_safety' => [

@@ -109,12 +109,16 @@ class ImageService
                     $path = $cloudResponse->filePath;
 
                     // ── Optional: Also push to LocalStack S3 for background Python scanner ──
+                    // DISABLED: Pushing to LocalStack S3 synchronously blocks the PHP thread for 
+                    // up to 3 minutes if the Docker container is unresponsive or bucket is missing.
+                    /*
                     try {
                         $s3Key = 'images/' . date('Y/m') . '/' . uniqid('mirror_') . '_' . preg_replace('/[^A-Za-z0-9\-\_\.]/', '', $file->getClientOriginalName());
                         Storage::disk('s3')->put($s3Key, file_get_contents($cleanFile), 'public');
                     } catch (\Exception $s3e) {
                         // Mirror failure is non-critical
                     }
+                    */
 
                 } catch (\Exception $e) {
                     Log::warning("OpticVault Cloud Failed: " . $e->getMessage() . ". Attempting secondary storages.");
@@ -122,19 +126,21 @@ class ImageService
                     $fileName = uniqid('fallback_') . '_' . preg_replace('/[^A-Za-z0-9\-\_\.]/', '', $file->getClientOriginalName());
                     $relativePath = 'images/' . date('Y/m') . '/' . $fileName;
 
-                    // 1. Try S3 (LocalStack)
+                    // DISABLED: LocalStack S3 fallback causes 3-minute timeouts if container is missing.
+                    /*
                     try {
                         Storage::disk('s3')->put($relativePath, file_get_contents($cleanFile), 'public');
                         $path = $relativePath;
                         Log::info("Fallback upload to LocalStack S3 successful: {$relativePath}");
                     } catch (\Exception $s3e) {
                         Log::warning("LocalStack S3 fallback failed: " . $s3e->getMessage() . ". Final fallback to LOCAL Public disk.");
-                        
-                        // 2. Final Fallback: Store on local public disk for instant visibility
-                        Storage::disk('public')->put($relativePath, file_get_contents($cleanFile));
-                        $path = $relativePath;
-                        Log::info("Final local fallback successful: {$relativePath}");
                     }
+                    */
+                    
+                    // Final Fallback: Store on local public disk for instant visibility
+                    Storage::disk('public')->put($relativePath, file_get_contents($cleanFile));
+                    $path = $relativePath;
+                    Log::info("Final local fallback successful: {$relativePath}");
                 }
             }
 
@@ -172,17 +178,37 @@ class ImageService
                 'is_sensitive'       => $moderationResult['is_sensitive'] ?? false,
                 'is_visible'         => $moderationResult['is_visible'] ?? true,
                 'sensitivity_reason' => $moderationResult['reason'] ?? null,
-                'ai_metadata'        => $moderationResult['metadata'],
+                'ai_metadata'        => $moderationResult['metadata'] ?? [],
             ]);
 
-            // 4e. Settings/permissions
+            // 4e. Intelligence: Auto-Tagging & Categorization (v14.1)
+            $aiData = $moderationResult['metadata'] ?? [];
+            $tags = $aiData['tags'] ?? [];
+            
+            if (!empty($tags)) {
+                $image->syncTags($tags);
+                $image->update(['labels' => $tags]);
+            }
+
+            // Save to polymorphic MediaAiMetadata table for UI & Advanced Filtering
+            $image->aiMetadata()->updateOrCreate(['media_id' => $image->id, 'media_type' => Image::class], [
+                'driver_name'      => $moderationResult['driver'] ?? 'unknown',
+                'raw_results'      => $aiData['raw_results'] ?? $aiData,
+                'extracted_tags'   => $tags,
+                'quality_grade'    => $aiData['quality_grade'] ?? 'high_quality',
+                'category'         => $aiData['category'] ?? 'other',
+                'is_sensitive'     => $moderationResult['is_sensitive'] ?? false,
+                'confidence_score' => $aiData['confidence_score'] ?? 1.0,
+            ]);
+
+            // 4f. Settings/permissions
             $image->settings()->updateOrCreate(['image_id' => $image->id], [
                 'allow_download'        => isset($data['allow_download']),
                 'watermark_on_download' => isset($data['watermark_on_download']),
             ]);
 
             // Refresh so proxy accessors work correctly
-            $image->load(['storage', 'meta', 'moderation', 'settings']);
+            $image->load(['storage', 'meta', 'moderation', 'settings', 'tags', 'aiMetadata']);
 
             // 5. Notify Super Admins if Quarantined
             if ($image->status === Image::STATUS_REJECTED) {

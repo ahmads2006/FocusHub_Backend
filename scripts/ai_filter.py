@@ -51,11 +51,11 @@ def check_nsfw(image_path):
 
             skin_ratio = skin_pixels / total
 
-            # --- Decision logic ---
-            if skin_ratio > 0.55:
+            # --- Decision logic (v14.1 adjusted) ---
+            if skin_ratio > 0.65:
                 return "UNSAFE"
 
-            elif skin_ratio > 0.35:
+            elif skin_ratio > 0.45:
                 return "SUSPICIOUS"
 
             else:

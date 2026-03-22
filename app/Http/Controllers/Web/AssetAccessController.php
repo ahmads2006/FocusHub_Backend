@@ -49,6 +49,11 @@ class AssetAccessController extends Controller
             abort(403, 'You do not have permission to download the original file.');
         }
 
+        // 2b. Red Layer: Rejected Content (Critical violations)
+        if ($image->isRejected()) {
+            abort(403, 'This image has been rejected and cannot be downloaded.');
+        }
+
         // 3. Determine whether watermark should be applied
         $isOwner              = Auth::check() && Auth::id() === $image->user_id;
         $sessionLinkWatermark = session("shared_link_watermark_{$image->id}");
@@ -74,10 +79,28 @@ class AssetAccessController extends Controller
 
         // 4a. No watermark needed → serve original
         if (!$shouldWatermark) {
+            $imagekitPath = $image->imagekit_file_path ?? null;
+            if ($imagekitPath) {
+                $imageKitService = app(\App\Services\Core\ImageKitService::class);
+                $url = $imageKitService->generateSignedUrl($imagekitPath, [], 60);
+                \Illuminate\Support\Facades\Log::info("AssetAccess: Redirecting to signed ImageKit URL for original image {$image->id}");
+                return redirect($url);
+            }
             return $this->streamImageFile($image);
         }
 
-        // 4b. Watermark needed → look for a pre-rendered ProtectedImage first
+        // 4b. Watermark via ImageKit CDN overlay (preferred — no file modification)
+        $imagekitPath = $image->imagekit_file_path ?? null;
+        if ($imagekitPath) {
+            $imageKitService = app(\App\Services\Core\ImageKitService::class);
+            $watermarkText = $image->user->name ?? 'OpticVault';
+            $watermarkedUrl = $imageKitService->getWatermarkedUrl($imagekitPath, $watermarkText);
+
+            \Illuminate\Support\Facades\Log::info("AssetAccess: Redirecting to ImageKit watermarked URL for image {$image->id}");
+            return redirect($watermarkedUrl);
+        }
+
+        // 4c. Fallback: check for a pre-rendered ProtectedImage
         $protected = \App\Models\ProtectedImage::where('image_id', $image->id)
             ->whereNull('reverted_at')
             ->latest()
@@ -88,7 +111,7 @@ class AssetAccessController extends Controller
             return $this->streamFile($protected->path, $filename);
         }
 
-        // 4c. No pre-rendered copy → generate on-the-fly via SecureShield
+        // 4d. Last resort: generate on-the-fly via SecureShield (local/S3 images only)
         try {
             $settings = [
                 'watermark_text'    => $image->user->name,
@@ -100,7 +123,6 @@ class AssetAccessController extends Controller
 
             $protectedUrl = $this->secureShield->protect($image, $settings);
 
-            // Correctly strip the URL base to get the storage-relative path
             $relativePath = ltrim(str_replace(Storage::disk('public')->url(''), '', $protectedUrl), '/');
             $filename     = pathinfo($image->filename, PATHINFO_FILENAME) . '_secured.jpg';
 
@@ -122,10 +144,38 @@ class AssetAccessController extends Controller
             abort(403, 'Unauthorized access or expired link.');
         }
 
-        // Only the owner or authorized users can see private previews
-        $isOwner = \Illuminate\Support\Facades\Auth::check() && \Illuminate\Support\Facades\Auth::id() === $image->user_id;
+        // 1. Authorization check
+        $isOwner = Auth::check() && Auth::id() === $image->user_id;
         if (!$isOwner && $image->privacy !== 'public') {
             abort(403, 'You do not have permission to view this image.');
+        }
+
+        // 2. Red Layer: Rejected Content (Critical violations)
+        if ($image->isRejected()) {
+            abort(403, 'This image has been rejected due to content policy violations.');
+        }
+
+        // 3. Yellow Layer: Pending Review / Sensitive Content
+        $isSensitive = $image->is_sensitive || $image->isPendingReview();
+        
+        $imagekitPath = $image->imagekit_file_path ?? null;
+
+        // Skip blur for owners so they can review their own content
+        if ($isSensitive && !$isOwner) {
+            if ($imagekitPath) {
+                $imageKitService = app(\App\Services\Core\ImageKitService::class);
+                $blurredUrl = $imageKitService->getBlurredUrl($imagekitPath);
+                
+                \Illuminate\Support\Facades\Log::info("AssetAccess: Serving BLURRED preview (Yellow Layer) for image {$image->id}");
+                return redirect($blurredUrl);
+            }
+        }
+
+        // Generate Signed preview URL for safe/owner views if it's in the cloud
+        if ($imagekitPath) {
+            $imageKitService = app(\App\Services\Core\ImageKitService::class);
+            $url = $imageKitService->generateSignedUrl($imagekitPath, [['format' => 'webp', 'quality' => 'auto']], 30);
+            return redirect($url);
         }
 
         return $this->streamImageFile($image, 'inline');

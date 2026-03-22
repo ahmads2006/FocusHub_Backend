@@ -19,7 +19,7 @@ class AssetDeliveryService
     {
         // 🚀 SMART ROUTING (v4.0): Force secure signed routes for anything non-public, rejected, or NOT in ImageKit.
         // This ensures cloud-fallback assets (S3/local) are found correctly.
-        $isInCloud = !empty($image->storage->imagekit_file_id);
+        $isInCloud = !empty($image->storage?->imagekit_file_id);
         if (!$isInCloud || $image->privacy !== 'public' || $image->isRejected() || ($image->album && $image->album->privacy !== 'public')) {
             if ($this->canAccessOriginal($image) || $image->privacy === 'public') {
                 // For gallery/thumbnail display → use inline preview route (renders in <img> tags)
@@ -33,25 +33,29 @@ class AssetDeliveryService
             }
         }
 
+        // If it's public and safe and in the cloud, serve directly from the CDN
+        $imageKit = app(\App\Services\Core\ImageKitService::class);
+        $path = $image->storage?->imagekit_file_path ?? $image->storage?->path;
+
         switch ($context) {
             case 'avatar':
             case 'icon':
-                return $image->getThumbnailUrl('avatar');
+                return $isInCloud ? $imageKit->getOptimizedUrl($path, 150, 150) : $image->getThumbnailUrl('avatar');
 
             case 'thumbnail':
             case 'square':
-                return $image->getThumbnailUrl('square');
+                return $isInCloud ? $imageKit->getOptimizedUrl($path, 400, 400) : $image->getThumbnailUrl('square');
 
             case 'gallery':
             case 'preview':
-                return $image->getThumbnailUrl('medium');
+                return $isInCloud ? $imageKit->getOptimizedUrl($path, 800) : $image->getThumbnailUrl('medium');
 
             case 'original':
             case 'source':
                 return $this->generateSecureOriginalUrl($image);
 
             default:
-                return $image->getThumbnailUrl('medium');
+                return $isInCloud ? $imageKit->getOptimizedUrl($path) : $image->getThumbnailUrl('medium');
         }
     }
 

@@ -253,7 +253,29 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
         return $this->hasMany(Image::class);
     }
 
+    public function connections(): HasMany
+    {
+        return $this->hasMany(Connection::class);
+    }
+
+    public function acceptedConnections()
+    {
+        return User::whereIn('id', function($query) {
+            $query->select('connected_user_id')
+                ->from('connections')
+                ->where('user_id', $this->id)
+                ->where('status', 'accepted')
+                ->union(
+                    $query->newQuery()->select('user_id')
+                    ->from('connections')
+                    ->where('connected_user_id', $this->id)
+                    ->where('status', 'accepted')
+                );
+        });
+    }
+
     /**
+
      * الحصول على رابط الصورة الشخصية أو صورة افتراضية.
      * يستخدم النسخة المحسنة (avatar.webp) إذا كانت متوفرة.
      */

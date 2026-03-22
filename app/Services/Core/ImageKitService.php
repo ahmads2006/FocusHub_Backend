@@ -56,11 +56,14 @@ class ImageKitService
 
     /**
      * Apply a dynamic watermark (SecureShield) via ImageKit overlay.
+     * Returns a signed URL by default for maximum security to prevent manual tampering.
      */
-    public function getWatermarkedUrl(string $path, string $text): string
+    public function getWatermarkedUrl(string $path, string $text, bool $signed = true, int $expireMinutes = 30): string
     {
         return $this->imagekit->url([
             'path' => $path,
+            'signed' => $signed,
+            'expireSeconds' => $expireMinutes * 60,
             'transformation' => [
                 [
                     'format' => 'webp',
@@ -73,6 +76,48 @@ class ImageKitService
                     'overlayAlpha' => '50',
                     'overlayX' => '10',
                     'overlayY' => '10',
+                ]
+            ],
+        ]);
+    }
+
+    /**
+     * Get an enhanced URL for an image.
+     */
+    public function getEnhancedUrl(string $path, array $transformations, bool $signed = true, int $expireMinutes = 60): string
+    {
+        return $this->imagekit->url([
+            'path' => $path,
+            'signed' => $signed,
+            'expireSeconds' => $expireMinutes * 60,
+            'transformation' => array_merge([
+                ['format' => 'webp', 'quality' => 'auto']
+            ], $transformations),
+        ]);
+    }
+
+    /**
+     * Get a blurred URL for sensitive content (Yellow layer).
+     */
+    public function getBlurredUrl(string $path, bool $signed = true): string
+    {
+        return $this->imagekit->url([
+            'path' => $path,
+            'signed' => $signed,
+            'expireSeconds' => 3600, // 1 hour for previews
+            'transformation' => [
+                [
+                    'format' => 'webp',
+                    'quality' => 'auto',
+                    'blur' => '10', // Significant blur
+                ],
+                [
+                    'overlayText' => 'SENSITIVE CONTENT',
+                    'overlayTextFontSize' => '40',
+                    'overlayTextColor' => 'FFFFFF',
+                    'overlayAlpha' => '80',
+                    'overlayX' => 'center',
+                    'overlayY' => 'center',
                 ]
             ],
         ]);

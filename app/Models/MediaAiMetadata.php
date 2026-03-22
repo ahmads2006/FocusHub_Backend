@@ -15,6 +15,8 @@ class MediaAiMetadata extends Model
         'driver_name',
         'raw_results',
         'extracted_tags',
+        'quality_grade',
+        'category',
         'ocr_text',
         'is_sensitive',
         'confidence_score',

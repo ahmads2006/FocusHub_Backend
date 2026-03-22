@@ -329,6 +329,23 @@
                             <span class="text-gray-700 mx-1">•</span>
                             <span class="text-[10px] text-gray-600 font-mono">{{ number_format($image->size / 1024 / 1024, 2) }} MB</span>
                         </div>
+
+                        {{-- AI Classification Result (v14.1) --}}
+                        <div class="mt-3 pt-3 border-t border-white/5 flex flex-wrap gap-1.5">
+                            @if($image->aiMetadata?->category)
+                                <span class="text-[8px] bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded border border-blue-500/10 font-black uppercase tracking-tighter">
+                                    📁 {{ $image->aiMetadata->category }}
+                                </span>
+                                <span class="text-[8px] {{ $image->aiMetadata->quality_grade === 'high_quality' ? 'bg-green-500/10 text-green-400' : 'bg-orange-500/10 text-orange-400' }} px-2 py-0.5 rounded border border-current/10 font-black uppercase tracking-tighter">
+                                    ✨ {{ str_replace('_', ' ', $image->aiMetadata->quality_grade) }}
+                                </span>
+                            @endif
+                            @foreach($image->tags->take(3) as $tag)
+                                <span class="text-[8px] bg-white/5 text-gray-500 px-2 py-0.5 rounded border border-white/5 font-bold uppercase">
+                                    #{{ $tag->name }}
+                                </span>
+                            @endforeach
+                        </div>
                     </div>
                 </div>
             @endforeach

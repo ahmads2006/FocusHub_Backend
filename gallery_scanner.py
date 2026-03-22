@@ -34,7 +34,7 @@ LARAVEL_BASE_URL  = os.environ.get("LARAVEL_URL", "http://127.0.0.1:8000")
 SCANNER_API_KEY   = os.environ.get("SCANNER_API_KEY", "lVV0HMvLY4UsVwnJBQSECrOGpIB9hzs5")
 AI_FILTER_SCRIPT  = os.path.join(os.path.dirname(__file__), "scripts", "ai_filter.py")
 PYTHON_BIN        = sys.executable
-SCAN_INTERVAL_SEC = 30 * 60  # 30 minutes between full scans
+SCAN_INTERVAL_SEC = 3 * 60  # 3 minutes between full scans
 LOG_FILE          = os.path.join(os.path.dirname(__file__), "scanner.log")
 
 # ──────────────────────────────────────────────────────────────

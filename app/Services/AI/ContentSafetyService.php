@@ -7,10 +7,13 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-use Intervention\Image\ImageManager;
-use Intervention\Image\Drivers\Gd\Driver;
-use Symfony\Component\Process\Process;
 
+/**
+ * ContentSafetyService
+ *
+ * All safety checks go through the MediaAnalyzerManager failover system.
+ * No inline image processing (skin-tone heuristics, Python scripts, etc.).
+ */
 class ContentSafetyService
 {
     public function validate(UploadedFile $file): array
@@ -34,7 +37,7 @@ class ContentSafetyService
             'checks' => []
         ];
 
-        // LAYER 1: Blacklist & Cache (Same as before)
+        // LAYER 1: Blacklist & Cache
         if (BannedImageHash::where('hash', $fileHash)->exists()) {
             return [
                 'status' => 'rejected',
@@ -49,49 +52,100 @@ class ContentSafetyService
             return array_merge($cachedResult, ['metadata' => array_merge($metadata, ['cached_redis' => true])]);
         }
 
-            // LAYER 2: Failover AI Analysis
+        // LAYER 1: Local Heuristics (ai_filter.py)
+        $aiFilterPath = base_path('scripts/ai_filter.py');
+        if (file_exists($aiFilterPath)) {
+            Log::info("AI Safety: Running Layer 1 (ai_filter.py) on {$fileHash}");
+            try {
+                $process = new \Symfony\Component\Process\Process(['python3', $aiFilterPath, $filePath]);
+                $process->setTimeout(10);
+                $process->run();
+                
+                if ($process->isSuccessful()) {
+                    $l1Result = trim($process->getOutput());
+                    Log::info("AI Safety: Layer 1 returned [{$l1Result}]");
+                    
+                    if ($l1Result === 'UNSAFE') {
+                        Log::channel('datadog')->error("Image Rejected (Local Heuristic)", ['hash' => $fileHash]);
+                        $this->banHash($fileHash, 'AI Rejected: Local Heuristic', ['layer1' => 'UNSAFE']);
+                        return [
+                            'status' => 'rejected',
+                            'is_visible' => false,
+                            'reason' => 'AI Flagged (Critical)',
+                            'driver' => 'ai_filter_local',
+                            'metadata' => array_merge($metadata, ['layer1_result' => 'UNSAFE'])
+                        ];
+                    } elseif ($l1Result === 'SUSPICIOUS') {
+                        // Skip to Layer 2 but remember it's suspicious
+                        $metadata['layer1_result'] = 'SUSPICIOUS';
+                    } else {
+                        $metadata['layer1_result'] = 'SAFE';
+                    }
+                } else {
+                    Log::warning("AI Safety: Layer 1 failed with error: " . $process->getErrorOutput());
+                }
+            } catch (\Exception $e) {
+                Log::warning("AI Safety: Layer 1 execution error: " . $e->getMessage());
+            }
+        }
+
+        // LAYER 2: Failover AI File Analysis (Sightengine -> Cloudinary)
         try {
-            /** @var \App\Services\AI\Contracts\MediaAnalyzerInterface $analyzer */
+            /** @var \App\Services\AI\Contracts\MediaAnalyzerInterface|MediaAnalyzerManager $analyzer */
             $analyzer = app(\App\Services\AI\Contracts\MediaAnalyzerInterface::class);
             
-            // We need a temporary model or we mock it. 
-            // Since our drivers expect a Model, let's create a "Dummy" one or pass the path.
-            // Actually, let's update the interface to accept a file or path? 
-            // No, let's stick to the model if possible or mock it.
-            $mockMedia = new \App\Models\Image(['filename' => $file->getClientOriginalName()]);
-            // Mock a URL or path for the analyzer
-            $mockMedia->forceFill(['url' => $file->getRealPath()]); 
-
-            $analysisResult = $analyzer->analyze($mockMedia, 'image');
+            Log::info("AI Safety: Running Layer 2 (Cloud AI) on {$fileHash}");
+            $analysisResult = $analyzer->analyzeFile($file, 'image');
             
-            $status = $analysisResult->isSensitive ? 'pending_review' : 'approved';
-            $reason = $analysisResult->isSensitive ? 'AI Flagged (Sensitive)' : 'Safe';
+            // v15.0: Read the safety verdict from the analyzer (Sightengine Master Decision)
+            $safetyVerdict = $analysisResult->rawResults['_safety_verdict'] ?? null;
+            $sensitivityReasons = $analysisResult->rawResults['_sensitivity_reasons'] ?? [];
+            
+            if ($safetyVerdict) {
+                // Sightengine (or compatible driver) provided a direct verdict
+                $status = $safetyVerdict;
+                $reason = match ($status) {
+                    'rejected' => 'AI Rejected: ' . implode(', ', $sensitivityReasons),
+                    'pending_review' => 'AI Flagged: ' . implode(', ', $sensitivityReasons),
+                    default => 'Safe',
+                };
+            } else {
+                // Fallback for drivers that don't provide _safety_verdict (e.g. Cloudinary)
+                $status = $analysisResult->isSensitive ? 'pending_review' : 'approved';
+                $reason = $analysisResult->isSensitive ? 'AI Flagged (Sensitive)' : 'Safe';
+            }
+            
+            // If layer 1 was suspicious, elevate caution
+            if (($metadata['layer1_result'] ?? '') === 'SUSPICIOUS' && $status === 'approved') {
+                $status = 'pending_review';
+                $reason = 'Suspicious Local Heuristics';
+            }
 
-            if ($analysisResult->isSensitive) {
+            if ($status === 'pending_review') {
                 Log::channel('datadog')->warning("Image Flagged (Sensitive Contents)", [
                     'hash' => $fileHash,
                     'driver' => $analysisResult->driverName,
-                    'scores' => $analysisResult->rawResults,
+                    'reasons' => $sensitivityReasons,
                 ]);
             }
             
-            // If it's a critical reject (e.g. from Sightengine or Google Vision)
-            if (isset($analysisResult->rawResults['status']) && $analysisResult->rawResults['status'] === 'rejected') {
-                $status = 'rejected';
-                Log::channel('datadog')->error("Image Rejected (Critical Violation)", [
+            if ($status === 'rejected') {
+                Log::channel('datadog')->error("Image Rejected (Safety Verdict)", [
                     'hash' => $fileHash,
                     'driver' => $analysisResult->driverName,
-                    'details' => $analysisResult->rawResults,
+                    'reasons' => $sensitivityReasons,
+                    'gore_score' => $analysisResult->rawResults['_gore_score'] ?? 0,
                 ]);
                 $this->banHash($fileHash, "AI Rejected: {$analysisResult->driverName}", $analysisResult->rawResults);
             }
 
             $result = [
                 'status' => $status,
-                'is_sensitive' => $analysisResult->isSensitive,
+                'is_sensitive' => in_array($status, ['pending_review', 'rejected']),
+                'is_visible' => ($status !== 'rejected'),
                 'reason' => $reason,
-                'driver' => $analysisResult->driverName, // This answers the user's question!
-                'analysis' => $analysisResult->toArray(),
+                'driver' => $analysisResult->driverName,
+                'metadata' => array_merge($metadata, $analysisResult->toArray()),
             ];
 
             \Illuminate\Support\Facades\Cache::put("moderation_hash:{$fileHash}", $result, now()->addDays(7));
@@ -99,106 +153,8 @@ class ContentSafetyService
 
         } catch (\Exception $e) {
             Log::error("AI Safety Failover System Failed: " . $e->getMessage());
-            // Fall-Open Logic for Development
-            return ['status' => 'approved', 'reason' => 'Fail-Open (System Error)', 'driver' => 'none', 'metadata' => $metadata];
-        }
-    }
-
-    /**
-     * Local Skin Tone Heuristic using Intervention Image
-     */
-    private function hasExcessiveSkinTones(string $filePath): bool
-    {
-        try {
-            $manager = new ImageManager(new Driver());
-            $image = $manager->read($filePath)->scaleDown(50, 50);
-            
-            $width = $image->width();
-            $height = $image->height();
-            $totalPixels = $width * $height;
-            $skinPixels = 0;
-
-            for ($x = 0; $x < $width; $x++) {
-                for ($y = 0; $y < $height; $y++) {
-                    $color = $image->pickColor($x, $y);
-                    $r = $color->red()->value();
-                    $g = $color->green()->value();
-                    $b = $color->blue()->value();
-
-                    $isSkin = ($r > 95 && $g > 40 && $b > 20 && 
-                              max($r, $g, $b) - min($r, $g, $b) > 15 && 
-                              abs($r - $g) > 15 && $r > $g && $r > $b);
-                    
-                    if ($isSkin) {
-                        $skinPixels++;
-                    }
-                }
-            }
-
-            return ($skinPixels / $totalPixels) > 0.45;
-        } catch (\Exception $e) {
-            Log::warning("Skin Tone check failed: " . $e->getMessage());
-        }
-        return false;
-    }
-
-    /**
-     * Bridge for Local Python Script
-     */
-    private function runLocalPythonModel(string $scriptPath, string $imagePath): string
-    {
-        try {
-            $pythonBinary = env('PYTHON_BINARY');
-            if (empty($pythonBinary)) {
-                $venvPath = base_path('venv/bin/python3');
-                $pythonBinary = file_exists($venvPath) ? $venvPath : 'python3';
-            }
-
-            $process = new Process([$pythonBinary, $scriptPath, $imagePath]);
-            $process->setTimeout(10);
-            $process->run();
-
-            if (!$process->isSuccessful()) {
-                Log::error("Local AI script failed: " . $process->getErrorOutput());
-                return 'ERROR';
-            }
-
-            return trim($process->getOutput());
-        } catch (\Exception $e) {
-            Log::error("Local AI script execution failed: " . $e->getMessage());
-            return 'ERROR';
-        }
-    }
-
-    private function runSightengineRawCheck(UploadedFile $file): ?array
-    {
-        $apiUser = config('services.sightengine.api_user');
-        $apiSecret = config('services.sightengine.api_secret');
-
-        if (empty($apiUser) || empty($apiSecret)) {
-            return null;
-        }
-
-        try {
-            // استخدام كافة الموديلات المطلوبة للنسخة الثالثة المتاحة مع اضافة text-content للبيانات الحساسة
-            $url = 'https://api.sightengine.com/1.0/check.json?' . http_build_query([
-                'api_user' => $apiUser,
-                'api_secret' => $apiSecret,
-                'models' => 'nudity-2.1,weapon,offensive-2.0,gore-2.0,alcohol,recreational_drug,medical,text-content',
-            ]);
-
-            $response = Http::timeout(40)
-                ->when(app()->environment('local'), function ($http) {
-                    return $http->withoutVerifying(); // حل مشكلة SSL في اللوكلي
-                })
-                ->attach('media', fopen($file->getRealPath(), 'r'), $file->getClientOriginalName())
-                ->post($url);
-
-            return $response->successful() ? $response->json() : null;
-
-        } catch (\Exception $e) {
-            Log::error('Sightengine System Error: ' . $e->getMessage());
-            return null;
+            // FAIL-CLOSED: If all engines fail, mark as pending_review (NOT approved)
+            return ['status' => 'pending_review', 'is_sensitive' => true, 'is_visible' => true, 'reason' => 'Fail-Closed (All Engines Down)', 'driver' => 'none', 'metadata' => $metadata];
         }
     }
 

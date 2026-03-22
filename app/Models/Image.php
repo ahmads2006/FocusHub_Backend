@@ -140,9 +140,9 @@ class Image extends Model implements HasMedia
     }
 
     /** AI Analysis Metadata (polymorphic) */
-    public function aiMetadata(): HasOne
+    public function aiMetadata(): \Illuminate\Database\Eloquent\Relations\MorphOne
     {
-        return $this->hasOne(MediaAiMetadata::class, 'media_id');
+        return $this->morphOne(MediaAiMetadata::class, 'media');
     }
 
     // ───────────────────────── Proxy Accessors (backward compat) ─────────────────────────

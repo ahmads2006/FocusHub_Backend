@@ -148,4 +148,42 @@ class AlbumController extends Controller
 
         return back()->with('success', "تم إزالة المتعاون {$user->name} بنجاح.");
     }
+
+    /**
+     * Accept a collaboration invitation.
+     */
+    public function acceptInvitation(Album $album)
+    {
+        $userId = Auth::id();
+        
+        // Find if user is attached and status is invited
+        $collaborator = $album->collaborators()->where('user_id', $userId)->first();
+        
+        if (!$collaborator || $collaborator->pivot->status !== 'invited') {
+            abort(403, 'لا توجد دعوة معلقة لهذا الألبوم.');
+        }
+
+        $album->collaborators()->updateExistingPivot($userId, ['status' => 'accepted']);
+
+        return back()->with('success', 'تم قبول الدعوة بنجاح.');
+    }
+
+    /**
+     * Decline a collaboration invitation.
+     */
+    public function declineInvitation(Album $album)
+    {
+        $userId = Auth::id();
+        
+        // Find if user is attached and status is invited
+        $collaborator = $album->collaborators()->where('user_id', $userId)->first();
+        
+        if (!$collaborator || $collaborator->pivot->status !== 'invited') {
+            abort(403, 'لا توجد دعوة معلقة لهذا الألبوم.');
+        }
+
+        $album->collaborators()->detach($userId);
+
+        return back()->with('success', 'تم رفض الدعوة.');
+    }
 }

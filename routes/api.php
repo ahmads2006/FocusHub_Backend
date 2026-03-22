@@ -35,5 +35,9 @@ Route::prefix('internal/scanner')->group(function () {
     Route::post('/report', [ScannerController::class, 'report']);
 });
 
+// ─── Webhooks ──────────────────────────────────────────────
+Route::post('/webhooks/imagekit', [\App\Http\Controllers\Api\ImageKitWebhookController::class, 'handle'])
+    ->name('api.webhooks.imagekit');
+
 // ─── Diagnostic API ──────────────────────────────────────────
 Route::get('/health', [App\Http\Controllers\Api\SystemHealthController::class, 'index']);

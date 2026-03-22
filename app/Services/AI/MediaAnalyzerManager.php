@@ -21,11 +21,11 @@ class MediaAnalyzerManager extends Manager implements MediaAnalyzerInterface
     /**
      * The order of failover.
      */
-    protected array $failoverOrder = ['google_vision', 'cloudinary', 'sightengine', 'imagekit'];
+    protected array $failoverOrder = ['sightengine', 'cloudinary', 'google_vision', 'imagekit'];
 
     public function getDefaultDriver()
     {
-        return $this->config->get('ai.analyzer.default', 'google_vision');
+        return $this->config->get('ai.analyzer.default', 'sightengine');
     }
 
     public function getName(): string
@@ -84,6 +84,118 @@ class MediaAnalyzerManager extends Manager implements MediaAnalyzerInterface
         // If we reach here, all drivers failed
         throw new AllAnalyzersFailedException(
             "All AI Analyzers failed. Errors: " . json_encode($errors)
+        );
+    }
+
+    /**
+     * Core Failover Logic for Raw Files (Pre-Upload Validation).
+     * ONLY uses drivers that support raw file analysis (Sightengine, Cloudinary).
+     */
+    public function analyzeFile(\Illuminate\Http\UploadedFile $file, string $mediaType = 'image'): AnalysisResult
+    {
+        $errors = [];
+        $lastFailedDriver = null;
+        
+        // For pre-upload, we only use these two
+        $rawFileDrivers = ['sightengine', 'cloudinary'];
+
+        foreach ($rawFileDrivers as $driverName) {
+            if (Cache::has("ai_quota_depleted:{$driverName}")) {
+                Log::warning("AI Failover (File): Skipping {$driverName} (Quota known to be depleted).");
+                continue;
+            }
+
+            try {
+                if ($lastFailedDriver) {
+                    Log::channel('datadog')->warning("AI Failover Event (File)", [
+                        'failed_service' => $lastFailedDriver,
+                        'current_service' => $driverName,
+                    ]);
+                }
+
+                Log::info("AI Failover (File): Attempting analysis with {$driverName}...");
+                
+                $driver = $this->driver($driverName);
+                $result = $driver->analyzeFile($file, $mediaType);
+
+                Log::info("AI Failover (File): SUCCESS with {$driverName}.");
+                return $result;
+
+            } catch (QuotaExceededException $e) {
+                Log::error("AI Failover (File): {$driverName} Quota Exceeded. Marking as depleted.");
+                Cache::put("ai_quota_depleted:{$driverName}", true, now()->addHour());
+                $errors[$driverName] = $e->getMessage();
+                $lastFailedDriver = $driverName;
+            } catch (AnalyzerException $e) {
+                Log::error("AI Failover (File): {$driverName} Failed: " . $e->getMessage());
+                $errors[$driverName] = $e->getMessage();
+                $lastFailedDriver = $driverName;
+            } catch (\Exception $e) {
+                Log::error("AI Failover (File): Unexpected error in {$driverName}: " . $e->getMessage());
+                $errors[$driverName] = $e->getMessage();
+                $lastFailedDriver = $driverName;
+            }
+        }
+
+        throw new AllAnalyzersFailedException(
+            "All AI File Analyzers failed for pre-upload. Errors: " . json_encode($errors)
+        );
+    }
+
+    /**
+     * Stage 2: Intelligence & Tagging ONLY (No Safety Re-scan).
+     * Uses Google Vision → Cloudinary failover for extracting tags/labels/categories.
+     * This method should only be called AFTER safety has been confirmed (Stage 1).
+     */
+    public function analyzeTags(Model $media, string $mediaType = 'image'): AnalysisResult
+    {
+        $errors = [];
+        $lastFailedDriver = null;
+
+        // Tagging-only drivers (Google Vision first, Cloudinary as fallback)
+        $taggingDrivers = ['google_vision', 'cloudinary'];
+
+        foreach ($taggingDrivers as $driverName) {
+            if (Cache::has("ai_quota_depleted:{$driverName}")) {
+                Log::warning("AI Pipeline (Tags): Skipping {$driverName} (Quota known to be depleted).");
+                continue;
+            }
+
+            try {
+                if ($lastFailedDriver) {
+                    Log::channel('datadog')->warning("AI Pipeline (Tags) Failover", [
+                        'failed_service' => $lastFailedDriver,
+                        'current_service' => $driverName,
+                        'media_id' => $media->id,
+                    ]);
+                }
+
+                Log::info("AI Pipeline (Tags): Attempting tagging with {$driverName}...");
+                
+                $driver = $this->driver($driverName);
+                $result = $driver->analyze($media, $mediaType);
+
+                Log::info("AI Pipeline (Tags): SUCCESS with {$driverName}.");
+                return $result;
+
+            } catch (QuotaExceededException $e) {
+                Log::error("AI Pipeline (Tags): {$driverName} Quota Exceeded. Marking as depleted.");
+                Cache::put("ai_quota_depleted:{$driverName}", true, now()->addHour());
+                $errors[$driverName] = $e->getMessage();
+                $lastFailedDriver = $driverName;
+            } catch (AnalyzerException $e) {
+                Log::error("AI Pipeline (Tags): {$driverName} Failed: " . $e->getMessage());
+                $errors[$driverName] = $e->getMessage();
+                $lastFailedDriver = $driverName;
+            } catch (\Exception $e) {
+                Log::error("AI Pipeline (Tags): Unexpected error in {$driverName}: " . $e->getMessage());
+                $errors[$driverName] = $e->getMessage();
+                $lastFailedDriver = $driverName;
+            }
+        }
+
+        throw new AllAnalyzersFailedException(
+            "All AI Tagging Analyzers failed. Errors: " . json_encode($errors)
         );
     }
 

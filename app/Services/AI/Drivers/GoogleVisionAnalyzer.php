@@ -13,6 +13,20 @@ use Illuminate\Support\Facades\Log;
 
 class GoogleVisionAnalyzer implements MediaAnalyzerInterface
 {
+    /**
+     * Map of label keywords → scene categories.
+     */
+    protected const CATEGORY_MAP = [
+        'forest'       => ['forest', 'woodland', 'jungle', 'tree', 'trees', 'rainforest'],
+        'sea'          => ['sea', 'ocean', 'beach', 'coast', 'wave', 'coral', 'underwater'],
+        'nature'       => ['nature', 'landscape', 'mountain', 'valley', 'river', 'lake', 'waterfall', 'sunset', 'sunrise', 'sky', 'cloud', 'field', 'meadow', 'garden', 'flower', 'plant'],
+        'urban'        => ['city', 'urban', 'street', 'road', 'traffic', 'skyline', 'downtown', 'night city'],
+        'architecture' => ['building', 'architecture', 'bridge', 'tower', 'church', 'mosque', 'cathedral', 'monument', 'castle', 'house', 'interior design'],
+        'portrait'     => ['person', 'face', 'portrait', 'selfie', 'people', 'man', 'woman', 'child', 'smile'],
+        'food'         => ['food', 'meal', 'dish', 'cuisine', 'dessert', 'fruit', 'vegetable', 'drink', 'coffee', 'cake'],
+        'abstract'     => ['abstract', 'pattern', 'texture', 'art', 'painting', 'design', 'geometric'],
+    ];
+
     public function getName(): string
     {
         return 'google_vision';
@@ -30,12 +44,15 @@ class GoogleVisionAnalyzer implements MediaAnalyzerInterface
         }
 
         try {
-            // Fix: Google cannot reach local 127.0.0.1 URLs. We MUST send the file content directly.
-            $path = $media->path; // Uses proxy accessor to ImageStorage->path
+            $path = $media->path;
             
             if (!$path || !\Illuminate\Support\Facades\Storage::disk('public')->exists($path)) {
-                // If not local public, try fetching from the absolute URL or S3
-                $content = file_get_contents($media->url); 
+                // If it's a temp file path (pre-upload) or a full URL
+                $url = $media->getRawOriginal('url') ?? $media->url;
+                $content = @file_get_contents($url);
+                if ($content === false) {
+                    throw new AnalyzerException("Failed to read media content from URL/Path: {$url}");
+                }
             } else {
                 $content = \Illuminate\Support\Facades\Storage::disk('public')->get($path);
             }
@@ -47,9 +64,11 @@ class GoogleVisionAnalyzer implements MediaAnalyzerInterface
                     [
                         'image' => ['content' => $base64Image],
                         'features' => [
-                            ['type' => 'LABEL_DETECTION', 'maxResults' => 10],
+                            ['type' => 'LABEL_DETECTION', 'maxResults' => 15],
                             ['type' => 'SAFE_SEARCH_DETECTION'],
                             ['type' => 'TEXT_DETECTION'],
+                            ['type' => 'IMAGE_PROPERTIES'],
+                            ['type' => 'CROP_HINTS'],
                         ],
                     ],
                 ],
@@ -79,22 +98,143 @@ class GoogleVisionAnalyzer implements MediaAnalyzerInterface
             $ocrText = $res['fullTextAnnotation']['text'] ?? null;
             
             $safeSearch = $res['safeSearchAnnotation'] ?? [];
-            $isSensitive = in_array($safeSearch['adult'] ?? '', ['LIKELY', 'VERY_LIKELY']) || 
-                           in_array($safeSearch['violence'] ?? '', ['LIKELY', 'VERY_LIKELY']);
+            
+            $safetyVerdict = 'approved';
+            $goreScore = 0.0;
+            $sensitivityReasons = [];
+
+            // Score Mapping Helper
+            $getScore = function($likelihood) {
+                if ($likelihood === 'VERY_LIKELY') return 0.95;
+                if ($likelihood === 'LIKELY') return 0.7;
+                if ($likelihood === 'POSSIBLE') return 0.4;
+                return 0.0;
+            };
+
+            $isLikely = function($likelihood) {
+                return in_array($likelihood, ['LIKELY', 'VERY_LIKELY'], true);
+            };
+
+            $violenceScore = $getScore($safeSearch['violence'] ?? '');
+            if ($violenceScore > 0) {
+                $goreScore = max($goreScore, $violenceScore);
+            }
+
+            if ($isLikely($safeSearch['violence'] ?? '')) {
+                $safetyVerdict = 'rejected';
+                $sensitivityReasons[] = 'violence';
+            }
+            if ($isLikely($safeSearch['adult'] ?? '')) {
+                $safetyVerdict = 'rejected';
+                $sensitivityReasons[] = 'adult';
+            }
+
+            // Yellow layer fallbacks if not already rejected
+            if ($safetyVerdict !== 'rejected') {
+                if ($isLikely($safeSearch['medical'] ?? '')) {
+                    $safetyVerdict = 'pending_review';
+                    $sensitivityReasons[] = 'medical';
+                }
+                if ($isLikely($safeSearch['racy'] ?? '')) {
+                    $safetyVerdict = 'pending_review';
+                    $sensitivityReasons[] = 'racy';
+                }
+                if ($isLikely($safeSearch['spoof'] ?? '')) {
+                    $safetyVerdict = 'pending_review';
+                    $sensitivityReasons[] = 'spoof';
+                }
+            }
+
+            $isSensitive = ($safetyVerdict === 'rejected' || $safetyVerdict === 'pending_review');
+
+            // --- Quality Grade ---
+            $qualityGrade = $this->deriveQualityGrade($res);
+
+            // --- Scene Category ---
+            $category = $this->deriveCategory($tags);
+
+            // Inject standardized safety metrics into raw results
+            $res['_safety_verdict'] = $safetyVerdict;
+            $res['_sensitivity_reasons'] = $sensitivityReasons;
+            $res['_gore_score'] = $goreScore;
 
             return new ImageAnalysisResult(
                 driverName: $this->getName(),
                 rawResults: $res,
                 tags: $tags,
                 ocrText: $ocrText,
-                isSensitive: $isSensitive
+                isSensitive: $isSensitive,
+                qualityGrade: $qualityGrade,
+                category: $category,
             );
 
         } catch (QuotaExceededException $e) {
             throw $e;
         } catch (\Exception $e) {
             Log::error("Google Vision Analysis Failed: " . $e->getMessage());
-            throw new AnalyzerException($e->getMessage(), $e->getCode(), $e);
+            throw new AnalyzerException($e->getMessage(), 0, $e);
         }
+    }
+
+    public function analyzeFile(\Illuminate\Http\UploadedFile $file, string $mediaType = 'image'): AnalysisResult
+    {
+        throw new AnalyzerException("GoogleVisionAnalyzer does not support raw file analysis without saving due to credential scoping. Use Sightengine/Cloudinary for pre-upload.");
+    }
+
+    /**
+     * Derive quality grade from IMAGE_PROPERTIES and CROP_HINTS confidence.
+     */
+    protected function deriveQualityGrade(array $res): string
+    {
+        // Use cropHints confidence as a proxy for image sharpness/quality
+        $cropHints = $res['cropHintsAnnotation']['cropHints'] ?? [];
+        if (!empty($cropHints)) {
+            $maxConfidence = 0;
+            foreach ($cropHints as $hint) {
+                $maxConfidence = max($maxConfidence, $hint['confidence'] ?? 0);
+            }
+            if ($maxConfidence < 0.5) {
+                return 'low_quality';
+            }
+            if ($maxConfidence < 0.8) {
+                return 'medium_quality';
+            }
+        }
+
+        // Use dominant colors — very low-contrast images (few dominant colors) suggest low quality
+        $dominantColors = $res['imagePropertiesAnnotation']['dominantColors']['colors'] ?? [];
+        if (!empty($dominantColors)) {
+            $topScore = $dominantColors[0]['score'] ?? 0;
+            // If a single color dominates > 80%, it's likely a very flat/corrupted image
+            if ($topScore > 0.8 && count($dominantColors) <= 2) {
+                return 'low_quality';
+            }
+        }
+
+        return 'high_quality';
+    }
+
+    /**
+     * Derive scene category from detected labels.
+     */
+    protected function deriveCategory(array $tags): ?string
+    {
+        $lowerTags = array_map('strtolower', $tags);
+
+        foreach (self::CATEGORY_MAP as $category => $keywords) {
+            foreach ($keywords as $keyword) {
+                if (in_array($keyword, $lowerTags, true)) {
+                    return $category;
+                }
+                // Partial match for compound labels like "Palm tree"
+                foreach ($lowerTags as $tag) {
+                    if (str_contains($tag, $keyword)) {
+                        return $category;
+                    }
+                }
+            }
+        }
+
+        return 'other';
     }
 }
