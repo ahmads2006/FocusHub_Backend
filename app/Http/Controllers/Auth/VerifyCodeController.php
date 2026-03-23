@@ -14,6 +14,13 @@ class VerifyCodeController extends Controller
      */
     public function show()
     {
+        $user = Auth::user() ?? User::find(session('temp_user_id'));
+
+        if ($user && !$user->is_verified) {
+            // Auto-send code if not already sent or if expired (simimplified: always send if visiting)
+            $user->sendVerificationEmail();
+        }
+
         return view('auth.verify-code');
     }
 
@@ -26,38 +33,71 @@ class VerifyCodeController extends Controller
             'code' => 'required|digits:6',
         ]);
 
-        $userId = session('temp_user_id') ?? Auth::id(); // Support both flows
+        $userId = session('temp_user_id') ?? Auth::id();
 
         if (!$userId) {
             return redirect()->route('login')
                 ->withErrors(['code' => 'انتهت صلاحية الجلسة. يرجى تسجيل الدخول من جديد.']);
         }
 
-        $user = User::query()->find($userId);
-
         if (!$user) {
             return redirect()->route('register')
                 ->withErrors(['code' => 'المستخدم غير موجود.']);
         }
 
-        // مطابقة الرمز مع ما في قاعدة البيانات
+        // ── Check Expiration (3 Minutes) ──
+        $verification = $user->verification;
+        if ($verification && $verification->updated_at->addMinutes(3)->isPast()) {
+            return back()->withErrors(['code' => 'انتهت صلاحية هذا الكود (3 دقائق). يرجى طلب كود جديد.']);
+        }
+
         if ($request->code !== $user->verification_code) {
             return back()->withErrors(['code' => 'الرمز غير صحيح. يرجى المحاولة مرة أخرى.']);
         }
 
-        // تفعيل الحساب في قاعدة البيانات
+        // Activate account in DB
         $user->update([
             'is_verified' => true,
-            'verification_code' => null, // مسح الرمز بعد الاستخدام
+            'verification_code' => null,
         ]);
 
-        // تسجيل الدخول ومسح الجلسة المؤقتة
+        $response = redirect()->route('dashboard');
+
+        // Handle Trusted Device
+        if ($request->boolean('trust_device')) {
+            $rawToken = \Illuminate\Support\Str::random(64);
+            $hashedToken = hash('sha256', $rawToken);
+            
+            $user->verification()->update([
+                'device_token' => $hashedToken,
+                'device_trusted_until' => now()->addDays(30),
+                'last_login_ip' => $request->ip(),
+            ]);
+
+            // Set secure cookie
+            $response->withCookie(cookie()->make(
+                'opticvault_trusted_device',
+                $rawToken,
+                60 * 24 * 30, // 30 days
+                null,
+                null,
+                true, // Secure
+                true, // HttpOnly
+                false,
+                'Lax'
+            ));
+        }
+
+        // Login if needed (guest flow)
         if (session()->has('temp_user_id')) {
             Auth::login($user);
             session()->forget('temp_user_id');
         }
 
-        return redirect()->route('dashboard');
+        // Mark session as 2fa verified
+        session(['2fa_verified' => true]);
+
+        return $response;
     }
 
     /**

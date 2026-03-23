@@ -5,7 +5,7 @@ use App\Http\Controllers\Api\ScannerController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware(['auth:sanctum', 'check.banned'])->group(function () {
+Route::middleware(['auth:sanctum', 'check.banned', 'throttle:api'])->group(function () {
     Route::get('/user', function (Request $request) {
         return $request->user();
     });

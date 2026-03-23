@@ -14,10 +14,14 @@ class UserVerification extends Model
         'user_id',
         'verification_code',
         'is_verified',
+        'last_login_ip',
+        'device_token',
+        'device_trusted_until',
     ];
 
     protected $casts = [
         'is_verified' => 'boolean',
+        'device_trusted_until' => 'datetime',
     ];
 
     public function user(): BelongsTo

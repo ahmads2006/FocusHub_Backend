@@ -7,28 +7,40 @@ return [
     | Cross-Origin Resource Sharing (CORS) Configuration
     |--------------------------------------------------------------------------
     |
-    | Here you may configure your settings for cross-origin resource sharing
-    | or "CORS". This determines what cross-origin operations may execute
-    | in web browsers. You are free to adjust these settings as needed.
+    | Strict CORS policy for OpticVault.
+    | Only whitelisted origins can access the API. No wildcards.
     |
-    | To learn more: https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS
+    | React (Axios) must send withCredentials: true to match this config.
     |
     */
 
-    'paths' => ['*'],
+    'paths' => ['api/*', 'sanctum/csrf-cookie', 'login', 'logout', 'register'],
 
-    'allowed_methods' => ['*'],
+    'allowed_methods' => ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
 
-    'allowed_origins' => [env('FRONTEND_URL', 'http://localhost:3000')],
+    'allowed_origins' => [
+        'http://localhost:3000',        // React dev (CRA / Next.js)
+        'http://localhost:5173',        // Vite + React dev
+        'https://opticvault.com',       // Production
+    ],
 
     'allowed_origins_patterns' => [],
 
-    'allowed_headers' => ['*'],
+    'allowed_headers' => [
+        'Content-Type',
+        'X-Requested-With',
+        'Authorization',
+        'Accept',
+        'Origin',
+        'X-CSRF-TOKEN',
+    ],
 
-    'exposed_headers' => [],
+    'exposed_headers' => [
+        'Content-Disposition',  // Needed for batch download/upload tracking
+    ],
 
-    'max_age' => 0,
+    'max_age' => 600,  // Cache pre-flight OPTIONS for 10 minutes
 
-    'supports_credentials' => true,
+    'supports_credentials' => true,  // Required for Sanctum cookie-based auth
 
 ];

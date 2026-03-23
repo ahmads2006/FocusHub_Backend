@@ -48,7 +48,7 @@ Route::post('/verify-code', [VerifyCodeController::class, 'verify'])->name('veri
 // ────────────────────────────────────────────────
 // Authenticated + verified routes
 // ────────────────────────────────────────────────
-Route::middleware(['auth', 'check.verified', 'check.banned', 'check.timeout'])->group(function () {
+Route::middleware(['auth', 'check.verified', 'check.banned', 'check.timeout', 'throttle:web'])->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::put('/profile/security', [ProfileController::class, 'updateSecurity'])->name('profile.security.update');
@@ -62,7 +62,7 @@ Route::middleware(['auth', 'check.verified', 'check.banned', 'check.timeout'])->
 
     // إدارة الصور والألبومات (Consolidated)
     Route::get('/manage-my-vault', [ImageController::class, 'manage'])->name('images.index');
-    Route::post('/manage-my-vault', [ImageController::class, 'store'])->name('images.store');
+    Route::post('/manage-my-vault', [ImageController::class, 'store'])->middleware('throttle:sensitive')->name('images.store');
     Route::put('/manage-my-vault/{image}', [ImageController::class, 'update'])->name('images.update');
     Route::delete('/manage-my-vault/{image}', [ImageController::class, 'destroy'])->name('images.destroy');
     Route::post('/manage-albums', [ImageController::class, 'storeAlbum'])->name('albums.store');
@@ -82,8 +82,10 @@ Route::middleware(['auth', 'check.verified', 'check.banned', 'check.timeout'])->
 
     // Bulk Upload System
     Route::get('/bulk-upload', [\App\Http\Controllers\Api\AlbumUploadController::class, 'index'])->name('images.bulk');
-    Route::post('/api/upload/album', [\App\Http\Controllers\Api\AlbumUploadController::class, 'uploadAlbum'])->name('api.upload.album');
+    Route::post('/api/upload/album', [\App\Http\Controllers\Api\AlbumUploadController::class, 'uploadAlbum'])->middleware('throttle:batch-album')->name('api.upload.album');
+    Route::post('/api/upload/batch', [\App\Http\Controllers\Api\AlbumUploadController::class, 'uploadBatch'])->middleware('throttle:batch-album')->name('api.upload.batch');
     Route::get('/api/upload/progress/{jobId}', [\App\Http\Controllers\Api\AlbumUploadController::class, 'getUploadProgress'])->name('api.upload.progress');
+    Route::get('/albums/{album}/status', [\App\Http\Controllers\Api\AlbumUploadController::class, 'getAlbumStatus'])->name('albums.status');
 
     Route::get('/gallery', [ImageController::class, 'gallery'])->name('images.gallery');
     

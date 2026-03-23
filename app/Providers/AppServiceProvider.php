@@ -69,6 +69,52 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('likes', function (Request $request) {
             return Limit::perMinute(10)->by($request->user()?->id ?: $request->ip());
         });
+
+        // ── Multi-Tiered Rate Limiting ──────────────────────────
+
+        // Sensitive Tier: Single uploads & resend-code (strict)
+        RateLimiter::for('sensitive', function (Request $request) {
+            return Limit::perMinute(10)
+                ->by($request->user()?->id ?: $request->ip())
+                ->response(function () {
+                    return response()->json([
+                        'message' => 'محاولات كثيرة جداً. الذكاء الاصطناعي يعالج صورك السابقة، يرجى الانتظار لحظة.',
+                    ], 429);
+                });
+        });
+
+        // Batch Album Tier: Parallel UI-driven uploads (flexible)
+        RateLimiter::for('batch-album', function (Request $request) {
+            return Limit::perMinute(100)
+                ->by($request->user()?->id ?: $request->ip())
+                ->response(function () {
+                    return response()->json([
+                        'message' => 'محاولات كثيرة جداً. الذكاء الاصطناعي يعالج صورك السابقة، يرجى الانتظار لحظة.',
+                    ], 429);
+                });
+        });
+
+        // Web Tier: General navigation (standard)
+        RateLimiter::for('web', function (Request $request) {
+            return Limit::perMinute(60)
+                ->by($request->user()?->id ?: $request->ip())
+                ->response(function () {
+                    return response()->json([
+                        'message' => 'Too many requests. Please slow down.',
+                    ], 429);
+                });
+        });
+
+        // API Tier: Mobile/external API access
+        RateLimiter::for('api', function (Request $request) {
+            return Limit::perMinute(80)
+                ->by($request->user()?->id ?: $request->ip())
+                ->response(function () {
+                    return response()->json([
+                        'message' => 'Too many API requests. Please wait a moment.',
+                    ], 429);
+                });
+        });
     }
 
 }

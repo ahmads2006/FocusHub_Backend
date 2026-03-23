@@ -96,9 +96,8 @@
                                 <tr>
                                     <td style="background-color: #0d0f14; border-right: 2px solid #d4a853; padding: 16px 18px; border-radius: 0 8px 8px 0;">
                                         <p style="margin: 0; font-size: 13px; color: #8891aa; line-height: 1.8;">
-                                            🔒 هذا الرمز <span style="color: #d4a853; font-weight: 600;">صالح مرة واحدة فقط</span>. إذا لم تطلبه، يمكنك تجاهل هذا البريد بأمان.
+                                            🔒 هذا الرمز <span style="color: #d4a853; font-weight: 600;">صالح لمدة 3 دقائق فقط</span> لدواعي أمنية. إذا لم تطلبه، يمكنك تجاهل هذا البريد بأمان.
                                         </p>
-                                        <p style="background-color: #c7050566;">ينتهي الكود خلال دقيقها</p>
                                     </td>
                                 </tr>
                             </table>

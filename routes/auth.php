@@ -49,8 +49,10 @@ Route::middleware('auth')->group(function () {
         ->name('logout');
 
     Route::post('email/verification-notification', [\App\Http\Controllers\Auth\VerifyCodeController::class, 'resend'])
+        ->middleware('throttle:sensitive')
         ->name('verification.send');
 });
 
 Route::post('verify-code/resend', [\App\Http\Controllers\Auth\VerifyCodeController::class, 'resend'])
+    ->middleware('throttle:sensitive')
     ->name('verification.resend.guest');

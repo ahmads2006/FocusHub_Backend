@@ -20,7 +20,12 @@ class ImageModerationObserver
     public function updated(ImageModeration $moderation): void
     {
         if ($moderation->isDirty('status')) {
-            $image = $moderation->image;
+            // Bypass global scope 'visible' which might hide the image if status is rejected
+            $image = $moderation->image()->withoutGlobalScopes()->first();
+
+            if (!$image) {
+                return;
+            }
 
             if ($moderation->status === 'approved') {
                 $this->verificationService->checkEligibility($image->user);

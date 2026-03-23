@@ -38,8 +38,12 @@ class VerificationService
     /**
      * Handle actions when a user uploads a "Red Zone" image.
      */
-    public function handleRejectedImage(Image $image, string $reason = ''): void
+    public function handleRejectedImage(?Image $image, string $reason = ''): void
     {
+        if (!$image) {
+            return;
+        }
+
         // If image was rejected due to gore or nudity (Red Zone)
         if (str_contains(strtolower($reason), 'gore') || str_contains(strtolower($reason), 'nudity') || str_contains(strtolower($reason), 'adult')) {
             $user = $image->user;

@@ -50,11 +50,34 @@ class LoginRequest extends FormRequest
         }
 
         $user = Auth::user();
+
         if ($user && ($user->is_banned || ($user->userStatus?->is_deleted ?? false))) {
             Auth::logout();
             throw ValidationException::withMessages([
                 'email' => __('Your account has been banned or deactivated. Please contact support.'),
             ]);
+        }
+
+        // ──────────────────────────────────────────────
+        // Trusted Device Bypass (2FA Optimization)
+        // ──────────────────────────────────────────────
+        $token = $this->cookie('opticvault_trusted_device');
+        if ($token && $user) {
+            $hashed = hash('sha256', $token);
+            $verification = $user->verification;
+
+            if ($verification && 
+                $verification->device_token === $hashed && 
+                $verification->device_trusted_until && 
+                $verification->device_trusted_until->isFuture()) {
+                
+                // Secondary IP hint (optional update)
+                if ($verification->last_login_ip !== $this->ip()) {
+                    $verification->update(['last_login_ip' => $this->ip()]);
+                }
+
+                session(['2fa_verified' => true]);
+            }
         }
 
         RateLimiter::clear($this->throttleKey());

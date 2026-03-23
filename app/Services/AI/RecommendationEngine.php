@@ -105,8 +105,8 @@ class RecommendationEngine
                 
                 // For demonstration of ORDER BY RAW, we elevate specific creators too
                 if (!empty($topCreators)) {
-                    $creatorsCsv = "'" . implode("','", $topCreators) . "'";
-                    $query->orderByRaw("FIELD(user_id, {$creatorsCsv}) DESC");
+                    $placeholders = implode(',', array_fill(0, count($topCreators), '?'));
+                    $query->orderByRaw("FIELD(user_id, {$placeholders}) DESC", $topCreators);
                 }
             } else if (!empty($topCreators)) {
                  $query->whereIn('user_id', $topCreators);
@@ -149,10 +149,10 @@ class RecommendationEngine
         }
 
         // Fetch from DB honoring order using FIELD()
-        $idsCsv = "'" . implode("','", $trendingIds) . "'";
+        $placeholders = implode(',', array_fill(0, count($trendingIds), '?'));
         return Image::whereIn('id', $trendingIds)
             ->where('visibility', 'public')
-            ->orderByRaw("FIELD(id, {$idsCsv})")
+            ->orderByRaw("FIELD(id, {$placeholders})", $trendingIds)
             ->get();
     }
 

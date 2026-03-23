@@ -11,6 +11,13 @@
             <x-input-error :messages="$errors->get('code')" class="mt-2" />
         </div>
 
+        <div class="block mt-4">
+            <label for="trust_device" class="inline-flex items-center">
+                <input id="trust_device" type="checkbox" class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500" name="trust_device" checked>
+                <span class="ms-2 text-sm text-gray-600">{{ __('الثقة بهذا الجهاز لمدة 30 يوماً') }}</span>
+            </label>
+        </div>
+
         <div class="flex items-center justify-between mt-4">
             <x-primary-button>
                 {{ __('تحقق') }}
