@@ -225,6 +225,7 @@ class CloudinaryAnalyzer implements MediaAnalyzerInterface
             }
 
             $data = $response->json();
+            $tags = [];
             $categories = $response['info']['categorization']['aws_rek_tagging']['data'] ?? [];
             foreach ($categories as $cat) {
                 $tags[] = $cat['tag'];

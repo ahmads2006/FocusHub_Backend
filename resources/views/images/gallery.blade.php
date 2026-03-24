@@ -297,7 +297,8 @@
        id="gallery-grid" role="tabpanel" aria-labelledby="tab-grid"
        x-show="view === 'grid'" x-cloak>
 
-    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
+    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5" id="grid-container">
+      @fragment('grid-items')
       @forelse($images as $image)
         @php
           $isOwner      = auth()->id() === $image->user_id;
@@ -592,6 +593,7 @@
           </div>
         </div>
       @empty
+        @if($images->currentPage() == 1)
         <div class="col-span-full surface rounded-3xl flex flex-col items-center justify-center py-20 text-center">
           <div class="float-icon mb-6 w-20 h-20 rounded-full flex items-center justify-center"
                style="background:var(--ink-3);border:1px solid var(--border-hi);">
@@ -611,23 +613,25 @@
             Upload now
           </a>
         </div>
+        @endif
       @endforelse
+      @endfragment
     </div>
 
-    @if($images->hasPages())
-      <nav class="mt-10 flex justify-center" role="navigation" aria-label="Pagination">
-        <div class="surface px-2 py-2 rounded-2xl flex items-center gap-1">
-          {{ $images->onEachSide(1)->links() }}
-        </div>
-      </nav>
-    @endif
+    <div x-show="hasMore" class="my-10 flex justify-center sentinel" role="status" aria-label="Loading more images">
+      <svg class="w-8 h-8 animate-spin" style="color:var(--text-mid);" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-10" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-70" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+      </svg>
+    </div>
   </div>
 
   {{-- ── List View ── --}}
   <div id="gallery-list" role="tabpanel" aria-labelledby="tab-list"
        x-show="view === 'list'" x-cloak
-       class="vault-scroll flex-1 min-h-0 overflow-y-auto pr-1 space-y-3">
-
+       class="vault-scroll flex-1 min-h-0 overflow-y-auto pr-1">
+    <div id="list-container" class="space-y-3">
+    @fragment('list-items')
     @forelse($images as $image)
       @php $isOwner = auth()->id() === $image->user_id; $imgUrl = $image->url; @endphp
       <div class="list-row fade-up cursor-pointer group"
@@ -736,17 +740,22 @@
           @endif
         </div>
       </div>
-    @empty
-      <div class="surface rounded-3xl flex items-center justify-center py-16">
-        <p class="font-body text-sm" style="color:var(--text-dim);">No images found.</p>
-      </div>
-    @endforelse
+      @empty
+        @if($images->currentPage() == 1)
+        <div class="surface rounded-3xl flex items-center justify-center py-16">
+          <p class="font-body text-sm" style="color:var(--text-dim);">No images found.</p>
+        </div>
+        @endif
+      @endforelse
+      @endfragment
+    </div>
 
-    @if($images->hasPages())
-      <nav class="mt-8 flex justify-center" role="navigation" aria-label="Pagination">
-        {{ $images->onEachSide(1)->links() }}
-      </nav>
-    @endif
+    <div x-show="hasMore" class="my-8 flex justify-center sentinel" role="status" aria-label="Loading more images">
+      <svg class="w-8 h-8 animate-spin" style="color:var(--text-mid);" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-10" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-70" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+      </svg>
+    </div>
   </div>
 
   {{-- ── Image Details Modal ── --}}
@@ -787,6 +796,62 @@ document.addEventListener('alpine:init', () => {
     selectedImage: null,
     showModal: false,
     isFollowing: false,
+    
+    // Infinite Scroll State
+    hasMore: {{ $images->hasMorePages() ? 'true' : 'false' }},
+    nextPageUrl: '{!! $images->nextPageUrl() !!}',
+    isLoadingMore: false,
+
+    init() {
+        if ('IntersectionObserver' in window) {
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        this.loadMore();
+                    }
+                });
+            }, { rootMargin: '400px' }); // Load early before reaching absolute bottom
+
+            const observeSentinels = () => {
+                document.querySelectorAll('.sentinel').forEach(el => observer.observe(el));
+            };
+
+            this.$watch('view', () => { setTimeout(observeSentinels, 100); });
+            setTimeout(observeSentinels, 500);
+        }
+    },
+
+    loadMore() {
+        if (this.isLoadingMore || !this.hasMore || !this.nextPageUrl) return;
+        this.isLoadingMore = true;
+
+        fetch(this.nextPageUrl, {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json'
+            }
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.grid_html) {
+                document.getElementById('grid-container').insertAdjacentHTML('beforeend', data.grid_html);
+            }
+            if (data.list_html) {
+                document.getElementById('list-container').insertAdjacentHTML('beforeend', data.list_html);
+            }
+            
+            this.hasMore = data.has_more;
+            this.nextPageUrl = data.next_page_url;
+            this.isLoadingMore = false;
+            
+            // Re-trigger global lazy loading setup (IntersectionObserver for images)
+            document.dispatchEvent(new Event('DOMContentLoaded'));
+        })
+        .catch(err => {
+            console.error('Infinity scroll error:', err);
+            this.isLoadingMore = false;
+        });
+    },
 
     openModal(data) {
         this.selectedImage = data;

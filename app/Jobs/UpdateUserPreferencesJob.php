@@ -21,7 +21,7 @@ class UpdateUserPreferencesJob implements ShouldQueue
     /**
      * Create a new job instance.
      */
-    public function __construct(string $userId, string $imageId, int $weightAdjustment = 1)
+    public function __construct(string $userId, string $imageId, float $weightAdjustment = 1.0)
     {
         $this->userId = $userId;
         $this->imageId = $imageId;

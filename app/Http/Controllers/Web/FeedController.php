@@ -59,4 +59,58 @@ class FeedController extends Controller
             'message' => $result['action'] === 'like' ? 'تم الإعجاب بالصورة' : 'تم إزالة الإعجاب',
         ]);
     }
+
+    /**
+     * Implicit Feedback: Track when a user views an image.
+     */
+    public function trackView(Request $request, Image $image)
+    {
+        $user = Auth::user();
+        if ($user && $user->id !== $image->user_id) {
+            $debounceKey = "viewed:{$user->id}:{$image->id}";
+
+            // Debounce: Only track view if not viewed in the last hour
+            if (!\Illuminate\Support\Facades\Redis::exists($debounceKey)) {
+                // Set expiry for 1 hour (3600 seconds)
+                \Illuminate\Support\Facades\Redis::setex($debounceKey, 3600, 1);
+                
+                // Dispatch with a fractional weight (0.1) for a simple view
+                \App\Jobs\UpdateUserPreferencesJob::dispatch($user->id, $image->id, 0.1);
+            }
+        }
+
+        return response()->json([
+            'success' => true
+        ]);
+    }
+
+    /**
+     * Negative Signals: heavily penalize image tags when a user is not interested.
+     */
+    public function notInterested(Request $request, Image $image)
+    {
+        $user = Auth::user();
+        if ($user) {
+            // Heavy negative weight
+            \App\Jobs\UpdateUserPreferencesJob::dispatch($user->id, $image->id, -5.0);
+            
+            // Add to DB for permanent persistence
+            \App\Models\UserHiddenImage::firstOrCreate([
+                'user_id' => $user->id,
+                'image_id' => $image->id,
+            ]);
+
+            // Add to Redis for fast in-memory filtering (with 90 days TTL)
+            $redisKey = "hidden_images:{$user->id}";
+            \Illuminate\Support\Facades\Redis::sadd($redisKey, $image->id);
+            \Illuminate\Support\Facades\Redis::expire($redisKey, 90 * 24 * 60 * 60); // 90 days
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'لن تظهر لك صور مشابهة كثيراً'
+        ]);
+    }
+
 }
+

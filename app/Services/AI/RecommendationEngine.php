@@ -58,70 +58,119 @@ class RecommendationEngine
     }
 
     /**
-     * Gets the highly personalized feed using Redis caching, Cold Start fallback, and optimized JSON matching.
+     * Gets the personalized feed using the 50/20/30 distribution strategy.
+     * - 50% Direct Match: Based on top 5 tags/creators (what user loves most).
+     * - 20% Discovery Match: Based on secondary tags (6-15) to expand taste.
+     * - 30% Random/Trending: Pure trending or random to break the filter bubble.
      */
     public function getForYouFeed(User $user, int $limit = 20)
     {
         $startTime = microtime(true);
         $cacheKey = "feed:for_you:{$user->id}";
 
-        $feed = Cache::remember($cacheKey, 300, function () use ($user, $limit) { // 5 minutes TTL
+        $feed = Cache::remember($cacheKey, 300, function () use ($user, $limit) {
             $prefs = UserPreference::where('user_id', $user->id)->first();
 
-            // 1. Cold Start Fallback (No preferences or completely empty weights)
+            // Cold Start Fallback — no prefs yet
             if (!$prefs || (empty($prefs->tag_weights) && empty($prefs->creator_weights))) {
                 return $this->getTrendingFeed($limit);
             }
 
-            // 2. Optimized Query Logic
-            // Parse top 5 preferred tags to keep query optimal
+            // --- Parse preference weights ---
             $tagWeights = $prefs->tag_weights ?? [];
             arsort($tagWeights);
-            $topTags = array_keys(array_slice($tagWeights, 0, 5, true));
+            $allTagKeys = array_keys($tagWeights);
 
             $creatorWeights = $prefs->creator_weights ?? [];
             arsort($creatorWeights);
             $topCreators = array_keys(array_slice($creatorWeights, 0, 5, true));
-            
-            // If the user has preferences but they happened to all be zero/deleted
-            if (empty($topTags) && empty($topCreators)) {
-                return $this->getTrendingFeed($limit);
-            }
 
-            // Query using JSON_OVERLAPS for fast performance on MySQL 8.0+
-            $query = Image::query()
-                ->where('visibility', 'public') // Only public images
-                ->where('user_id', '!=', $user->id) // Don't show their own images
-                ->whereDoesntHave('likes', function($q) use ($user) {
-                    $q->where('user_id', $user->id); // Don't show already liked images
-                });
+            // --- Feed Bucket Sizes ---
+            $directCount    = (int) ceil($limit * 0.50);  // 50%
+            $discoveryCount = (int) ceil($limit * 0.20);  // 20%
+            $randomCount    = $limit - $directCount - $discoveryCount; // 30%
 
-            if (!empty($topTags)) {
-                $topTagsJson = json_encode($topTags);
-                // Assume images.labels is a JSON array. JSON_OVERLAPS returns 1 if they intersect.
-                // Depending on the exact structure, we handle simple JSON matching. 
-                // Using raw expression for JSON_OVERLAPS:
-                $query->whereRaw("JSON_OVERLAPS(JSON_EXTRACT(labels, '$[*].description'), ?) OR JSON_OVERLAPS(labels, ?)", [$topTagsJson, $topTagsJson]);
-                
-                // For demonstration of ORDER BY RAW, we elevate specific creators too
+            // --- Hidden images (not interested) from Redis ---
+            $hiddenIds = Redis::smembers("hidden_images:{$user->id}") ?? [];
+
+            // Base query constraints (shared across all buckets)
+            $baseConstraints = function ($q) use ($user, $hiddenIds) {
+                $q->where('visibility', 'public')
+                  ->where('user_id', '!=', $user->id)
+                  ->whereDoesntHave('likes', fn($lq) => $lq->where('user_id', $user->id));
+                if (!empty($hiddenIds)) {
+                    $q->whereNotIn('id', $hiddenIds);
+                }
+            };
+
+            // ── BUCKET 1: 50% Direct Match (top 5 tags + top creators) ──────
+            $topTags = array_slice($allTagKeys, 0, 5);
+            $directResults = collect();
+            if (!empty($topTags) || !empty($topCreators)) {
+                $q = Image::query()->tap($baseConstraints);
+                if (!empty($topTags)) {
+                    $json = json_encode($topTags);
+                    $q->whereRaw("JSON_OVERLAPS(JSON_EXTRACT(labels, '$[*].description'), ?) OR JSON_OVERLAPS(labels, ?)", [$json, $json]);
+                }
                 if (!empty($topCreators)) {
                     $placeholders = implode(',', array_fill(0, count($topCreators), '?'));
-                    $query->orderByRaw("FIELD(user_id, {$placeholders}) DESC", $topCreators);
+                    $q->orderByRaw("FIELD(user_id, {$placeholders}) DESC", $topCreators);
                 }
-            } else if (!empty($topCreators)) {
-                 $query->whereIn('user_id', $topCreators);
+                $directResults = $q->latest()->take($directCount)->get();
             }
 
-            $results = $query->latest()->take($limit)->get();
-
-            // Fallback if the personalized query yields too few results
-            if ($results->count() < ($limit / 2)) {
-                $additional = $this->getTrendingFeed($limit - $results->count());
-                // Ensure unique collection
-                $results = $results->merge($additional)->unique('id');
+            // ── BUCKET 2: 20% Discovery Match (secondary tags 6-15) ──────────
+            $secondaryTags = array_slice($allTagKeys, 5, 10);
+            $discoveryResults = collect();
+            if (!empty($secondaryTags)) {
+                $json = json_encode($secondaryTags);
+                $excludeIds = array_merge($hiddenIds, $directResults->pluck('id')->toArray());
+                $discoveryResults = Image::query()
+                    ->tap($baseConstraints)
+                    ->whereNotIn('id', $excludeIds)
+                    ->whereRaw("JSON_OVERLAPS(JSON_EXTRACT(labels, '$[*].description'), ?) OR JSON_OVERLAPS(labels, ?)", [$json, $json])
+                    ->latest()
+                    ->take($discoveryCount)
+                    ->get();
             }
 
-            return $results;
+            // ── BUCKET 3: 30% Trending / Random ─────────────────────────────
+            $excludeIds = array_merge(
+                $hiddenIds,
+                $directResults->pluck('id')->toArray(),
+                $discoveryResults->pluck('id')->toArray()
+            );
+            $trendingIds = Redis::zrevrange('trending_images_24h', 0, ($randomCount * 3) - 1);
+            $trendingIds = array_diff($trendingIds, $excludeIds);
+
+            $randomResults = collect();
+            if (!empty($trendingIds)) {
+                $placeholders = implode(',', array_fill(0, count($trendingIds), '?'));
+                $randomResults = Image::whereIn('id', $trendingIds)
+                    ->where('visibility', 'public')
+                    ->whereNotIn('id', $excludeIds)
+                    ->orderByRaw("FIELD(id, {$placeholders})", $trendingIds)
+                    ->take($randomCount)
+                    ->get();
+            }
+
+            // Fallback: if trending is empty, use pure random
+            if ($randomResults->isEmpty()) {
+                $randomResults = Image::query()
+                    ->tap($baseConstraints)
+                    ->whereNotIn('id', array_merge($hiddenIds, $directResults->pluck('id')->toArray(), $discoveryResults->pluck('id')->toArray()))
+                    ->inRandomOrder()
+                    ->take($randomCount)
+                    ->get();
+            }
+
+            // ── Merge and shuffle to make feed look natural ───────────────────
+            return $directResults
+                ->merge($discoveryResults)
+                ->merge($randomResults)
+                ->unique('id')
+                ->shuffle()
+                ->values();
         });
 
         // 3. Emit Feed Datadog Metrics

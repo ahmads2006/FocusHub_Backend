@@ -13,3 +13,6 @@ Schedule::command('quarantine:prune')->daily();
 
 // Execute every 5 minutes and rotate tokens if 5 hours have passed since last rotation
 Schedule::command('share-links:rotate')->everyFiveMinutes();
+
+// Decay user preference weights weekly to favor recent interactions
+Schedule::command('preferences:decay')->weekly();

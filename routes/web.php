@@ -79,6 +79,9 @@ Route::middleware(['auth', 'check.verified', 'check.banned', 'check.timeout', 't
     Route::get('/for-you', [\App\Http\Controllers\Web\FeedController::class, 'index'])->name('feed.index');
     Route::get('/feed/for-you', [\App\Http\Controllers\Web\FeedController::class, 'forYou'])->name('feed.api.for_you');
     Route::post('/images/{image}/like', [\App\Http\Controllers\Web\FeedController::class, 'like'])->middleware('throttle:likes')->name('images.like');
+    Route::post('/images/{image}/view', [\App\Http\Controllers\Web\FeedController::class, 'trackView'])->name('images.view');
+    Route::post('/images/{image}/not-interested', [\App\Http\Controllers\Web\FeedController::class, 'notInterested'])->name('images.not_interested');
+
 
     // Bulk Upload System
     Route::get('/bulk-upload', [\App\Http\Controllers\Api\AlbumUploadController::class, 'index'])->name('images.bulk');

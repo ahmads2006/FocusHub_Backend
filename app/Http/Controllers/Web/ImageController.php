@@ -267,15 +267,43 @@ class ImageController extends Controller
     {
         $selectedTag = $request->query('tag');
         
+        // Setup base query for filtering or guest users
         $query = Image::where('privacy', 'public')
             ->with(['settings', 'user', 'labels'])
             ->withCount('likes');
 
         if ($selectedTag) {
             $query->whereRaw('JSON_CONTAINS(labels, ?)', [json_encode($selectedTag)]);
-        }
+            $images = $query->latest()->paginate(12);
+        } else {
+            // No tag selected. If user is logged in, use personalized For You engine
+            $user = auth()->user();
+            if ($user) {
+                // Fetch up to 60 personalized images (5 pages of 12)
+                $recommendationEngine = app(\App\Services\AI\RecommendationEngine::class);
+                $feedPool = $recommendationEngine->getForYouFeed($user, 60);
 
-        $images = $query->latest()->paginate(12);
+                // Eager load relationships necessary for the gallery view
+                $feedPool->load(['settings', 'user', 'labels']);
+                $feedPool->loadCount('likes');
+
+                // Manual pagination of the collection
+                $perPage = 12;
+                $page = \Illuminate\Pagination\Paginator::resolveCurrentPage() ?: 1;
+                $slice = $feedPool->slice(($page - 1) * $perPage, $perPage)->values();
+
+                $images = new \Illuminate\Pagination\LengthAwarePaginator(
+                    $slice,
+                    $feedPool->count(),
+                    $perPage,
+                    $page,
+                    ['path' => \Illuminate\Pagination\Paginator::resolveCurrentPath(), 'query' => $request->query()]
+                );
+            } else {
+                // Guests fallback to latest timeline
+                $images = $query->latest()->paginate(12);
+            }
+        }
 
         // Fetch which of these images the current user has already liked
         $likedImageIds = [];
@@ -300,6 +328,15 @@ class ImageController extends Controller
         ];
         $categories = collect($categories)->sortKeys();
         
+        // Infinite Scroll AJAX Response
+        if ($request->ajax()) {
+            return response()->json([
+                'grid_html' => view('images.gallery', compact('images', 'likedImageIds', 'categories', 'selectedTag'))->fragment('grid-items'),
+                'list_html' => view('images.gallery', compact('images', 'likedImageIds', 'categories', 'selectedTag'))->fragment('list-items'),
+                'has_more' => $images->hasMorePages(),
+                'next_page_url' => $images->nextPageUrl(),
+            ]);
+        }
 
         return view('images.gallery', compact('images', 'likedImageIds', 'categories', 'selectedTag'));
     }
