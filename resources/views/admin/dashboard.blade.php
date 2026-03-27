@@ -56,6 +56,17 @@
             <p class="text-[10px] text-gray-600 mt-2">مركز الرقابة نشط</p>
             <a href="{{ route('admin.photos.index') }}" class="mt-4 block text-[10px] font-bold text-orange-500 hover:text-orange-400 transition-colors uppercase tracking-wider">فتح الرقابة ←</a>
         </div>
+
+        <!-- New Admin Vault Link -->
+        <div class="glass p-6 rounded-[32px] border border-white/5 bg-slate-900/40 group hover:border-emerald-500/30 transition-all">
+            <p class="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-4">Audit Vault</p>
+            <div class="flex items-center gap-2">
+                <span class="material-symbols-outlined text-emerald-400">shield</span>
+                <h3 class="text-xl font-bold text-white">سجل العمليات</h3>
+            </div>
+            <p class="text-[10px] text-gray-400 mt-2 font-medium uppercase tracking-[0.1em]">Super Admin Only</p>
+            <a href="{{ route('vault.dashboard') }}" class="mt-4 block text-[10px] font-bold text-emerald-400 hover:text-emerald-300 transition-colors uppercase tracking-widest">فتح الـ Vault ←</a>
+        </div>
     </div>
 
     <!-- Recent Activities -->

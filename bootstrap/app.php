@@ -14,6 +14,9 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->append(\App\Http\Middleware\SecurityHeaders::class);
+        $middleware->web(append: [
+            \App\Http\Middleware\SetLocale::class,
+        ]);
         $middleware->trustProxies(at: '*');
         $middleware->api(prepend: [
             \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
@@ -24,6 +27,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'check.verified' => \App\Http\Middleware\CheckVerified::class,
             'check.banned' => \App\Http\Middleware\EnsureUserNotBanned::class,
             'ProtectAdminPanel' => \App\Http\Middleware\ProtectAdminPanel::class,
+            'CheckSuperAdmin' => \App\Http\Middleware\CheckSuperAdmin::class,
             'role' => \Spatie\Permission\Middleware\RoleMiddleware::class,
             'permission' => \Spatie\Permission\Middleware\PermissionMiddleware::class,
             'role_or_permission' => \Spatie\Permission\Middleware\RoleOrPermissionMiddleware::class,

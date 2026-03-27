@@ -122,6 +122,17 @@ Route::middleware(['auth', 'check.verified', 'check.banned', 'check.timeout', 't
     Route::get('/connect/{user}/status', [\App\Http\Controllers\Web\ConnectionController::class, 'status'])->name('connect.status');
 });
 
+// ─── Admin Vault — Audit Trail Dashboard (super-admin only) ──────
+Route::middleware(['auth', 'check.verified', 'CheckSuperAdmin'])
+    ->prefix('admin-vault')
+    ->name('vault.')
+    ->group(function () {
+        Route::get('/', [\App\Http\Controllers\Admin\AuditVaultController::class, 'dashboard'])->name('dashboard');
+        Route::get('/operations', [\App\Http\Controllers\Admin\AuditVaultController::class, 'operations'])->name('operations');
+        Route::get('/users', [\App\Http\Controllers\Admin\AuditVaultController::class, 'users'])->name('users');
+        Route::get('/security', [\App\Http\Controllers\Admin\AuditVaultController::class, 'security'])->name('security');
+    });
+
 // ─── لوحة الإدارة (super-admin only) ─────────────────────────────
 Route::middleware(['auth', 'check.verified', 'ProtectAdminPanel'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/', [AdminDashboardController::class, 'index'])->name('dashboard');

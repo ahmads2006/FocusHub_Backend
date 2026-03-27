@@ -95,7 +95,7 @@ class RecommendationEngine
 
             // Base query constraints (shared across all buckets)
             $baseConstraints = function ($q) use ($user, $hiddenIds) {
-                $q->where('visibility', 'public')
+                $q->where('privacy', 'public')
                   ->where('user_id', '!=', $user->id)
                   ->whereDoesntHave('likes', fn($lq) => $lq->where('user_id', $user->id));
                 if (!empty($hiddenIds)) {
@@ -147,7 +147,7 @@ class RecommendationEngine
             if (!empty($trendingIds)) {
                 $placeholders = implode(',', array_fill(0, count($trendingIds), '?'));
                 $randomResults = Image::whereIn('id', $trendingIds)
-                    ->where('visibility', 'public')
+                    ->where('privacy', 'public')
                     ->whereNotIn('id', $excludeIds)
                     ->orderByRaw("FIELD(id, {$placeholders})", $trendingIds)
                     ->take($randomCount)
@@ -194,13 +194,13 @@ class RecommendationEngine
         
         if (empty($trendingIds)) {
             // Absolute absolute fallback: latest good images
-            return Image::where('visibility', 'public')->latest()->take($limit)->get();
+            return Image::where('privacy', 'public')->latest()->take($limit)->get();
         }
 
         // Fetch from DB honoring order using FIELD()
         $placeholders = implode(',', array_fill(0, count($trendingIds), '?'));
         return Image::whereIn('id', $trendingIds)
-            ->where('visibility', 'public')
+            ->where('privacy', 'public')
             ->orderByRaw("FIELD(id, {$placeholders})", $trendingIds)
             ->get();
     }

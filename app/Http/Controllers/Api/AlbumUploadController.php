@@ -158,23 +158,42 @@ class AlbumUploadController extends Controller
         foreach ($files as $file) {
             $filename = $file->getClientOriginalName();
             $uid = Str::uuid()->toString();
-            $s3Path = 'uploads/' . date('Y/m') . '/' . $uid . '_' . $filename;
+            $extension = $file->getClientOriginalExtension() ?: strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+            $newFilename = $uid . '_' . $filename; // or $uid . '.' . $extension
 
-            // ── Fast Store to S3/LocalStack (immediate) ──
-            \Illuminate\Support\Facades\Storage::disk('s3')->put($s3Path, file_get_contents($file->getRealPath()));
+            // ── Dynamic S3 Folder Structure ──
+            $year = date('Y');
+            $month = date('m');
+            $userId = $user->id;
+            $uploadedImages[] = [
+            'file' => $file,
+            'filename' => $filename,
+            'uid' => $uid,
+            'extension' => $extension,
+            'newFilename' => $newFilename,
+            'year' => $year,
+            'month' => $month,
+            'userId' => $userId,
+          ];
+            // ── Dynamic S3 Folder Structure ──
+            $dynamicPath = "photos/{$year}/{$month}/{$userId}". $albumId ."/". $filename;
+
+            // ── Store to S3/LocalStack (immediate) using putFileAs ──
+            $s3Path = \Illuminate\Support\Facades\Storage::disk('s3')->putFileAs($dynamicPath, $file, $newFilename);
 
             // ── Create DB record with "pending" moderation ──
             $album = \App\Models\Album::find($albumId);
             $inheritedPrivacy = $album ? $album->privacy : 'private';
 
             $image = \App\Models\Image::create([
-                'album_id'  => $albumId,
-                'user_id'   => $user->id,
-                'title'     => pathinfo($filename, PATHINFO_FILENAME),
-                'filename'  => $filename,
-                'file_type' => strtolower(pathinfo($filename, PATHINFO_EXTENSION)),
-                'size'      => $file->getSize(),
-                'privacy'   => $inheritedPrivacy,
+                'album_id'   => $albumId,
+                'user_id'    => $user->id,
+                'title'      => pathinfo($filename, PATHINFO_FILENAME),
+                'filename'   => $filename,
+                'path'       => $s3Path, // Store the Full Path so Laravel knows exactly where to find it later
+                'file_type'  => $extension,
+                'size'       => $file->getSize(),
+                'privacy'    => $inheritedPrivacy,
             ]);
 
             $image->storage()->updateOrCreate(['image_id' => $image->id], [
