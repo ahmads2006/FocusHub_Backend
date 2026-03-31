@@ -61,6 +61,30 @@ class FeedController extends Controller
     }
 
     /**
+     * Toggles a 'Bookmark / Save' on an image. (Rate limited by 'throttle:likes' middleware)
+     */
+    public function bookmark(Request $request, Image $image)
+    {
+        $user = Auth::user();
+
+        if ($user->bookmarks()->where('image_id', $image->id)->exists()) {
+            $user->bookmarks()->where('image_id', $image->id)->delete();
+            $action = 'unbookmark';
+            $message = 'تم إزالة الصورة من المحفوظات';
+        } else {
+            $user->bookmarks()->create(['image_id' => $image->id]);
+            $action = 'bookmark';
+            $message = 'تم حفظ الصورة بنجاح';
+        }
+
+        return response()->json([
+            'success' => true,
+            'action' => $action,
+            'message' => $message,
+        ]);
+    }
+
+    /**
      * Implicit Feedback: Track when a user views an image.
      */
     public function trackView(Request $request, Image $image)

@@ -140,7 +140,7 @@ class ProfileController extends Controller
     /**
      * Display the public profile gallery of a selected user.
      */
-    public function show(\App\Models\User $user): View
+    public function show(Request $request, \App\Models\User $user): View
     {
         $isOwner = Auth::id() === $user->id;
         $isPublic = (bool) $user->is_public_profile;
@@ -159,22 +159,64 @@ class ProfileController extends Controller
         $totalPhotos = (int) \Illuminate\Support\Facades\Redis::get("{$redisPrefix}:photos") ?: 0;
         $totalConnections = (int) \Illuminate\Support\Facades\Redis::get("{$redisPrefix}:connections") ?: 0;
 
+        $activeTab = $request->get('tab', 'public');
+        if (!$isOwner) {
+            $activeTab = 'public';
+        }
+
         $images = collect();
         if ($isOwner || $isPublic) {
-            // Fetch images where privacy = public and moderation_status = 'approved'
-            $images = $user->images()
-                ->where('privacy', 'public')
-                ->whereHas('moderation', function ($q) {
-                    $q->where('status', \App\Models\Image::STATUS_APPROVED);
-                })
-                ->with(['likes', 'labels'])
-                ->latest()
-                ->paginate(24);
+            if ($activeTab === 'private' && $isOwner) {
+                $images = $user->images()
+                    ->where('privacy', 'private')
+                    ->whereHas('moderation', function ($q) {
+                        $q->where('status', \App\Models\Image::STATUS_APPROVED);
+                    })
+                    ->with(['likes', 'labelData'])
+                    ->latest()
+                    ->paginate(24);
+            } elseif ($activeTab === 'saved' && $isOwner) {
+                // For bookmarks, we get images user bookmarked
+                $images = $user->bookmarkedImages()
+                    ->whereHas('moderation', function ($q) {
+                        $q->where('status', \App\Models\Image::STATUS_APPROVED);
+                    })
+                    ->with(['likes', 'labelData'])
+                    ->latest('bookmarks.created_at')
+                    ->paginate(24);
+            } elseif ($activeTab === 'liked' && $isOwner) {
+                // For liked images, we get images user liked
+                $images = \App\Models\Image::whereHas('likes', function ($q) use ($user) {
+                        $q->where('user_id', $user->id);
+                    })
+                    ->whereHas('moderation', function ($q) {
+                        $q->where('status', \App\Models\Image::STATUS_APPROVED);
+                    })
+                    ->with(['likes', 'labelData'])
+                    ->latest() // ideally sort by like created_at but this is fine
+                    ->paginate(24);
+            } else {
+                // Default: public
+                $images = $user->images()
+                    ->where('privacy', 'public')
+                    ->whereHas('moderation', function ($q) {
+                        $q->where('status', \App\Models\Image::STATUS_APPROVED);
+                    })
+                    ->with(['likes', 'labelData'])
+                    ->latest()
+                    ->paginate(24);
+            }
         }
 
         $likedImageIds = [];
+        $bookmarkedImageIds = [];
         if (Auth::check()) {
             $likedImageIds = \App\Models\Like::where('user_id', Auth::id())
+                ->whereIn('image_id', $images->pluck('id'))
+                ->pluck('image_id')
+                ->toArray();
+                
+            $bookmarkedImageIds = \App\Models\Bookmark::where('user_id', Auth::id())
                 ->whereIn('image_id', $images->pluck('id'))
                 ->pluck('image_id')
                 ->toArray();
@@ -187,6 +229,8 @@ class ProfileController extends Controller
             'isPublic' => $isPublic,
             'isFollowing' => $isFollowing,
             'likedImageIds' => $likedImageIds,
+            'bookmarkedImageIds' => $bookmarkedImageIds,
+            'activeTab' => $activeTab,
             'stats' => [
                 'likes' => $totalLikes,
                 'photos' => $totalPhotos,

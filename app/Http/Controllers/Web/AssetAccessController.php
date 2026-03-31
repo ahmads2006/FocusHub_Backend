@@ -146,8 +146,18 @@ class AssetAccessController extends Controller
 
         // 1. Authorization check
         $isOwner = Auth::check() && Auth::id() === $image->user_id;
+
         if (!$isOwner && $image->privacy !== 'public') {
-            abort(403, 'You do not have permission to view this image.');
+            // SHARED MEDIA EXCEPTION (v18.0): Allow access if image was shared in chat with current user
+            $isSharedInChat = \App\Models\Message::where('image_id', $image->id)
+                ->where(function ($q) {
+                    $q->where('sender_id', Auth::id())
+                      ->orWhere('receiver_id', Auth::id());
+                })->exists();
+
+            if (!$isSharedInChat) {
+                abort(403, 'You do not have permission to view this image.');
+            }
         }
 
         // 2. Red Layer: Rejected Content (Critical violations)

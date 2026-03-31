@@ -25,7 +25,7 @@
             <div class="glass group rounded-[32px] overflow-hidden border border-white/5 hover:border-purple-500/30 transition-all duration-500">
                 <!-- Image Preview -->
                 <div class="aspect-square relative overflow-hidden bg-black/40">
-                    <img src="{{ Storage::url($image->path) }}" alt="{{ $image->title }}" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110">
+                    <img src="{{ $image->url }}" alt="{{ $image->title }}" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110">
                     <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
                     
                     <!-- Status Badge -->
@@ -48,7 +48,7 @@
 
                     <div class="flex items-center justify-between text-[9px] font-mono text-gray-600">
                         <span>{{ $image->created_at->format('Y.m.d') }}</span>
-                        <span>{{ strtoupper(pathinfo($image->path, PATHINFO_EXTENSION)) }}</span>
+                        <span>{{ strtoupper(pathinfo($image->filename, PATHINFO_EXTENSION)) }}</span>
                     </div>
 
                     <!-- Actions -->

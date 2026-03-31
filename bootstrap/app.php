@@ -16,6 +16,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->append(\App\Http\Middleware\SecurityHeaders::class);
         $middleware->web(append: [
             \App\Http\Middleware\SetLocale::class,
+            \App\Http\Middleware\TrackOnlineStatus::class,
         ]);
         $middleware->trustProxies(at: '*');
         $middleware->api(prepend: [

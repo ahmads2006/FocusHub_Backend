@@ -79,6 +79,7 @@ Route::middleware(['auth', 'check.verified', 'check.banned', 'throttle:web'])->g
     Route::get('/for-you', [\App\Http\Controllers\Web\FeedController::class, 'index'])->name('feed.index');
     Route::get('/feed/for-you', [\App\Http\Controllers\Web\FeedController::class, 'forYou'])->name('feed.api.for_you');
     Route::post('/images/{image}/like', [\App\Http\Controllers\Web\FeedController::class, 'like'])->middleware('throttle:likes')->name('images.like');
+    Route::post('/images/{image}/bookmark', [\App\Http\Controllers\Web\FeedController::class, 'bookmark'])->middleware('throttle:likes')->name('images.bookmark');
     Route::post('/images/{image}/view', [\App\Http\Controllers\Web\FeedController::class, 'trackView'])->name('images.view');
     Route::post('/images/{image}/not-interested', [\App\Http\Controllers\Web\FeedController::class, 'notInterested'])->name('images.not_interested');
 
@@ -120,6 +121,15 @@ Route::middleware(['auth', 'check.verified', 'check.banned', 'throttle:web'])->g
     // Connection & Following
     Route::post('/connect/{user}', [\App\Http\Controllers\Web\ConnectionController::class, 'toggle'])->name('connect.toggle');
     Route::get('/connect/{user}/status', [\App\Http\Controllers\Web\ConnectionController::class, 'status'])->name('connect.status');
+
+    // ─── Photographers Hub & Live Chat ───────────────────────────
+    Route::get('/photographers', [\App\Http\Controllers\Web\ChatController::class, 'hub'])->name('chat.hub');
+    Route::get('/api/chat/conversations', [\App\Http\Controllers\Web\ChatController::class, 'conversations'])->name('chat.conversations');
+    Route::get('/api/chat/messages/{partner}', [\App\Http\Controllers\Web\ChatController::class, 'messages'])->name('chat.messages');
+    Route::post('/api/chat/send', [\App\Http\Controllers\Web\ChatController::class, 'store'])->name('chat.send');
+    Route::get('/api/chat/unread-count', [\App\Http\Controllers\Web\ChatController::class, 'unreadCount'])->name('chat.unread');
+    Route::get('/api/chat/poll/{partner}', [\App\Http\Controllers\Web\ChatController::class, 'poll'])->name('chat.poll');
+    Route::get('/api/chat/my-images', [\App\Http\Controllers\Web\ChatController::class, 'myImages'])->name('chat.my-images');
 });
 
 // ─── Admin Vault — Audit Trail Dashboard (super-admin only) ──────

@@ -300,6 +300,26 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
         return $this->hasMany(Connection::class);
     }
 
+    public function bookmarks(): HasMany
+    {
+        return $this->hasMany(Bookmark::class);
+    }
+
+    public function bookmarkedImages(): BelongsToMany
+    {
+        return $this->belongsToMany(Image::class, 'bookmarks', 'user_id', 'image_id')->withTimestamps();
+    }
+
+    public function sentMessages(): HasMany
+    {
+        return $this->hasMany(Message::class, 'sender_id');
+    }
+
+    public function receivedMessages(): HasMany
+    {
+        return $this->hasMany(Message::class, 'receiver_id');
+    }
+
     public function acceptedConnections()
     {
         return User::whereIn('id', function($query) {

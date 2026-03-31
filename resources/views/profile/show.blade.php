@@ -44,11 +44,13 @@
             @else
                 @auth
                 <button @click="toggleFollow()" 
-                        class="p-3 px-8 rounded-2xl text-sm font-bold transition-all flex items-center gap-2 shadow-lg"
+                        class="p-3 px-8 rounded-2xl text-sm font-bold transition-all flex items-center gap-2 shadow-lg {{ $isFollowing ? 'bg-white/10 text-white border border-white/20' : 'accent-gradient text-white shadow-purple-500/20 hover:scale-105' }}"
                         :class="isFollowing ? 'bg-white/10 text-white border border-white/20' : 'accent-gradient text-white shadow-purple-500/20 hover:scale-105'">
-                    <svg x-show="!isFollowing" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path></svg>
-                    <svg x-show="isFollowing" class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>
-                    <span x-text="isFollowing ? 'إلغاء المتابعة' : 'متابعة المصور'"></span>
+                    <svg x-show="!isFollowing" @if($isFollowing) x-cloak style="display: none;" @endif class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path></svg>
+                    <svg x-show="isFollowing" @if(!$isFollowing) x-cloak style="display: none;" @endif class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>
+                    <span x-text="isFollowing ? 'إلغاء المتابعة' : 'متابعة المصور'">
+                        {{ $isFollowing ? 'إلغاء المتابعة' : 'متابعة المصور' }}
+                    </span>
                 </button>
                 @endauth
             @endif
@@ -81,11 +83,47 @@
         @endif
     </div>
 
+    <!-- Tabs Section (Only for Owner) -->
+    @if($isOwner)
+        <div class="flex items-center justify-center gap-4 pt-8 pb-4 border-b border-white/10 mb-8 overflow-x-auto px-4">
+            <a href="?tab=public" class="px-6 py-3 rounded-full font-bold transition-all whitespace-nowrap {{ $activeTab === 'public' ? 'bg-white/10 text-white shadow-lg' : 'text-gray-400 hover:text-white hover:bg-white/5' }}">
+                <div class="flex items-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    العامة
+                </div>
+            </a>
+            <a href="?tab=private" class="px-6 py-3 rounded-full font-bold transition-all whitespace-nowrap {{ $activeTab === 'private' ? 'bg-white/10 text-white shadow-lg' : 'text-gray-400 hover:text-white hover:bg-white/5' }}">
+                <div class="flex items-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                    الخاصة
+                </div>
+            </a>
+            <a href="?tab=saved" class="px-6 py-3 rounded-full font-bold transition-all whitespace-nowrap {{ $activeTab === 'saved' ? 'bg-white/10 text-white shadow-lg' : 'text-gray-400 hover:text-white hover:bg-white/5' }}">
+                <div class="flex items-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"></path></svg>
+                    المحفوظة
+                </div>
+            </a>
+            <a href="?tab=liked" class="px-6 py-3 rounded-full font-bold transition-all whitespace-nowrap {{ $activeTab === 'liked' ? 'bg-white/10 text-white shadow-lg' : 'text-gray-400 hover:text-white hover:bg-white/5' }}">
+                <div class="flex items-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path></svg>
+                    المُعجب بها
+                </div>
+            </a>
+        </div>
+    @endif
+
     <!-- Gallery Section (if visible) -->
     @if(($isOwner || $isPublic) && $images->isNotEmpty())
         <div>
             <div class="flex items-center justify-between mb-8 px-2">
-                <h3 class="text-2xl font-bold tracking-tight">معرض <span class="accent-text-gradient">المصور</span></h3>
+                <h3 class="text-2xl font-bold tracking-tight">معرض <span class="accent-text-gradient">
+                    @if($isOwner)
+                        {{ $activeTab === 'private' ? 'الصور الخاصة' : ($activeTab === 'saved' ? 'المحفوظات' : ($activeTab === 'liked' ? 'الإعجابات' : 'العامة')) }}
+                    @else
+                        المصور
+                    @endif
+                </span></h3>
                 <div class="flex gap-2">
                     {{-- Filter buttons could go here --}}
                 </div>
@@ -152,12 +190,42 @@
             @include('images._detail_modal')
         </div>
     @elseif(($isOwner || $isPublic) && $images->isEmpty())
-        <div class="glass p-20 rounded-[40px] text-center">
+        <div class="glass p-20 rounded-[40px] text-center mt-8">
             <div class="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-6">
-                <svg class="w-10 h-10 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                <svg class="w-10 h-10 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    @if($isOwner && $activeTab === 'saved')
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"></path>
+                    @elseif($isOwner && $activeTab === 'liked')
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
+                    @elseif($isOwner && $activeTab === 'private')
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                    @else
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                    @endif
+                </svg>
             </div>
-            <h3 class="text-xl font-bold text-white mb-2">لا توجد صور عامة</h3>
-            <p class="text-gray-500">هذا المستخدم لم يقم بمشاركة أي صور في المعرض العام حتى الآن.</p>
+            <h3 class="text-xl font-bold text-white mb-2">
+                @if($isOwner && $activeTab === 'saved')
+                    لا توجد صور محفوظة
+                @elseif($isOwner && $activeTab === 'liked')
+                    لا توجد إعجابات
+                @elseif($isOwner && $activeTab === 'private')
+                    لا توجد صور خاصة
+                @else
+                    لا توجد صور عامة
+                @endif
+            </h3>
+            <p class="text-gray-500">
+                @if($isOwner && $activeTab === 'saved')
+                    لم تقم بحفظ أي صور بعد.
+                @elseif($isOwner && $activeTab === 'liked')
+                    لم تعجب بأي صور بعد.
+                @elseif($isOwner && $activeTab === 'private')
+                    هذا الفلتر فارغ حالياً.
+                @else
+                    لم يقم المستخدم بمشاركة أي صور في المعرض العام حالياً.
+                @endif
+            </p>
         </div>
     @endif
 </div>

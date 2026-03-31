@@ -49,12 +49,7 @@ class PhotoController extends Controller
      */
     public function destroy(Image $image)
     {
-        // Use the existing service or direct deletion
-        if (Storage::disk('public')->exists($image->path)) {
-            Storage::disk('public')->delete($image->path);
-        }
-        
-        $image->delete();
+        app(\App\Services\Core\ImageService::class)->delete($image);
 
         return back()->with('success', 'تم حذف الصورة نهائياً من النظام.');
     }
@@ -64,26 +59,28 @@ class PhotoController extends Controller
      */
     public function ban(Image $image)
     {
-        $path = storage_path('app/public/' . $image->path);
-        
-        if (file_exists($path)) {
-            $hash = md5_file($path);
-            
-            BannedImageHash::firstOrCreate([
-                'hash' => $hash
-            ], [
-                'reason' => 'Admin Manual Ban',
-                'details' => [
-                    'original_name' => $image->title,
-                    'user_id' => $image->user_id,
-                    'banned_at' => now()->toDateTimeString()
-                ]
-            ]);
+        $hash = $image->storage?->md5_hash;
 
-            Storage::disk('public')->delete($image->path);
+        if (!$hash) {
+            try {
+                $hash = md5(file_get_contents($image->url));
+            } catch (\Exception $e) {
+                $hash = md5(uniqid('banned_', true)); // Fallback if file is completely inaccessible
+            }
         }
+        
+        BannedImageHash::firstOrCreate([
+            'hash' => $hash
+        ], [
+            'reason' => 'Admin Manual Ban',
+            'details' => [
+                'original_name' => $image->title,
+                'user_id' => $image->user_id,
+                'banned_at' => now()->toDateTimeString()
+            ]
+        ]);
 
-        $image->delete();
+        app(\App\Services\Core\ImageService::class)->delete($image);
 
         return back()->with('success', 'تم حظر بصمة الصورة وحذفها نهائياً.');
     }

@@ -142,6 +142,16 @@ class Image extends Model
         return $this->hasMany(Like::class);
     }
 
+    public function bookmarks(): HasMany
+    {
+        return $this->hasMany(Bookmark::class);
+    }
+
+    public function bookmarkedBy(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'bookmarks', 'image_id', 'user_id')->withTimestamps();
+    }
+
     /** AI Analysis Metadata (polymorphic) */
     public function aiMetadata(): \Illuminate\Database\Eloquent\Relations\MorphOne
     {
