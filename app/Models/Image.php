@@ -11,15 +11,13 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use App\Models\ImageAppeal;
-use Spatie\MediaLibrary\HasMedia;
-use Spatie\MediaLibrary\InteractsWithMedia;
 use Spatie\Tags\HasTags;
 use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\Activitylog\LogOptions;
 
-class Image extends Model implements HasMedia
+class Image extends Model
 {
-    use HasFactory, HasUuids, InteractsWithMedia, HasTags, LogsActivity;
+    use HasFactory, HasUuids, HasTags, LogsActivity;
 
     // Keep legacy constants for backward compatibility (now in ImageModeration)
     const STATUS_PENDING        = 'pending';
@@ -75,10 +73,9 @@ class Image extends Model implements HasMedia
         'labels' => 'array',
     ];
 
-    protected $with = ['settings'];
     protected $appends = ['can_edit', 'can_delete', 'can_download'];
 
-    // ───────────────────────── Relations ─────────────────────────
+
 
     public function user(): BelongsTo
     {
@@ -115,7 +112,7 @@ class Image extends Model implements HasMedia
     }
 
     /** AI Labels classification */
-    public function labels(): HasOne
+    public function labelData(): HasOne
     {
         return $this->hasOne(ImageLabel::class);
     }

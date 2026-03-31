@@ -25,6 +25,18 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // ── Socialite Providers Registration ──────────────────────────
+        $socialiteListeners = [
+            \SocialiteProviders\Instagram\InstagramExtendSocialite::class . '@handle',
+            \SocialiteProviders\Adobe\AdobeExtendSocialite::class . '@handle',
+        ];
+
+        foreach ($socialiteListeners as $listener) {
+            \Illuminate\Support\Facades\Event::listen(
+                \SocialiteProviders\Manager\SocialiteWasCalled::class,
+                $listener
+            );
+        }
         // Register Observers
         \App\Models\ImageModeration::observe(\App\Observers\ImageModerationObserver::class);
         \App\Models\AlbumSettings::observe(\App\Observers\AlbumSettingsObserver::class);

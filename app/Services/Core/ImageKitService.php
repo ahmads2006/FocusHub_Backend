@@ -99,10 +99,10 @@ class ImageKitService
     /**
      * Get a blurred URL for sensitive content (Yellow layer).
      */
-    public function getBlurredUrl(string $path, bool $signed = true): string
+    /* public function getBlurredUrl(string $path, bool $signed = true): string
     {
         return $this->imagekit->url([
-            'path' => $path,
+         'path' => $path,
             'signed' => $signed,
             'expireSeconds' => 3600, // 1 hour for previews
             'transformation' => [
@@ -121,5 +121,23 @@ class ImageKitService
                 ]
             ],
         ]);
-    }
+    }    
+   
+    /*
+     * Get a tiny, blurred placeholder URL (LQIP) for the Blur-up technique.
+     */
+   /* public function getPlaceholderUrl(string $path): string
+    {
+        return $this->imagekit->url([
+            'path' => $path,
+            'transformation' => [
+                [
+                    'width' => '20',
+                    'blur' => '30',
+                    'quality' => '10',
+                    'format' => 'webp',
+                ]
+            ],
+        ]);
+    }    */
 }

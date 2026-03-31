@@ -84,7 +84,7 @@ class UpdateUserPreferencesJob implements ShouldQueue
             ]);
 
             // 4. Invalidate the specific User's 'For You' Feed Cache
-            Cache::forget("feed:for_you:{$this->userId}");
+            Cache::tags(["user:{$this->userId}", 'feeds'])->flush();
 
             // Datadog Tracking happens via the Engine (Gauge), but we can log securely here.
             Log::channel('datadog')->debug('User preferences updated successfully via Job', [

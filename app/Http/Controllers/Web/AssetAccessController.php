@@ -91,7 +91,7 @@ class AssetAccessController extends Controller
 
         // 4b. Watermark via ImageKit CDN overlay (preferred — no file modification)
         $imagekitPath = $image->imagekit_file_path ?? null;
-        if ($imagekitPath) {
+        if ($imagekitPath && !app()->environment('local')) {
             $imageKitService = app(\App\Services\Core\ImageKitService::class);
             $watermarkText = $image->user->name ?? 'OpticVault';
             $watermarkedUrl = $imageKitService->getWatermarkedUrl($imagekitPath, $watermarkText);
@@ -155,24 +155,10 @@ class AssetAccessController extends Controller
             abort(403, 'This image has been rejected due to content policy violations.');
         }
 
-        // 3. Yellow Layer: Pending Review / Sensitive Content
-        $isSensitive = $image->is_sensitive || $image->isPendingReview();
-        
         $imagekitPath = $image->imagekit_file_path ?? null;
 
-        // Skip blur for owners so they can review their own content
-        if ($isSensitive && !$isOwner) {
-            if ($imagekitPath) {
-                $imageKitService = app(\App\Services\Core\ImageKitService::class);
-                $blurredUrl = $imageKitService->getBlurredUrl($imagekitPath);
-                
-                \Illuminate\Support\Facades\Log::info("AssetAccess: Serving BLURRED preview (Yellow Layer) for image {$image->id}");
-                return redirect($blurredUrl);
-            }
-        }
-
         // Generate Signed preview URL for safe/owner views if it's in the cloud
-        if ($imagekitPath) {
+        if ($imagekitPath && !app()->environment('local')) {
             $imageKitService = app(\App\Services\Core\ImageKitService::class);
             $url = $imageKitService->generateSignedUrl($imagekitPath, [['format' => 'webp', 'quality' => 'auto']], 30);
             return redirect($url);
@@ -227,6 +213,10 @@ class AssetAccessController extends Controller
             ? 'inline; filename="' . $filename . '"'
             : 'attachment; filename="' . $filename . '"';
 
+        $cacheControl = $disposition === 'inline' 
+            ? 'public, max-age=2592000, immutable' // 30 days for gallery previews (cache-busted by ?v=)
+            : 'private, max-age=3600';             // 1 hour for secure downloads
+
         return response()->stream(function () use ($storage, $path, $disk) {
             $stream = $storage->readStream($path);
             if ($stream) {
@@ -240,7 +230,7 @@ class AssetAccessController extends Controller
             'Content-Length' => $size,
             'Content-Disposition' => $contentDisposition,
             'X-Content-Type-Options' => 'nosniff',
-            'Cache-Control' => 'no-cache, private',
+            'Cache-Control' => $cacheControl,
         ]);
     }
 

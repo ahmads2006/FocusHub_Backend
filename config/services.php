@@ -69,5 +69,17 @@ return [
         'api_key' => env('SCANNER_API_KEY'),
     ],
 
+    'instagram' => [
+        'client_id' => env('INSTAGRAM_CLIENT_ID'),
+        'client_secret' => env('INSTAGRAM_CLIENT_SECRET'),
+        'redirect' => env('INSTAGRAM_REDIRECT_URI'),
+    ],
+
+    'adobe' => [
+        'client_id' => env('ADOBE_CLIENT_ID'),
+        'client_secret' => env('ADOBE_CLIENT_SECRET'),
+        'redirect' => env('ADOBE_REDIRECT_URI'),
+    ],
+
 ];
 

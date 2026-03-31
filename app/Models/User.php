@@ -92,6 +92,10 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
         'is_verified',
         'stay_logged_in',
         'google_id',
+        'instagram_id',
+        'provider_name',
+        'provider_id',
+        'provider_avatar',
         'avatar',
         'provider_token',
         'is_public_profile',
@@ -319,6 +323,12 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
      */
     public function getAvatarAttribute(): string
     {
+        // 1. Check provider_avatar (Social Login)
+        if ($this->provider_avatar && filter_var($this->provider_avatar, FILTER_VALIDATE_URL)) {
+            return $this->provider_avatar;
+        }
+
+        // 2. Check profile picture from Profile relation
         $profilePicture = $this->profile ? $this->profile->profile_picture : ($this->attributes['profile_picture'] ?? null);
         
         if ($profilePicture) {

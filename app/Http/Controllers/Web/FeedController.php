@@ -104,6 +104,9 @@ class FeedController extends Controller
             $redisKey = "hidden_images:{$user->id}";
             \Illuminate\Support\Facades\Redis::sadd($redisKey, $image->id);
             \Illuminate\Support\Facades\Redis::expire($redisKey, 90 * 24 * 60 * 60); // 90 days
+
+            // Instantly invalidate feed cache
+            $this->engine->invalidateUserFeedCache($user->id);
         }
 
         return response()->json([

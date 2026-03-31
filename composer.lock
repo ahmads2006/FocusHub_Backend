@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "b889be1aaef5f107f53a61b03b518076",
+    "content-hash": "d0ed66c395cf80974e89ec172e8cb791",
     "packages": [
         {
             "name": "aws/aws-crt-php",
@@ -2147,16 +2147,16 @@
         },
         {
             "name": "laravel/socialite",
-            "version": "v5.25.0",
+            "version": "v5.26.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/laravel/socialite.git",
-                "reference": "231f572e1a37c9ca1fb8085e9fb8608285beafb3"
+                "reference": "1d26f0c653a5f0e88859f4197830a29fe0cc59d0"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/laravel/socialite/zipball/231f572e1a37c9ca1fb8085e9fb8608285beafb3",
-                "reference": "231f572e1a37c9ca1fb8085e9fb8608285beafb3",
+                "url": "https://api.github.com/repos/laravel/socialite/zipball/1d26f0c653a5f0e88859f4197830a29fe0cc59d0",
+                "reference": "1d26f0c653a5f0e88859f4197830a29fe0cc59d0",
                 "shasum": ""
             },
             "require": {
@@ -2215,7 +2215,7 @@
                 "issues": "https://github.com/laravel/socialite/issues",
                 "source": "https://github.com/laravel/socialite"
             },
-            "time": "2026-02-27T13:56:35+00:00"
+            "time": "2026-03-24T18:37:47+00:00"
         },
         {
             "name": "laravel/tinker",
@@ -5451,6 +5451,181 @@
                 }
             ],
             "time": "2026-03-03T14:29:01+00:00"
+        },
+        {
+            "name": "socialiteproviders/adobe",
+            "version": "4.1.1",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/SocialiteProviders/Adobe.git",
+                "reference": "dfcaedd930088e0c6fe50d7f7ad013d611265ebc"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/SocialiteProviders/Adobe/zipball/dfcaedd930088e0c6fe50d7f7ad013d611265ebc",
+                "reference": "dfcaedd930088e0c6fe50d7f7ad013d611265ebc",
+                "shasum": ""
+            },
+            "require": {
+                "ext-json": "*",
+                "php": "^8.0",
+                "socialiteproviders/manager": "^4.4"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "SocialiteProviders\\Adobe\\": ""
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Mex de Loo",
+                    "email": "mex@zeodev.cc",
+                    "homepage": "https://zeodev.cc",
+                    "role": "developer"
+                }
+            ],
+            "description": "Adobe OAuth2 Provider for Laravel Socialite",
+            "keywords": [
+                "adobe",
+                "laravel",
+                "oauth",
+                "provider",
+                "socialite"
+            ],
+            "support": {
+                "docs": "https://socialiteproviders.com/adobe",
+                "issues": "https://github.com/socialiteproviders/providers/issues",
+                "source": "https://github.com/socialiteproviders/providers"
+            },
+            "time": "2023-09-05T22:59:51+00:00"
+        },
+        {
+            "name": "socialiteproviders/instagram",
+            "version": "5.2.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/SocialiteProviders/Instagram.git",
+                "reference": "44927a21a5c6dade9dd00ef9936ff33ccfe75d20"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/SocialiteProviders/Instagram/zipball/44927a21a5c6dade9dd00ef9936ff33ccfe75d20",
+                "reference": "44927a21a5c6dade9dd00ef9936ff33ccfe75d20",
+                "shasum": ""
+            },
+            "require": {
+                "php": "^8.0",
+                "socialiteproviders/manager": "^4.4"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "SocialiteProviders\\Instagram\\": ""
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Brian Faust",
+                    "email": "hello@brianfaust.de"
+                }
+            ],
+            "description": "Instagram OAuth2 Provider for Laravel Socialite",
+            "keywords": [
+                "instagram",
+                "laravel",
+                "oauth",
+                "provider",
+                "socialite"
+            ],
+            "support": {
+                "docs": "https://socialiteproviders.com/instagram",
+                "issues": "https://github.com/socialiteproviders/providers/issues",
+                "source": "https://github.com/socialiteproviders/providers"
+            },
+            "time": "2026-03-23T02:07:36+00:00"
+        },
+        {
+            "name": "socialiteproviders/manager",
+            "version": "4.9.2",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/SocialiteProviders/Manager.git",
+                "reference": "35372dc62787e61e91cfec73f45fd5d5ae0f8891"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/SocialiteProviders/Manager/zipball/35372dc62787e61e91cfec73f45fd5d5ae0f8891",
+                "reference": "35372dc62787e61e91cfec73f45fd5d5ae0f8891",
+                "shasum": ""
+            },
+            "require": {
+                "illuminate/support": "^11.0 || ^12.0 || ^13.0",
+                "laravel/socialite": "^5.5",
+                "php": "^8.2"
+            },
+            "require-dev": {
+                "mockery/mockery": "^1.2",
+                "phpunit/phpunit": "^9.0"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "SocialiteProviders\\Manager\\ServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "SocialiteProviders\\Manager\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Andy Wendt",
+                    "email": "andy@awendt.com"
+                },
+                {
+                    "name": "Anton Komarev",
+                    "email": "a.komarev@cybercog.su"
+                },
+                {
+                    "name": "Miguel Piedrafita",
+                    "email": "soy@miguelpiedrafita.com"
+                },
+                {
+                    "name": "atymic",
+                    "email": "atymicq@gmail.com",
+                    "homepage": "https://atymic.dev"
+                }
+            ],
+            "description": "Easily add new or override built-in providers in Laravel Socialite.",
+            "homepage": "https://socialiteproviders.com",
+            "keywords": [
+                "laravel",
+                "manager",
+                "oauth",
+                "providers",
+                "socialite"
+            ],
+            "support": {
+                "issues": "https://github.com/socialiteproviders/manager/issues",
+                "source": "https://github.com/socialiteproviders/manager"
+            },
+            "time": "2026-03-18T22:13:24+00:00"
         },
         {
             "name": "spatie/eloquent-sortable",

@@ -31,7 +31,7 @@ class ProcessImageJob implements ShouldQueue
     /**
      * Create a new job instance.
      */
-    public function __construct(string $imagePath, string $jobId, string $albumId, string $userId, string $status, bool $isSensitive, string $reason = null, string $driver = 'unknown')
+    public function __construct(string $imagePath, string $jobId, string $albumId, string $userId, string $status, bool $isSensitive, ?string $reason = null, string $driver = 'unknown')
     {
         $this->imagePath = $imagePath;
         $this->jobId = $jobId;
@@ -65,23 +65,28 @@ class ProcessImageJob implements ShouldQueue
             
             if ($this->status === 'rejected') {
                 // RED LOGIC: Secure Private Quarantine, No Cloud/Public Upload
+                $year = date('Y');
+                $month = date('m');
                 $uid = Str::uuid()->toString();
-                $cleanPath = 'quarantine/' . $uid . '_' . $filename;
+                $cleanPath = "quarantine/{$year}/{$month}/{$this->userId}/" . $uid . '_' . $filename;
                 Storage::disk('local')->put($cleanPath, file_get_contents($absolutePath));
                 $storagePath = $cleanPath;
                 // No public preview for rejected content
             } else {
                 // NORMAL/YELLOW LOGIC: Save Clean Original in storage/app/secure_uploads
-                $cleanDir = 'secure_uploads/' . date('Y/m');
-                Storage::disk('local')->makeDirectory($cleanDir);
+                $year = date('Y');
+                $month = date('m');
                 $uid = Str::uuid()->toString();
-                $cleanPath = $cleanDir . '/' . $uid . '_' . $filename;
+
+                $cleanPath = "secure_uploads/{$year}/{$month}/{$this->userId}/" . $uid . '_' . $filename;
                 Storage::disk('local')->put($cleanPath, file_get_contents($absolutePath));
 
                 // Save Public Preview (clean, watermark applied at CDN delivery time)
-                $publicDir = 'images/' . date('Y/m');
-                Storage::disk('public')->makeDirectory($publicDir);
-                $publicPath = $publicDir . '/' . $uid . '_' . $filename;
+                $publicPath = "photos/{$year}/{$month}/{$this->userId}/" . $uid . '_' . $filename;
+                
+                // Ensure directory exists
+                Storage::disk('public')->makeDirectory(dirname($publicPath));
+                
                 $img->save(Storage::disk('public')->path($publicPath), quality: 80);
                 $storagePath = $publicPath;
             }
@@ -95,6 +100,7 @@ class ProcessImageJob implements ShouldQueue
                 'user_id' => $this->userId,
                 'title' => pathinfo($filename, PATHINFO_FILENAME),
                 'filename' => $filename,
+                'path' => $storagePath, // v15.0 Sync Full Path
                 'file_type' => strtolower(pathinfo($filename, PATHINFO_EXTENSION)),
                 'size' => filesize($absolutePath),
                 'privacy' => ($this->status === 'rejected') ? 'private' : $inheritedPrivacy, 

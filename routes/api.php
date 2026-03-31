@@ -41,3 +41,9 @@ Route::post('/webhooks/imagekit', [\App\Http\Controllers\Api\ImageKitWebhookCont
 
 // ─── Diagnostic API ──────────────────────────────────────────
 Route::get('/health', [App\Http\Controllers\Api\SystemHealthController::class, 'index']);
+
+// ─── Instagram Authentication (Unified) ──────────────────────────
+Route::prefix('auth/{provider}')->group(function () {
+    Route::get('/redirect', [\App\Http\Controllers\Api\Auth\SocialAuthController::class, 'redirectToProvider']);
+    Route::get('/callback', [\App\Http\Controllers\Api\Auth\SocialAuthController::class, 'handleProviderCallback']);
+});

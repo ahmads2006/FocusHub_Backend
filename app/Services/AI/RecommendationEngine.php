@@ -47,6 +47,12 @@ class RecommendationEngine
         // Emit Datadog Action Counter
         $this->emitDatadogMetric('count', 'opticvault.likes.action', 1, ["type:{$action}"]);
 
+        // ── Instant Cache Invalidation via Redis Tags ───────────────────
+        // Immediately flush this user's feed cache so the effect of their
+        // Like/Unlike is visible on the very next page load, without waiting
+        // for the background UpdateUserPreferencesJob to finish.
+        $this->invalidateUserFeedCache($user->id);
+
         // Dispatch background job to update JSON affinities
         UpdateUserPreferencesJob::dispatch($user->id, $image->id, $weightAdjustment);
 
@@ -63,17 +69,18 @@ class RecommendationEngine
      * - 20% Discovery Match: Based on secondary tags (6-15) to expand taste.
      * - 30% Random/Trending: Pure trending or random to break the filter bubble.
      */
-    public function getForYouFeed(User $user, int $limit = 20)
+    public function getForYouFeed(User $user, int $limit = 20, bool $includeOwnImages = false)
     {
         $startTime = microtime(true);
-        $cacheKey = "feed:for_you:{$user->id}";
+        $cacheKey = "feed:for_you:{$user->id}:" . ($includeOwnImages ? 'all' : 'others');
 
-        $feed = Cache::remember($cacheKey, 300, function () use ($user, $limit) {
+        // Use Redis Cache Tags tied to the user ID.
+        $feed = Cache::tags(["user:{$user->id}", 'feeds'])->remember($cacheKey, 300, function () use ($user, $limit, $includeOwnImages) {
             $prefs = UserPreference::where('user_id', $user->id)->first();
 
             // Cold Start Fallback — no prefs yet
             if (!$prefs || (empty($prefs->tag_weights) && empty($prefs->creator_weights))) {
-                return $this->getTrendingFeed($limit);
+                return $this->getTrendingFeed($limit, $includeOwnImages);
             }
 
             // --- Parse preference weights ---
@@ -94,10 +101,14 @@ class RecommendationEngine
             $hiddenIds = Redis::smembers("hidden_images:{$user->id}") ?? [];
 
             // Base query constraints (shared across all buckets)
-            $baseConstraints = function ($q) use ($user, $hiddenIds) {
+            $baseConstraints = function ($q) use ($user, $hiddenIds, $includeOwnImages) {
                 $q->where('privacy', 'public')
-                  ->where('user_id', '!=', $user->id)
                   ->whereDoesntHave('likes', fn($lq) => $lq->where('user_id', $user->id));
+                
+                if (!$includeOwnImages) {
+                    $q->where('user_id', '!=', $user->id);
+                }
+
                 if (!empty($hiddenIds)) {
                     $q->whereNotIn('id', $hiddenIds);
                 }
@@ -134,33 +145,33 @@ class RecommendationEngine
                     ->get();
             }
 
-            // ── BUCKET 3: 30% Trending / Random ─────────────────────────────
             $excludeIds = array_merge(
                 $hiddenIds,
                 $directResults->pluck('id')->toArray(),
                 $discoveryResults->pluck('id')->toArray()
             );
-            $trendingIds = Redis::zrevrange('trending_images_24h', 0, ($randomCount * 3) - 1);
-            $trendingIds = array_diff($trendingIds, $excludeIds);
 
-            $randomResults = collect();
-            if (!empty($trendingIds)) {
-                $placeholders = implode(',', array_fill(0, count($trendingIds), '?'));
-                $randomResults = Image::whereIn('id', $trendingIds)
-                    ->where('privacy', 'public')
-                    ->whereNotIn('id', $excludeIds)
-                    ->orderByRaw("FIELD(id, {$placeholders})", $trendingIds)
-                    ->take($randomCount)
-                    ->get();
-            }
+            // ── BUCKET 3: Trending / Latest Fallback (Fill the remaining slots) ──
+            // Dynamically calculate remaining slots to ensure we always hit the $limit
+            $remainingCount = max(0, $limit - $directResults->count() - $discoveryResults->count());
 
-            // Fallback: if trending is empty, use pure random
+            // Fetch images based on likes count, then latest date, excluding already shown
+            $randomResults = Image::query()
+                ->tap($baseConstraints)
+                ->whereNotIn('id', $excludeIds)
+                ->withCount('likes')
+                ->orderBy('likes_count', 'desc')
+                ->latest()
+                ->take($remainingCount)
+                ->get();
+            
+            // Absolute fallback: if still empty, try pure random
             if ($randomResults->isEmpty()) {
                 $randomResults = Image::query()
                     ->tap($baseConstraints)
-                    ->whereNotIn('id', array_merge($hiddenIds, $directResults->pluck('id')->toArray(), $discoveryResults->pluck('id')->toArray()))
+                    ->whereNotIn('id', $excludeIds)
                     ->inRandomOrder()
-                    ->take($randomCount)
+                    ->take($remainingCount)
                     ->get();
             }
 
@@ -187,21 +198,22 @@ class RecommendationEngine
     /**
      * Ultra-fast Cold Start using Redis ZREVRANGE.
      */
-    protected function getTrendingFeed(int $limit = 20)
+    protected function getTrendingFeed(int $limit = 20, bool $includeOwnImages = false)
     {
-        // Get highest scored images instantly
-        $trendingIds = Redis::zrevrange('trending_images_24h', 0, $limit - 1);
-        
-        if (empty($trendingIds)) {
-            // Absolute absolute fallback: latest good images
-            return Image::where('privacy', 'public')->latest()->take($limit)->get();
+        $query = Image::where('privacy', 'public')
+            ->withCount('likes');
+
+        // Optional: Include owner images in Gallery context
+        if (!$includeOwnImages && auth()->check()) {
+            $query->where('user_id', '!=', auth()->id());
         }
 
-        // Fetch from DB honoring order using FIELD()
-        $placeholders = implode(',', array_fill(0, count($trendingIds), '?'));
-        return Image::whereIn('id', $trendingIds)
-            ->where('privacy', 'public')
-            ->orderByRaw("FIELD(id, {$placeholders})", $trendingIds)
+        // Logic: 
+        // 1. Order by Likes (most popular first, even if old)
+        // 2. Order by Date (if same likes, newest first)
+        return $query->orderBy('likes_count', 'desc')
+            ->latest()
+            ->take($limit)
             ->get();
     }
 
@@ -222,4 +234,13 @@ class RecommendationEngine
         // if ($type === 'gauge') \DataDog\DogStatsd::gauge($metric, $value, $tags);
         // if ($type === 'distribution') \DataDog\DogStatsd::distribution($metric, $value, $tags);
     }
+
+    /**
+     * Instantly invalidates the 'For You' feed for a specific user using Redis tags.
+     */
+    public function invalidateUserFeedCache($userId): void
+    {
+        Cache::tags(["user:{$userId}", 'feeds'])->flush();
+    }
 }
+

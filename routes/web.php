@@ -29,9 +29,9 @@ Route::middleware('guest')->group(function () {
     Route::get('register', [RegisteredUserController::class, 'create'])->name('register');
     Route::post('register', [RegisteredUserController::class, 'store']);
 
-    // Google OAuth Routes
-    Route::get('auth/google', [\App\Http\Controllers\Auth\GoogleAuthController::class, 'redirectToGoogle'])->name('auth.google');
-    Route::get('auth/google/callback', [\App\Http\Controllers\Auth\GoogleAuthController::class, 'handleGoogleCallback']);
+    // Unified Social OAuth Routes (Web/Session)
+    Route::get('auth/{provider}', [\App\Http\Controllers\Auth\SocialAuthController::class, 'redirectToProvider'])->name('auth.social.redirect');
+    Route::get('auth/{provider}/callback', [\App\Http\Controllers\Auth\SocialAuthController::class, 'handleProviderCallback'])->name('auth.social.callback');
 });
 
 // ────────────────────────────────────────────────
@@ -48,7 +48,7 @@ Route::post('/verify-code', [VerifyCodeController::class, 'verify'])->name('veri
 // ────────────────────────────────────────────────
 // Authenticated + verified routes
 // ────────────────────────────────────────────────
-Route::middleware(['auth', 'check.verified', 'check.banned', 'check.timeout', 'throttle:web'])->group(function () {
+Route::middleware(['auth', 'check.verified', 'check.banned', 'throttle:web'])->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::put('/profile/security', [ProfileController::class, 'updateSecurity'])->name('profile.security.update');

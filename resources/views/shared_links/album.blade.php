@@ -11,6 +11,16 @@
         .glass { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.05); }
         .accent-gradient { background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%); }
         .accent-text-gradient { background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+
+        /* Blur-up Effect */
+        .blur-up {
+            filter: blur(20px);
+            transition: filter 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+            will-change: filter;
+        }
+        .blur-up.is-loaded {
+            filter: blur(0);
+        }
     </style>
 </head>
 <body class="antialiased min-h-screen bg-[#0a0a0c] selection:bg-purple-500/30 overflow-x-hidden" dir="rtl">
@@ -71,8 +81,12 @@
             @foreach($album->photos as $photo)
                 <div class="group relative order-last md:order-none">
                     <div class="glass rounded-[32px] overflow-hidden border border-white/5 transition-all duration-500 hover:border-purple-500/30 hover:shadow-2xl hover:shadow-purple-500/5">
-                        <div class="aspect-[4/3] overflow-hidden relative">
-                            <img src="{{ $photo->url }}" alt="{{ $photo->title }}" class="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110">
+                        <div class="aspect-[4/3] overflow-hidden relative bg-white/5">
+                            <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" 
+                                 data-src="{{ $photo->url }}" 
+                                 alt="{{ $photo->title }}" 
+                                 class="lazy w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110"
+                                 onload="if(this.src === this.dataset.src) this.classList.add('is-loaded')">
                             <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
                             
                             @if($link->permission === 'download')
@@ -108,5 +122,28 @@
             <p class="text-[10px] text-gray-600 uppercase tracking-widest mt-2 font-bold">Secure Asset Delivery Pipeline</p>
         </footer>
     </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      if ('IntersectionObserver' in window) {
+        const obs = new IntersectionObserver((entries, o) => {
+          entries.forEach(e => {
+            if (e.isIntersecting) {
+              const img = e.target;
+              img.src = img.dataset.src;
+              img.classList.remove('lazy');
+              o.unobserve(img);
+            }
+          });
+        }, { rootMargin: '200px 0px', threshold: 0.1 });
+        document.querySelectorAll('img.lazy').forEach(img => obs.observe(img));
+      } else {
+        document.querySelectorAll('img.lazy').forEach(img => { 
+            img.src = img.dataset.src; 
+            img.classList.add('is-loaded');
+        });
+      }
+    });
+    </script>
 </body>
 </html>

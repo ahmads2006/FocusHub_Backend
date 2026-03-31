@@ -17,7 +17,11 @@
         
         {{-- Image Section --}}
         <div class="lg:flex-1 bg-black/20 flex items-center justify-center relative overflow-hidden group">
-            <img :src="selectedImage?.url" class="max-w-full max-h-full object-contain shadow-2xl transition-transform duration-500 group-hover:scale-105" alt="">
+            <template x-if="selectedImage">
+                <img :src="selectedImage.url" 
+                     class="max-w-full max-h-full object-contain shadow-2xl transition-all duration-700 group-hover:scale-105 is-loaded" 
+                     alt="">
+            </template>
             
             <button @click="closeModal()" class="absolute top-6 right-6 lg:hidden action-btn bg-black/40 border-white/10 hover:bg-black/60 shadow-lg">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>

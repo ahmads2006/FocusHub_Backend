@@ -17,10 +17,11 @@ class AssetDeliveryService
      */
     public function getUrl(Image $image, string $context = 'gallery'): string
     {
-        // 🚀 SMART ROUTING (v4.0): Force secure signed routes for anything non-public, rejected, or NOT in ImageKit.
-        // This ensures cloud-fallback assets (S3/local) are found correctly.
-        $isInCloud = !empty($image->storage?->imagekit_file_id);
-        if (!$isInCloud || $image->privacy !== 'public' || $image->isRejected() || ($image->album && $image->album->privacy !== 'public')) {
+        // 🚀 SMART ROUTING (v4.1): Support S3 Origins.
+        // An asset is "In Cloud" if it has an imagekit_file_id (legacy) OR an imagekit_file_path (S3/Origin).
+        $isInCloud = !empty($image->storage?->imagekit_file_id) || !empty($image->storage?->imagekit_file_path);
+
+        if (app()->environment('local') || !$isInCloud || $image->privacy !== 'public' || $image->isRejected() || ($image->album && $image->album->privacy !== 'public')) {
             if ($this->canAccessOriginal($image) || $image->privacy === 'public') {
                 // For gallery/thumbnail display → use inline preview route (renders in <img> tags)
                 // For download contexts → use original route (forces download)
@@ -33,9 +34,19 @@ class AssetDeliveryService
             }
         }
 
-        // If it's public and safe and in the cloud, serve directly from the CDN
+        // Using ImageKit directly whenever it's available.
         $imageKit = app(\App\Services\Core\ImageKitService::class);
         $path = $image->storage?->imagekit_file_path ?? $image->storage?->path;
+
+        // Path Normalization: Strip redundant folder prefix returned by some ImageKit uploads
+        // to prevent doubling it up in the final URL (ik.imagekit.io/vault/vault/...)
+        if ($path) {
+            $path = ltrim($path, '/');
+            $folderPrefix = 'opticvault/';
+            if (str_starts_with(strtolower($path), $folderPrefix)) {
+                $path = substr($path, strlen($folderPrefix));
+            }
+        }
 
         switch ($context) {
             case 'avatar':
@@ -49,6 +60,9 @@ class AssetDeliveryService
             case 'gallery':
             case 'preview':
                 return $isInCloud ? $imageKit->getOptimizedUrl($path, 800) : $image->getThumbnailUrl('medium');
+
+            case 'placeholder':
+                return $isInCloud ? $imageKit->getOptimizedUrl($path, 20, 20) : $image->getThumbnailUrl('avatar');
 
             case 'original':
             case 'source':

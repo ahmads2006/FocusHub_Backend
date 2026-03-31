@@ -70,6 +70,18 @@ class ImageService
             $imagekitFilePath = null;
             $path = '';
             $originalPath = null;
+            $year = date('Y');
+            $month = date('m');
+
+            // ── Normalize and Truncate Filename (Prevents SQLSTATE[22001] "Data too long") ─────
+            $originalFileName = $file->getClientOriginalName();
+            $safeName = preg_replace('/[^A-Za-z0-9\-\_\.]/', '', $originalFileName);
+            $baseName = pathinfo($safeName, PATHINFO_FILENAME);
+            $extension = $file->getClientOriginalExtension();
+            
+            // Truncate base name to 60 chars to keep the final path within DB limits
+            $truncatedBase = \Illuminate\Support\Str::limit($baseName, 60, '');
+            $shortName = $truncatedBase . '.' . $extension;
 
             if ($moderationResult['status'] === 'rejected') {
                 if (!$isPublicAlbum) {
@@ -80,17 +92,19 @@ class ImageService
                 }
 
                 // RED LOGIC: Secure Private Quarantine, No Cloud Upload (Public context)
-                $fileName = uniqid('rejected_') . '_' . preg_replace('/[^A-Za-z0-9\-\_\.]/', '', $file->getClientOriginalName());
-                $relativePath = 'quarantine/' . $fileName;
+                $fileName = uniqid('rejected_') . '_' . $shortName;
+                $relativePath = "quarantine/{$year}/{$month}/{$userId}/" . $fileName;
                 Storage::disk('local')->put($relativePath, file_get_contents($cleanFile));
                 $path = $relativePath;
                 $originalPath = $relativePath;
+                Log::warning("OpticVault Quarantined (Red) - Private Album: {$relativePath}");
+
             } else {
                 if ($moderationResult['is_sensitive'] ?? false) {
                     // YELLOW LOGIC: Dual-Storage Strategy
                     // Always save the clean original file securely (needed for privacy transitions)
-                    $originalFileName = uniqid('original_') . '_' . preg_replace('/[^A-Za-z0-9\-\_\.]/', '', $file->getClientOriginalName());
-                    $originalPath = 'secure_uploads/' . $originalFileName;
+                    $originalFileNameToStore = uniqid('original_') . '_' . $shortName;
+                    $originalPath = "secure_uploads/{$year}/{$month}/{$userId}/" . $originalFileNameToStore;
                     Storage::disk('local')->put($originalPath, file_get_contents($cleanFile));
 
                     if ($isPublicAlbum) {
@@ -101,45 +115,35 @@ class ImageService
                     }
                 }
 
-                // GREEN/YELLOW LOGIC: Upload to ImageKit (with Graceful Fallback)
+                // GREEN/YELLOW LOGIC: Upload to S3 and ImageKit
                 try {
-                    $cloudResponse = $this->uploadToCloud($cleanFile, $file->getClientOriginalName());
-                    $imagekitFileId = $cloudResponse->fileId;
-                    $imagekitFilePath = $cloudResponse->filePath;
-                    $path = $cloudResponse->filePath;
+                    $dynamicPath = "photos/{$year}/{$month}/{$userId}";
+                    
+                    // 1. Store in S3 (The foundation / LocalStack)
+                    $s3Path = $this->uploadToS3($cleanFile, $shortName, $dynamicPath);
+                    $path = $s3Path;
+                    $imagekitFileId = null; 
+                    $imagekitFilePath = $s3Path; 
 
-                    // ── Optional: Also push to LocalStack S3 for background Python scanner ──
-                    // DISABLED: Pushing to LocalStack S3 synchronously blocks the PHP thread for 
-                    // up to 3 minutes if the Docker container is unresponsive or bucket is missing.
-                    /*
+                    // 2. Dual-Upload to ImageKit Media Library
                     try {
-                        $s3Key = 'images/' . date('Y/m') . '/' . uniqid('mirror_') . '_' . preg_replace('/[^A-Za-z0-9\-\_\.]/', '', $file->getClientOriginalName());
-                        Storage::disk('s3')->put($s3Key, file_get_contents($cleanFile), 'public');
-                    } catch (\Exception $s3e) {
-                        // Mirror failure is non-critical
+                        $cloudResponse = $this->uploadToCloud($cleanFile, $shortName, $dynamicPath);
+                        $imagekitFileId = $cloudResponse->fileId;
+                        $imagekitFilePath = $cloudResponse->filePath;
+                    } catch (\Exception $e) {
+                         Log::warning("OpticVault ImageKit Dual-Upload Failed: " . $e->getMessage() . ". Falling back to S3 Origin only.");
                     }
-                    */
 
                 } catch (\Exception $e) {
-                    Log::warning("OpticVault Cloud Failed: " . $e->getMessage() . ". Attempting secondary storages.");
+                    Log::warning("OpticVault Cloud (S3) Failed: " . $e->getMessage() . ". Attempting secondary storages.");
                     
-                    $fileName = uniqid('fallback_') . '_' . preg_replace('/[^A-Za-z0-9\-\_\.]/', '', $file->getClientOriginalName());
-                    $relativePath = 'images/' . date('Y/m') . '/' . $fileName;
+                    $fileName = uniqid() . '_' . $shortName;
+                    $relativePath = "photos/{$year}/{$month}/{$userId}/" . $fileName;
 
-                    // DISABLED: LocalStack S3 fallback causes 3-minute timeouts if container is missing.
-                    /*
-                    try {
-                        Storage::disk('s3')->put($relativePath, file_get_contents($cleanFile), 'public');
-                        $path = $relativePath;
-                        Log::info("Fallback upload to LocalStack S3 successful: {$relativePath}");
-                    } catch (\Exception $s3e) {
-                        Log::warning("LocalStack S3 fallback failed: " . $s3e->getMessage() . ". Final fallback to LOCAL Public disk.");
-                    }
-                    */
-                    
                     // Final Fallback: Store on local public disk for instant visibility
                     Storage::disk('public')->put($relativePath, file_get_contents($cleanFile));
                     $path = $relativePath;
+                    $imagekitFilePath = null;
                     Log::info("Final local fallback successful: {$relativePath}");
                 }
             }
@@ -249,7 +253,7 @@ class ImageService
     public function delete(Image $image): void
     {
         try {
-            // 1. Delete from ImageKit if exists
+            // 1. Delete from ImageKit if legacy file exists
             if (!empty($image->imagekit_file_id)) {
                 try {
                     $this->imageKit->deleteFile($image->imagekit_file_id);
@@ -258,12 +262,17 @@ class ImageService
                 }
             }
 
-            // 2. Delete local fallback or thumbnails
+            // 2. Delete from S3 if exists
+            if (!empty($image->path) && Storage::disk('s3')->exists($image->path)) {
+                Storage::disk('s3')->delete($image->path);
+            }
+
+            // 3. Delete local fallback or thumbnails
             if (!empty($image->path) && Storage::disk('public')->exists($image->path)) {
                 Storage::disk('public')->delete($image->path);
             }
 
-            // 3. Delete from database
+            // 4. Delete from database
             $image->delete();
 
         } catch (\Exception $e) {
@@ -275,7 +284,7 @@ class ImageService
     /**
      * Generate Optimized CDN URL with dynamic resizing
      */
-    public function getDynamicUrl(Image $image, int $width = null): string
+    public function getDynamicUrl(Image $image, ?int $width = null): string
     {
         if (!$image->imagekit_file_path) {
             return asset($image->path);
@@ -368,23 +377,39 @@ class ImageService
         return $path;
     }
 
-    protected function uploadToCloud(string $filePath, string $originalName)
+    /**
+     * Upload directly to S3 Bucket (The Cloud Storage).
+     */
+    protected function uploadToS3(string $filePath, string $originalName, string $folder): string
+    {
+        $safeName = preg_replace('/[^A-Za-z0-9\-\_\.]/', '', $originalName);
+        $safeName = pathinfo($safeName, PATHINFO_FILENAME);
+        $extension = pathinfo($originalName, PATHINFO_EXTENSION);
+        $shortName = substr($safeName, 0, 40) . ($extension ? '.' . $extension : '');
+        
+        $fileName = uniqid('optic_') . '_' . $shortName;
+        $relativePath = ltrim($folder, '/') . '/' . $fileName;
+
+        Storage::disk('s3')->put($relativePath, file_get_contents($filePath));
+
+        return $relativePath;
+    }
+
+    /**
+     * @deprecated Use uploadToS3. ImageKit is now used as an Origin Proxy.
+     */
+    protected function uploadToCloud(string $filePath, string $originalName, string $folder = '/opticvault/uploads')
     {
         $upload = $this->imageKit->uploadFiles([
             'file' => base64_encode(file_get_contents($filePath)),
             'fileName' => $originalName,
             'useUniqueFileName' => true,
-            'folder' => '/opticvault/uploads',
+            'folder' => '/opticvault/' . ltrim($folder, '/'),
         ]);
 
         if (isset($upload->error) && $upload->error) {
             $errorMsg = is_string($upload->error) ? $upload->error : ($upload->error->message ?? json_encode($upload->error));
             throw new \Exception("ImageKit Upload Error: " . $errorMsg);
-        }
-
-        if (empty($upload->result)) {
-            $statusCode = $upload->responseMetadata['statusCode'] ?? 'Unknown';
-            throw new \Exception("ImageKit Upload Error: Empty response from ImageKit (HTTP {$statusCode})");
         }
 
         return $upload->result;

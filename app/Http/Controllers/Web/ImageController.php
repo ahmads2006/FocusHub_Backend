@@ -269,7 +269,7 @@ class ImageController extends Controller
         
         // Setup base query for filtering or guest users
         $query = Image::where('privacy', 'public')
-            ->with(['settings', 'user', 'labels'])
+            ->with(['settings', 'user', 'labelData'])
             ->withCount('likes');
 
         if ($selectedTag) {
@@ -281,10 +281,10 @@ class ImageController extends Controller
             if ($user) {
                 // Fetch up to 60 personalized images (5 pages of 12)
                 $recommendationEngine = app(\App\Services\AI\RecommendationEngine::class);
-                $feedPool = $recommendationEngine->getForYouFeed($user, 60);
+                $feedPool = $recommendationEngine->getForYouFeed($user, 60, true);
 
                 // Eager load relationships necessary for the gallery view
-                $feedPool->load(['settings', 'user', 'labels']);
+                $feedPool->load(['settings', 'user', 'labelData']);
                 $feedPool->loadCount('likes');
 
                 // Manual pagination of the collection

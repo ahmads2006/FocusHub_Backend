@@ -241,6 +241,16 @@
   }
   .no-scrollbar::-webkit-scrollbar { display: none; }
   .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+  /* Blur-up Effect */
+  .blur-up {
+    filter: blur(20px);
+    transition: filter 0.8s cubic-bezier(0.4, 0, 0.2, 1), transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+    will-change: filter, transform;
+  }
+  .blur-up.is-loaded {
+    filter: blur(0);
+  }
 </style>
 @endpush
 
@@ -344,7 +354,7 @@
                             },
                             status: '{{ $image->status }}',
                             is_sensitive: {{ $image->is_sensitive ? 'true' : 'false' }},
-                            labels: @json($image->labels ? $image->labels->labels : []),
+                            labels: @json($image->labelData ? $image->labelData->labels : ($image->labels ?? [])),
                             likes_count: {{ $image->likes_count ?? 0 }},
                             allow_download: {{ $image->allow_download ? 'true' : 'false' }},
                             download_url: '{{ $image->allow_download ? route('images.download', $image) : '#' }}'
@@ -353,8 +363,8 @@
             <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
                  data-src="{{ $imgUrl }}"
                  alt="{{ $image->title ?: 'Photograph' }}"
-                 class="card-img w-full h-full object-cover lazy select-none transition-transform duration-700 group-hover:scale-110 {{ $isSensitive ? 'blur-xl' : '' }}"
-                 :class="revealed ? '!blur-0' : ''"
+                 class="card-img w-full h-full object-cover lazy select-none transition-transform duration-700 group-hover:scale-110"
+                 onload="this.classList.add('is-loaded')"
                  width="400" height="300" loading="lazy">
 
             {{-- Hover overlay --}}
@@ -544,11 +554,9 @@
             {{-- AI Classification Label --}}
             @php
               $aiLabel = null;
-              // Try inline JSON column first, fallback to relationship
-              $rawLabels = $image->labels;
-              if (empty($rawLabels) && $image->relationLoaded('labels')) {
-                $rawLabels = optional($image->labels)->labels;
-              }
+              // Use relation if loaded, fallback to JSON column
+              $rawLabels = $image->labelData ? $image->labelData->labels : ($image->labels ?? []);
+              
               if (!empty($rawLabels)) {
                 $firstLabel = is_array($rawLabels) ? ($rawLabels[0] ?? null) : null;
                 if (is_array($firstLabel) && isset($firstLabel['description'])) {
@@ -647,7 +655,7 @@
                     },
                     status: '{{ $image->status }}',
                     is_sensitive: {{ $image->is_sensitive ? 'true' : 'false' }},
-                    labels: @json($image->labels ? $image->labels->labels : []),
+                    labels: @json($image->labelData ? $image->labelData->labels : ($image->labels ?? [])),
                     likes_count: {{ $image->likes_count ?? 0 }},
                     allow_download: {{ $image->allow_download ? 'true' : 'false' }},
                     download_url: '{{ $image->allow_download ? route('images.download', $image) : '#' }}'
@@ -655,7 +663,8 @@
         <div class="rounded-xl overflow-hidden flex-shrink-0 group-hover:ring-2 ring-purple-500/50 transition-all" style="width:72px;height:56px;background:var(--ink-3);">
           <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
                data-src="{{ $imgUrl }}" alt="{{ $image->title }}"
-               class="lazy w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 {{ $image->is_sensitive ? 'blur-md' : '' }}"
+               class="lazy w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+               onload="this.classList.add('is-loaded')"
                loading="lazy">
         </div>
         <div class="min-w-0">
@@ -676,7 +685,7 @@
             @endif
             {{-- AI Label (inline) --}}
             @php
-              $rawLabels = $image->labels;
+              $rawLabels = $image->labelData ? $image->labelData->labels : ($image->labels ?? []);
               $listAiLabel = null;
               if (!empty($rawLabels)) {
                 $fl = is_array($rawLabels) ? ($rawLabels[0] ?? null) : null;
@@ -705,7 +714,7 @@
                     },
                     status: '{{ $image->status }}',
                     is_sensitive: {{ $image->is_sensitive ? 'true' : 'false' }},
-                    labels: @json($image->labels ? $image->labels->labels : []),
+                    labels: @json($image->labelData ? $image->labelData->labels : ($image->labels ?? [])),
                     likes_count: {{ $image->likes_count ?? 0 }},
                     allow_download: {{ $image->allow_download ? 'true' : 'false' }},
                     download_url: '{{ $image->allow_download ? route('images.download', $image) : '#' }}'
@@ -766,23 +775,32 @@
 
 @push('scripts')
 <script>
-document.addEventListener('DOMContentLoaded', function () {
+window.setLazyLoad = function() {
   if ('IntersectionObserver' in window) {
     const obs = new IntersectionObserver((entries, o) => {
       entries.forEach(e => {
         if (e.isIntersecting) {
           const img = e.target;
-          img.src = img.dataset.src;
-          img.classList.remove('lazy');
-          o.unobserve(img);
+          if (img.dataset.src) {
+              img.src = img.dataset.src;
+              img.classList.remove('lazy');
+              o.unobserve(img);
+          }
         }
       });
-    }, { rootMargin: '60px 0px', threshold: 0.01 });
+    }, { rootMargin: '200px 0px', threshold: 0.1 });
     document.querySelectorAll('img.lazy').forEach(img => obs.observe(img));
   } else {
-    document.querySelectorAll('img.lazy').forEach(img => { img.src = img.dataset.src; });
+    document.querySelectorAll('img.lazy').forEach(img => { 
+        if (img.dataset.src) {
+            img.src = img.dataset.src; 
+            img.classList.add('is-loaded');
+        }
+    });
   }
-});
+};
+
+document.addEventListener('DOMContentLoaded', () => window.setLazyLoad());
 
 document.addEventListener('alpine:init', () => {
   // Pre-load liked image IDs from server for instant correct initial state
@@ -844,8 +862,8 @@ document.addEventListener('alpine:init', () => {
             this.nextPageUrl = data.next_page_url;
             this.isLoadingMore = false;
             
-            // Re-trigger global lazy loading setup (IntersectionObserver for images)
-            document.dispatchEvent(new Event('DOMContentLoaded'));
+            // Re-trigger global lazy loading setup
+            if (window.setLazyLoad) window.setLazyLoad();
         })
         .catch(err => {
             console.error('Infinity scroll error:', err);
@@ -866,8 +884,8 @@ document.addEventListener('alpine:init', () => {
     },
 
     isNature() {
-        return this.selectedImage?.labels.some(l => 
-            ['nature', 'mountain', 'landscape', 'forest', 'water', 'sky', 'tree', 'sea', 'ocean'].includes(l.description.toLowerCase())
+        return this.selectedImage?.labels?.some(l => 
+            l.description && ['nature', 'mountain', 'landscape', 'forest', 'water', 'sky', 'tree', 'sea', 'ocean'].includes(l.description.toLowerCase())
         );
     },
 
