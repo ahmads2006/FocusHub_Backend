@@ -374,7 +374,31 @@
                         </div>
                     </div>
                 @endforeach
+            @if($sharedAlbums->isNotEmpty())
+            <div class="pt-8 border-t border-white/5">
+                <h3 class="text-xl font-bold tracking-tight mb-6">الألبومات <span class="text-purple-400">المشتركة</span> المتصل بها</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                    @foreach($sharedAlbums as $album)
+                        <div class="glass p-6 rounded-[40px] flex gap-6 items-center group hover:bg-white/5 transition-all">
+                            <div class="w-20 h-20 rounded-3xl glass-dark border border-white/5 flex items-center justify-center relative overflow-hidden">
+                                @if($album->images->first())
+                                    <img src="{{ $album->images->first()->url }}" class="w-full h-full object-cover opacity-40 group-hover:opacity-100 transition-opacity">
+                                @else
+                                    <svg class="w-8 h-8 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path></svg>
+                                @endif
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <h4 class="font-bold truncate text-lg">{{ $album->title }}</h4>
+                                <p class="text-xs text-gray-500 uppercase tracking-widest mt-1">{{ $album->images->count() }} Assets • <span class="text-purple-400/80">{{ $album->pivot->role ?? 'Collaborator' }}</span></p>
+                                <div class="flex items-center gap-4 mt-3">
+                                    <a href="{{ route('albums.show', $album) }}" class="text-[10px] font-bold text-gray-400 hover:text-white transition-colors uppercase tracking-widest">عرض المحتوى للمساهمة</a>
+                                </div>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
             </div>
+            @endif
         </div>
 
     </div>

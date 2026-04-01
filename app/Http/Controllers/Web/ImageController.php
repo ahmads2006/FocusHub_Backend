@@ -34,7 +34,7 @@ class ImageController extends Controller
         $user = Auth::user();
         $images = $user->images()->with('settings')->withoutGlobalScope('visible')->latest()->get();
         $ownedAlbums = $user->ownedAlbums()->latest()->get();
-        $sharedAlbums = $user->collaborativeAlbums()->latest()->get();
+        $sharedAlbums = $user->collaborativeAlbums()->wherePivot('status', 'accepted')->latest()->get();
 
         // IDs of images that currently have an active SecureShield protected copy
         $protectedImageIds = ProtectedImage::whereIn('image_id', $images->pluck('id'))
@@ -305,10 +305,16 @@ class ImageController extends Controller
             }
         }
 
-        // Fetch which of these images the current user has already liked
+        // Fetch which of these images the current user has already liked or bookmarked
         $likedImageIds = [];
+        $bookmarkedImageIds = [];
         if (auth()->check()) {
             $likedImageIds = \App\Models\Like::where('user_id', auth()->id())
+                ->whereIn('image_id', $images->pluck('id'))
+                ->pluck('image_id')
+                ->toArray();
+                
+            $bookmarkedImageIds = \App\Models\Bookmark::where('user_id', auth()->id())
                 ->whereIn('image_id', $images->pluck('id'))
                 ->pluck('image_id')
                 ->toArray();
@@ -331,13 +337,13 @@ class ImageController extends Controller
         // Infinite Scroll AJAX Response
         if ($request->ajax()) {
             return response()->json([
-                'grid_html' => view('images.gallery', compact('images', 'likedImageIds', 'categories', 'selectedTag'))->fragment('grid-items'),
-                'list_html' => view('images.gallery', compact('images', 'likedImageIds', 'categories', 'selectedTag'))->fragment('list-items'),
+                'grid_html' => view('images.gallery', compact('images', 'likedImageIds', 'bookmarkedImageIds', 'categories', 'selectedTag'))->fragment('grid-items'),
+                'list_html' => view('images.gallery', compact('images', 'likedImageIds', 'bookmarkedImageIds', 'categories', 'selectedTag'))->fragment('list-items'),
                 'has_more' => $images->hasMorePages(),
                 'next_page_url' => $images->nextPageUrl(),
             ]);
         }
 
-        return view('images.gallery', compact('images', 'likedImageIds', 'categories', 'selectedTag'));
+        return view('images.gallery', compact('images', 'likedImageIds', 'bookmarkedImageIds', 'categories', 'selectedTag'));
     }
 }

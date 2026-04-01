@@ -84,7 +84,7 @@
                 </div>
 
                 {{-- Actions --}}
-                <div class="pt-8 mt-auto flex items-center gap-4">
+                <div class="pt-8 mt-auto flex flex-wrap items-center gap-4">
                     <button @click="toggleLike(selectedImage?.id)" 
                             class="flex-1 flex items-center justify-center gap-2 py-4 rounded-2xl glass hover:bg-white/10 group transition-all"
                             :class="isLiked(selectedImage?.id) ? 'text-rose-500 border-rose-500/30' : 'text-gray-400'">
@@ -92,14 +92,80 @@
                         <span class="font-bold text-sm" x-text="likeCount(selectedImage?.id, selectedImage?.likes_count)"></span>
                     </button>
 
+                    <button @click="toggleBookmark(selectedImage?.id)" 
+                            class="flex-1 flex items-center justify-center gap-2 py-4 rounded-2xl glass hover:bg-white/10 group transition-all"
+                            :class="isBookmarked(selectedImage?.id) ? 'text-yellow-400 border-yellow-400/30' : 'text-gray-400'">
+                        <svg class="w-5 h-5 transition-transform group-hover:scale-110" :class="isBookmarked(selectedImage?.id) ? 'fill-current' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/></svg>
+                        <span class="font-bold text-sm" x-text="isBookmarked(selectedImage?.id) ? 'محفوظ' : 'حفظ'"></span>
+                    </button>
+
+                    <button @click="openShareModal()" 
+                            class="flex-full w-full mt-2 flex items-center justify-center gap-2 py-3 rounded-2xl border border-white/10 hover:bg-white/5 transition-all text-gray-300">
+                        <svg class="w-5 h-5 bg-transparent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
+                        <span class="font-bold text-sm">إرسال لصديق في المحادثة</span>
+                    </button>
+
                     <template x-if="selectedImage?.allow_download">
                         <a :href="selectedImage?.download_url" 
-                           class="flex-1 accent-gradient flex items-center justify-center gap-2 py-4 rounded-2xl font-bold text-sm text-white shadow-lg shadow-purple-500/20 hover:scale-105 transition-all">
+                           class="w-full accent-gradient flex items-center justify-center gap-2 py-4 rounded-2xl font-bold text-sm text-white shadow-lg shadow-purple-500/20 hover:scale-105 transition-all">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
                             تنزيل الصورة
                         </a>
                     </template>
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+    {{-- Share to Chat Modal Overlay --}}
+    <div x-show="showShareModal" 
+         class="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="opacity-0 scale-95"
+         x-transition:enter-end="opacity-100 scale-100"
+         x-transition:leave="transition ease-in duration-200"
+         x-transition:leave-start="opacity-100 scale-100"
+         x-transition:leave-end="opacity-0 scale-95"
+         x-cloak>
+        <div class="glass w-full max-w-sm rounded-[32px] overflow-hidden flex flex-col max-h-[70vh] shadow-2xl border border-white/10" @click.away="closeShareModal()">
+            <div class="p-6 border-b border-white/5 flex justify-between items-center bg-white/[0.02]">
+                <h3 class="text-xl font-bold font-display" dir="rtl">إرسال الصورة</h3>
+                <button @click="closeShareModal()" class="p-2 rounded-full hover:bg-white/10 text-gray-500 transition-colors">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <div class="flex-1 overflow-y-auto p-4 custom-scrollbar bg-black/20" dir="rtl">
+                <template x-if="loadingConnections">
+                    <div class="flex items-center justify-center py-10">
+                        <svg class="animate-spin w-8 h-8 text-purple-500" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                    </div>
+                </template>
+                <template x-if="!loadingConnections && connections.length > 0">
+                    <div class="space-y-3">
+                        <template x-for="conn in connections" :key="conn.id">
+                            <button @click="sendToPartner(conn.id)" 
+                                    class="w-full flex items-center justify-between p-3 rounded-2xl hover:bg-white/5 transition-colors border border-transparent hover:border-white/10"
+                                    :disabled="sendingShareTo !== null">
+                                <div class="flex items-center gap-3">
+                                    <img :src="conn.avatar" class="w-10 h-10 rounded-full object-cover">
+                                    <span class="font-semibold text-sm text-gray-200" x-text="conn.name"></span>
+                                </div>
+                                <div x-show="sendingShareTo === conn.id" class="px-2">
+                                    <svg class="animate-spin w-4 h-4 text-purple-500" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                                </div>
+                                <div x-show="sendingShareTo !== conn.id">
+                                    <svg class="w-5 h-5 text-gray-500 hover:text-purple-400 rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
+                                </div>
+                            </button>
+                        </template>
+                    </div>
+                </template>
+                <template x-if="!loadingConnections && connections.length === 0">
+                    <div class="py-10 text-center">
+                        <p class="text-gray-500 text-sm">ليس لديك أي اتصالات بعد. تابع مصورين آخرين ليتابعوك لبدء مشاركة الصور.</p>
+                    </div>
+                </template>
             </div>
         </div>
     </div>

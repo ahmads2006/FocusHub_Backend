@@ -12,6 +12,7 @@ class Message extends Model
         'sender_id',
         'receiver_id',
         'image_id',
+        'album_id',
         'body',
         'is_read',
     ];
@@ -21,6 +22,11 @@ class Message extends Model
     ];
 
     // ─── Relationships ───────────────────────────────────────
+
+    public function album(): BelongsTo
+    {
+        return $this->belongsTo(Album::class, 'album_id');
+    }
 
     public function sender(): BelongsTo
     {

@@ -581,10 +581,25 @@
                 <span class="font-mono-alt text-[9px] tracking-widest uppercase" style="color:var(--gold);opacity:.7;">
                   {{ $image->privacy }}
                 </span>
+                {{-- Bookmark Button --}}
+                @auth
+                <button
+                  @click.stop="toggleBookmark('{{ $image->id }}')"
+                  class="like-btn flex items-center gap-1 px-2.5 py-1 rounded-full transition-all duration-200"
+                  :class="isBookmarked('{{ $image->id }}') ? 'text-yellow-400 border-yellow-400/30' : ''"
+                  style="background: transparent;"
+                  aria-label="Save this image"
+                  title="Save"
+                >
+                  <svg class="w-3.5 h-3.5" :class="isBookmarked('{{ $image->id }}') ? 'fill-current text-yellow-500' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/>
+                  </svg>
+                </button>
+                @endauth
                 {{-- Like Button --}}
                 @auth
                 <button
-                  @click="toggleLike('{{ $image->id }}')"
+                  @click.stop="toggleLike('{{ $image->id }}')"
                   class="like-btn flex items-center gap-1 px-2.5 py-1 rounded-full transition-all duration-200"
                   :class="isLiked('{{ $image->id }}') ? 'liked' : ''"
                   aria-label="Like this image"
@@ -726,8 +741,22 @@
           </button>
           <span class="content-badge font-mono-alt" style="color:var(--text-dim);background:var(--ink-3);border:1px solid var(--border);">{{ strtoupper($image->file_type) }}</span>
           @auth
+          {{-- Bookmark Button (List) --}}
           <button
-            @click="toggleLike('{{ $image->id }}')"
+            @click.stop="toggleBookmark('{{ $image->id }}')"
+            class="like-btn flex items-center gap-1 px-2.5 py-1 rounded-full transition-all duration-200"
+            :class="isBookmarked('{{ $image->id }}') ? 'text-yellow-400 border-yellow-400/30' : ''"
+            style="background:transparent"
+            aria-label="Save"
+          >
+            <svg class="w-3 h-3" :class="isBookmarked('{{ $image->id }}') ? 'fill-current text-yellow-500' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/>
+            </svg>
+          </button>
+          
+          {{-- Like Button --}}
+          <button
+            @click.stop="toggleLike('{{ $image->id }}')"
             class="like-btn flex items-center gap-1 px-2.5 py-1 rounded-full transition-all duration-200"
             :class="isLiked('{{ $image->id }}') ? 'liked' : ''"
             aria-label="Like"
@@ -805,11 +834,13 @@ document.addEventListener('DOMContentLoaded', () => window.setLazyLoad());
 document.addEventListener('alpine:init', () => {
   // Pre-load liked image IDs from server for instant correct initial state
   const initialLikedIds = new Set(@json($likedImageIds ?? []));
+  const initialBookmarkedIds = new Set(@json($bookmarkedImageIds ?? []));
 
   Alpine.data('galleryPage', () => ({
     view: 'grid',
     loading: false,
     likedIds: new Set(initialLikedIds),
+    bookmarkedIds: new Set(initialBookmarkedIds),
     localCounts: {},
     selectedImage: null,
     showModal: false,
@@ -820,7 +851,14 @@ document.addEventListener('alpine:init', () => {
     nextPageUrl: '{!! $images->nextPageUrl() !!}',
     isLoadingMore: false,
 
+    // Chat Share State
+    showShareModal: false,
+    connections: [],
+    loadingConnections: false,
+    sendingShareTo: null,
+
     init() {
+      // Intersection Observer logic remains...
         if ('IntersectionObserver' in window) {
             const observer = new IntersectionObserver((entries) => {
                 entries.forEach(entry => {
@@ -920,6 +958,10 @@ document.addEventListener('alpine:init', () => {
       return this.likedIds.has(id);
     },
 
+    isBookmarked(id) {
+      return this.bookmarkedIds.has(id);
+    },
+
     likeCount(id, initialCount) {
       if (this.localCounts[id] === undefined) {
         this.localCounts[id] = initialCount;
@@ -975,6 +1017,118 @@ document.addEventListener('alpine:init', () => {
         else { this.likedIds.delete(id); this.localCounts[id]--; }
         this.likedIds = new Set(this.likedIds);
       }
+    },
+
+    async toggleBookmark(id) {
+        const wasBookmarked = this.bookmarkedIds.has(id);
+        
+        // Optimistic Update
+        if (wasBookmarked) {
+            this.bookmarkedIds.delete(id);
+        } else {
+            this.bookmarkedIds.add(id);
+        }
+        this.bookmarkedIds = new Set(this.bookmarkedIds);
+
+        try {
+            const csrf = document.querySelector('meta[name="csrf-token"]').content;
+            const res = await fetch(`/images/${id}/bookmark`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf }
+            });
+            const json = await res.json();
+            
+            if (!json.success) throw new Error(json.message);
+            
+            if (json.action === 'bookmark') { this.bookmarkedIds.add(id); }
+            else { this.bookmarkedIds.delete(id); }
+            this.bookmarkedIds = new Set(this.bookmarkedIds);
+            
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    toast: true,
+                    position: 'bottom-end',
+                    icon: 'success',
+                    title: json.message,
+                    showConfirmButton: false,
+                    timer: 2000
+                });
+            }
+        } catch (e) {
+            console.error('Bookmark failed:', e);
+            // Revert
+            if (wasBookmarked) { this.bookmarkedIds.add(id); }
+            else { this.bookmarkedIds.delete(id); }
+            this.bookmarkedIds = new Set(this.bookmarkedIds);
+        }
+    },
+
+    async openShareModal() {
+        this.showShareModal = true;
+        if (this.connections.length === 0) {
+            this.loadingConnections = true;
+            try {
+                const res = await fetch('/api/chat/connections', {
+                    headers: { 'Accept': 'application/json' }
+                });
+                const data = await res.json();
+                if (data.connections) {
+                    this.connections = data.connections;
+                }
+            } catch (e) {
+                console.error('Failed to load connections:', e);
+            } finally {
+                this.loadingConnections = false;
+            }
+        }
+    },
+
+    closeShareModal() {
+        this.showShareModal = false;
+    },
+
+    async sendToPartner(partnerId) {
+        if (!this.selectedImage || this.sendingShareTo) return;
+        this.sendingShareTo = partnerId;
+
+        try {
+            const csrf = document.querySelector('meta[name="csrf-token"]').content;
+            const res = await fetch('/api/chat/send', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': csrf
+                },
+                body: JSON.stringify({
+                    receiver_id: partnerId,
+                    image_id: this.selectedImage.id,
+                    body: ''
+                })
+            });
+
+            if (res.ok) {
+                this.closeShareModal();
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire({
+                        toast: true,
+                        position: 'bottom-end',
+                        icon: 'success',
+                        title: 'تم إرسال الصورة في المحادثة بنجاح!',
+                        showConfirmButton: false,
+                        timer: 2000
+                    });
+                }
+            } else {
+                const data = await res.json();
+                throw new Error(data.error || 'Failed to send image');
+            }
+        } catch (e) {
+            console.error('Send failed:', e);
+            alert(e.message || 'حدث خطأ أثناء الإرسال');
+        } finally {
+            this.sendingShareTo = null;
+        }
     }
   }));
 });

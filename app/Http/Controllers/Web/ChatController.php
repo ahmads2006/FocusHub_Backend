@@ -12,6 +12,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Facades\DB;
+use App\Notifications\ChatMessageNotification;
 
 class ChatController extends Controller
 {
@@ -19,7 +20,7 @@ class ChatController extends Controller
      * Render the Photographers Hub page.
      * Shows only accepted connections with online status.
      */
-    public function hub(Request $request)
+    public function hub(?string $partnerId = null)
     {
         $user = Auth::user();
 
@@ -43,7 +44,7 @@ class ChatController extends Controller
             ->pluck('count', 'sender_id')
             ->toArray();
 
-        return view('chat.hub', compact('connections', 'onlineMap', 'unreadCounts'));
+        return view('chat.hub', compact('connections', 'onlineMap', 'unreadCounts', 'partnerId'));
     }
 
     /**
@@ -171,6 +172,12 @@ class ChatController extends Controller
             'body'        => $request->body,
         ]);
 
+        // Trigger Notification
+        $receiver = User::find($request->receiver_id);
+        if ($receiver) {
+            $receiver->notify(new ChatMessageNotification(Auth::user(), $request->body ?? 'Shared an image'));
+        }
+
         try {
             event(new MessageSent($message->load(['sender', 'image'])));
         } catch (\Throwable $e) {}
@@ -232,12 +239,30 @@ class ChatController extends Controller
         return response()->json(['count' => $count]);
     }
 
-    private function formatMessage(Message $msg, string $userId): array
+    /**
+     * API: Get my connections to share images.
+     */
+    public function connections(): JsonResponse
+    {
+        $connections = Auth::user()->acceptedConnections()
+            ->with(['profile'])
+            ->get()
+            ->map(fn($conn) => [
+                'id' => $conn->id,
+                'name' => $conn->name,
+                'avatar' => $conn->avatar,
+            ]);
+
+        return response()->json(['connections' => $connections]);
+    }
+
+    private function formatMessage(mixed $msg, string $userId): array
     {
         return [
             'id'         => $msg->id,
             'body'       => $msg->body,
             'image_id'   => $msg->image_id,
+            'album_id'   => $msg->album_id,
             'image_url'  => $msg->image_id ? $msg->image->url : null,
             'thumb_url'  => $msg->image_id ? app(\App\Services\Core\AssetDeliveryService::class)->getUrl($msg->image, 'thumbnail') : null,
             'is_mine'    => $msg->sender_id === $userId,

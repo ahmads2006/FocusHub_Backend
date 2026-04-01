@@ -14,8 +14,36 @@
 
     <!-- CSS / JS (Using CDN for speed and consistency with mockup) -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pusher-js@8.0.1/dist/web/pusher.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/laravel-echo@1.15.3/dist/echo.iife.js"></script>
     <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <script>
+        // Initialize Laravel Echo with Reverb (using Pusher compatibility mode)
+        window.Pusher = Pusher;
+        window.Echo = new Echo({
+            broadcaster: 'pusher',
+            key: '{{ config('broadcasting.connections.reverb.key') }}',
+            wsHost: window.location.hostname,
+            wsPort: {{ config('broadcasting.connections.reverb.options.port', 8080) }},
+            forceTLS: false,
+            encrypted: false,
+            cluster: 'mt1',
+            enabledTransports: ['ws', 'wss'],
+            debug: false,
+        });
+
+        // Connection monitoring (safe check)
+        const monitorEcho = setInterval(() => {
+            if (window.Echo && window.Echo.connector && window.Echo.connector.pusher) {
+                window.Echo.connector.pusher.connection.bind('connected', () => {
+                    console.log('✅ Real-time notifications connected!');
+                });
+                clearInterval(monitorEcho);
+            }
+        }, 500);
+    </script>
 
     <style>
         body { font-family: 'Outfit', sans-serif; background: #0a0a0c; color: #e1e1e6; }
@@ -113,7 +141,8 @@
     <div class="flex-1 flex flex-col h-screen overflow-hidden">
         
         <!-- Top Navigation -->
-        <header class="h-20 border-b border-white/5 flex items-center justify-between px-8 z-10">
+        <header class="h-20 border-b border-white/5 flex items-center justify-between px-8 z-10" 
+                x-data="notificationSystem()" x-init="init()">
             <div class="flex items-center flex-1">
                 <div class="relative w-full max-w-md">
                     <svg class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
@@ -122,10 +151,107 @@
             </div>
 
             <div class="flex items-center gap-6">
-                <button class="relative p-2 text-gray-400 hover:text-white transition-colors">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
-                    <span class="absolute top-2 right-2 w-2 h-2 bg-purple-500 rounded-full border border-[#0a0a0c]"></span>
-                </button>
+                <!-- Notifications Dropdown -->
+                <div class="relative" x-data="{ open: false }">
+                    <button @click="open = !open; if(open) fetchNotifications()" class="relative p-2 text-gray-400 hover:text-white transition-colors">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
+                        <template x-if="unreadCount > 0">
+                            <span class="absolute top-2 right-2 w-2 h-2 bg-purple-500 rounded-full border border-[#0a0a0c]"></span>
+                        </template>
+                    </button>
+
+                    <div x-show="open" @click.away="open = false" x-cloak
+                         x-transition:enter="transition ease-out duration-200"
+                         x-transition:enter-start="opacity-0 scale-95"
+                         x-transition:enter-end="opacity-100 scale-100"
+                         class="absolute right-0 mt-2 w-80 glass-dark rounded-2xl shadow-2xl overflow-hidden z-50 border border-white/10">
+                        <div class="p-4 border-b border-white/5 flex justify-between items-center bg-white/5">
+                            <h3 class="font-bold text-sm">Notifications</h3>
+                            <button @click="markAllAsRead()" x-show="unreadCount > 0" class="text-[10px] text-purple-400 hover:text-purple-300 uppercase font-bold tracking-wider">Mark all read</button>
+                        </div>
+                        <div class="max-h-96 overflow-y-auto custom-scrollbar">
+                            <template x-if="notifications.length === 0">
+                                <div class="p-8 text-center text-gray-500 italic text-sm">
+                                    No notifications yet.
+                                </div>
+                            </template>
+                            <template x-for="notif in notifications" :key="notif.id">
+                                <div class="p-4 border-b border-white/5 hover:bg-white/5 transition-colors relative group"
+                                     :class="!notif.read_at ? 'bg-purple-500/5' : ''">
+                                    
+                                    <div class="flex gap-3">
+                                        <div class="flex-1">
+                                            <p class="text-xs text-gray-200" x-text="notif.data.message"></p>
+                                            <p class="text-[10px] text-gray-500 mt-1" x-text="formatDate(notif.created_at)"></p>
+                                        </div>
+                                        <button @click.stop="deleteNotification(notif.id)" class="opacity-0 group-hover:opacity-100 p-1 text-gray-500 hover:text-red-500 transition-all">
+                                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                                        </button>
+                                    </div>
+
+                                    <!-- Action Buttons for Invitations -->
+                                    <template x-if="notif.data.type === 'album_invitation'">
+                                        <div class="mt-3">
+                                            <div class="flex gap-2" x-show="!notif.responded">
+                                                <button @click.stop="respondToInvitation(notif, 'accept')" 
+                                                        class="px-3 py-1 bg-purple-600 hover:bg-purple-500 text-white text-[10px] font-bold rounded-lg transition-all">
+                                                    Accept
+                                                </button>
+                                                <button @click.stop="respondToInvitation(notif, 'decline')" 
+                                                        class="px-3 py-1 bg-white/10 hover:bg-white/20 text-white text-[10px] font-bold rounded-lg transition-all">
+                                                    Decline
+                                                </button>
+                                            </div>
+                                            <div x-show="notif.responded" x-cloak>
+                                                <template x-if="notif.responseStatus === 'accept'">
+                                                    <span class="text-emerald-500 flex items-center gap-1 text-[11px] font-bold bg-emerald-500/10 px-2 py-1 rounded w-max">
+                                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                                                        تم قبول الدعوة بنجاح
+                                                    </span>
+                                                </template>
+                                                <template x-if="notif.responseStatus === 'decline'">
+                                                    <span class="text-red-500 flex items-center gap-1 text-[11px] font-bold bg-red-500/10 px-2 py-1 rounded w-max">
+                                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                                                        تم الرفض
+                                                    </span>
+                                                </template>
+                                            </div>
+                                        </div>
+                                    </template>
+
+                                    <!-- Link to action -->
+                                    <template x-if="notif.data.action_url && notif.data.type !== 'album_invitation'">
+                                        <a :href="notif.data.action_url" @click="markAsRead(notif.id)" class="absolute inset-0 z-0"></a>
+                                    </template>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Toast Container -->
+            <div class="fixed top-4 right-4 z-[9999] space-y-2 pointer-events-none">
+                <template x-for="toast in toasts" :key="toast.id">
+                    <div x-transition:enter="transition ease-out duration-300"
+                         x-transition:enter-start="opacity-0 translate-x-8"
+                         x-transition:enter-end="opacity-100 translate-x-0"
+                         x-transition:leave="transition ease-in duration-300"
+                         x-transition:leave-start="opacity-100 scale-100"
+                         x-transition:leave-end="opacity-0 scale-95"
+                         class="glass-dark border-l-4 border-purple-500 p-4 w-72 shadow-2xl pointer-events-auto rounded-xl flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center">
+                            <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
+                        </div>
+                        <div class="flex-1">
+                            <p class="text-xs font-bold text-white uppercase tracking-wider">New Notification</p>
+                            <p class="text-[11px] text-gray-400" x-text="toast.message"></p>
+                        </div>
+                        <button @click="removeToast(toast.id)" class="text-gray-500 hover:text-white transition-colors">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                        </button>
+                    </div>
+                </template>
             </div>
         </header>
 
@@ -135,6 +261,139 @@
                 @yield('content')
             </div>
         </main>
+        
+        <script>
+            function notificationSystem() {
+                return {
+                    notifications: [],
+                    unreadCount: 0,
+                    toasts: [],
+                    lastShownId: null,
+
+                    init() {
+                        this.fetchNotifications(true);
+                        
+                        // Listen for private notifications via Reverb (wait for Echo readiness)
+                        @auth
+                        const checkEcho = setInterval(() => {
+                            if (window.Echo && typeof window.Echo.private === 'function') {
+                                window.Echo.private('App.Models.User.{{ auth()->id() }}')
+                                    .notification((notification) => {
+                                        console.log('New notification received:', notification);
+                                        
+                                        this.notifications.unshift({
+                                            id: notification.id,
+                                            data: notification.data,
+                                            read_at: null,
+                                            created_at: 'Just now'
+                                        });
+                                        
+                                        this.unreadCount++;
+                                        this.showToast(notification.data.message);
+                                    });
+                                clearInterval(checkEcho);
+                            }
+                        }, 500);
+                        @endauth
+                    },
+
+                    fetchNotifications(isInitial = false) {
+                        fetch('{{ route('notifications.index') }}')
+                            .then(res => res.json())
+                            .then(data => {
+                                if (data.success) {
+                                    this.notifications = data.notifications;
+                                    this.unreadCount = data.unread_count;
+                                }
+                            });
+                    },
+
+                    markAsRead(id) {
+                        fetch(`/notifications/mark-read/${id}`, {
+                            method: 'POST',
+                            headers: { 
+                                'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                                'Accept': 'application/json'
+                            }
+                        }).then(() => {
+                            this.notifications = this.notifications.map(n => n.id === id ? {...n, read_at: new Date()} : n);
+                            this.unreadCount = Math.max(0, this.unreadCount - 1);
+                        });
+                    },
+
+                    markAllAsRead() {
+                        fetch('{{ route('notifications.mark-all-as-read') }}', {
+                            method: 'POST',
+                            headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' }
+                        }).then(() => {
+                            this.notifications = this.notifications.map(n => ({...n, read_at: new Date()}));
+                            this.unreadCount = 0;
+                        });
+                    },
+
+                    deleteNotification(id) {
+                        fetch(`/notifications/${id}`, {
+                            method: 'DELETE',
+                            headers: { 
+                                'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                                'Accept': 'application/json'
+                            }
+                        }).then(() => {
+                            this.notifications = this.notifications.filter(n => n.id !== id);
+                            this.unreadCount = this.notifications.filter(n => !n.read_at).length;
+                        });
+                    },
+
+                    respondToInvitation(notif, action) {
+                        const albumId = notif.data.album_id;
+                        const url = action === 'accept' ? `/albums/${albumId}/invitation/accept` : `/albums/${albumId}/invitation/decline`;
+                        
+                        fetch(url, {
+                            method: 'POST',
+                            headers: { 
+                                'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                                'Accept': 'application/json'
+                            }
+                        }).then(res => res.json()).then(data => {
+                            if (data.success) {
+                                // Show local UI state change instead of deleting
+                                notif.responded = true;
+                                notif.responseStatus = action;
+                                this.markAsRead(notif.id);
+                                
+                                Swal.fire({
+                                    icon: 'success',
+                                    title: action === 'accept' ? 'تم القبول!' : 'تم الرفض',
+                                    text: data.message,
+                                    toast: true,
+                                    position: 'top-end',
+                                    showConfirmButton: true,
+                                    confirmButtonText: 'OK',
+                                    background: '#1a1a1c',
+                                    color: '#fff'
+                                });
+                            }
+                        });
+                    },
+
+                    showToast(message) {
+                        const id = Date.now();
+                        this.toasts.push({ id, message });
+                    },
+
+                    removeToast(id) {
+                        this.toasts = this.toasts.filter(t => t.id !== id);
+                    },
+
+                    formatDate(dateString) {
+                        if (!dateString) return '';
+                        const date = new Date(dateString);
+                        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    }
+                }
+            }
+        </script>
+
         {{-- Scripts Stack & Hooks --}}
         @stack('scripts')
         @yield('scripts')

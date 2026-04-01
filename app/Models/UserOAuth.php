@@ -15,6 +15,7 @@ class UserOAuth extends Model
     protected $fillable = [
         'user_id',
         'google_id',
+        'adobe_id',
         'provider_token',
     ];
 

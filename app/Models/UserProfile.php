@@ -13,9 +13,15 @@ class UserProfile extends Model
     protected $fillable = [
         'user_id',
         'name',
+        'username',
+        'username_last_changed_at',
         'bio',
         'profile_picture',
         'avatar',
+    ];
+
+    protected $casts = [
+        'username_last_changed_at' => 'datetime',
     ];
 
     public function user(): BelongsTo

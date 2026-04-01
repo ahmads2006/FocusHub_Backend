@@ -53,11 +53,7 @@ class UpdateUserPreferencesJob implements ShouldQueue
             // 2. Update Tag/Label Affinity
             $labels = is_string($image->labels) ? json_decode($image->labels, true) : ($image->labels ?? []);
             
-            // Fallback to older image_labels relationship if JSON column is empty
-            if (empty($labels) && $image->labels()->exists()) {
-                $labelsRef = $image->labels()->first()->labels;
-                $labels = is_string($labelsRef) ? json_decode($labelsRef, true) : ($labelsRef ?? []);
-            }
+            // Labels are parsed from JSON column above
 
             foreach ($labels as $label) {
                 // Determine label string (assuming standard Google Vision JSON structure e.g., ["description" => "Forest"])

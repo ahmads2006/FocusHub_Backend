@@ -31,61 +31,41 @@ class GoogleAuthController extends Controller
             $googleUser = Socialite::driver('google')->user();
 
             // Find user by OAuth google_id or by email
-            $user = User::where('email', $googleUser->email)
+            $user = User::where('email', $googleUser->getEmail())
                 ->orWhereHas('oauth', function ($q) use ($googleUser) {
-                    $q->where('google_id', $googleUser->id);
+                    $q->where('google_id', $googleUser->getId());
                 })
                 ->first();
 
             if ($user) {
-                // Update existing user with Google info
-                if (!$user->oauth) {
-                    $user->oauth()->create([
-                        'google_id' => $googleUser->id,
+                // Update existing user OAuth info
+                $user->oauth()->updateOrCreate(
+                    ['user_id' => $user->id],
+                    [
+                        'google_id' => $googleUser->getId(),
                         'provider_token' => $googleUser->token,
-                    ]);
-                } else {
-                    $user->oauth()->update([
-                        'google_id' => $googleUser->id,
-                        'provider_token' => $googleUser->token,
-                    ]);
-                }
-
-                // Update Profile
-                if ($user->profile) {
-                    $user->profile()->update([
-                        'avatar' => $googleUser->avatar
-                    ]);
-                } else {
-                    $user->profile()->create([
-                        'name' => $googleUser->name,
-                        'avatar' => $googleUser->avatar
-                    ]);
+                    ]
+                );
+                
+                // Update avatar if provided
+                if ($googleUser->getAvatar()) {
+                    $user->provider_avatar = $googleUser->getAvatar();
+                    $user->save();
                 }
 
             } else {
                 // Create a completely new user
+                // The 'static::created' hook in User model will handle Profile & Handle generation
                 $user = User::create([
-                    'email' => $googleUser->email,
-                    'password' => \Illuminate\Support\Facades\Hash::make(\Illuminate\Support\Str::random(16)), // Placeholder password
-                ]);
-
-                // Manually fulfill verification status since it's Google
-                $user->verification()->create([
-                    'is_verified' => true,
-                    'verified_at' => now(),
-                ]);
-
-                // Create profile
-                $user->profile()->create([
-                    'name' => $googleUser->name,
-                    'avatar' => $googleUser->avatar,
-                ]);
-
-                // Create OAuth connection
-                $user->oauth()->create([
-                    'google_id' => $googleUser->id,
+                    'email' => $googleUser->getEmail(),
+                    'password' => \Illuminate\Support\Facades\Hash::make(\Illuminate\Support\Str::random(16)),
+                    'name' => \App\Helpers\RestrictedNameHelper::getSafeFallbackName($googleUser->getName(), $googleUser->getEmail()),
+                    'google_id' => $googleUser->getId(),
                     'provider_token' => $googleUser->token,
+                    'provider_name' => 'google',
+                    'provider_id' => $googleUser->getId(),
+                    'provider_avatar' => $googleUser->getAvatar(),
+                    'is_verified' => true,
                 ]);
 
                 // Create default status to prevent null relation issues

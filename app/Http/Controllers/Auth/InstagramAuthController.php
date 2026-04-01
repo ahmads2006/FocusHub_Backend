@@ -41,17 +41,14 @@ class InstagramAuthController extends Controller
             } else {
                 // Create a completely new user
                 $user = User::create([
-                    'name' => $instagramUser->getName() ?? $instagramUser->getNickname() ?? 'Instagram User',
+                    'name' => \App\Helpers\RestrictedNameHelper::getSafeFallbackName($instagramUser->getName() ?? $instagramUser->getNickname() ?? 'Instagram User'),
                     'email' => $instagramUser->getEmail() ?? $instagramUser->getId() . '@instagram.local',
                     'instagram_id' => $instagramUser->getId(),
                     'password' => Hash::make(Str::random(24)),
-                    'email_verified_at' => now(),
+                    'is_verified' => true,
+                    'provider_name' => 'instagram',
+                    'provider_id' => $instagramUser->getId(),
                 ]);
-
-                // Ensure relations are created
-                if ($user->verification) {
-                    $user->verification->update(['is_verified' => true]);
-                }
             }
 
             Auth::login($user);

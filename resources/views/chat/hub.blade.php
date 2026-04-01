@@ -29,6 +29,7 @@
             <div
                 x-show="'{{ strtolower($connection->name) }}'.includes(searchQuery.toLowerCase()) || searchQuery === ''"
                 @click="openChat('{{ $connection->id }}', '{{ addslashes($connection->name) }}', '{{ $connection->avatar }}', {{ $onlineMap[$connection->id] ? 'true' : 'false' }})"
+                data-partner-id="{{ $connection->id }}"
                 class="glass rounded-2xl p-4 cursor-pointer hover:bg-white/[0.06] transition-all duration-300 group glow"
                 :class="activeChat?.id === '{{ $connection->id }}' ? 'bg-white/[0.08] border-purple-500/30' : ''"
             >
@@ -172,6 +173,20 @@
                                     <template x-if="msg.body">
                                         <div class="px-4 py-2.5 text-sm leading-relaxed">
                                             <p x-text="msg.body"></p>
+                                            
+                                            {{-- Interactive Invitation Buttons --}}
+                                            <template x-if="msg.album_id && !msg.is_mine">
+                                                <div class="mt-3 flex gap-2">
+                                                    <button @click="respondToInvitation(msg, 'accept')" 
+                                                            class="px-4 py-1.5 bg-white text-purple-600 font-bold rounded-lg text-[11px] hover:bg-gray-100 transition-all shadow-md">
+                                                        Accept Invitation
+                                                    </button>
+                                                    <button @click="respondToInvitation(msg, 'decline')" 
+                                                            class="px-4 py-1.5 bg-black/20 text-white font-bold rounded-lg text-[11px] hover:bg-black/40 transition-all">
+                                                        Decline
+                                                    </button>
+                                                </div>
+                                            </template>
                                         </div>
                                     </template>
 
@@ -323,6 +338,15 @@ function chatHub() {
         init() {
             window.addEventListener('beforeunload', () => this.stopPolling());
 
+            // Handle auto-opening chat from notification redirect
+            const initialPartnerId = '{{ $partnerId }}';
+            if (initialPartnerId) {
+                this.$nextTick(() => {
+                    const conn = document.querySelector(`[data-partner-id="${initialPartnerId}"]`);
+                    if (conn) conn.click();
+                });
+            }
+
             // Load media when modal opens
             this.$watch('showMediaPicker', value => {
                 if (value && this.myMedia.length === 0) {
@@ -459,6 +483,43 @@ function chatHub() {
                     }
                 }
             } catch (e) {}
+        },
+
+        async respondToInvitation(msg, action) {
+            const albumId = msg.album_id;
+            const url = action === 'accept' ? `/albums/${albumId}/invitation/accept` : `/albums/${albumId}/invitation/decline`;
+            
+            try {
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                        'Accept': 'application/json'
+                    }
+                });
+                const data = await res.json();
+                
+                if (data.success) {
+                    Swal.fire({
+                        icon: 'success',
+                        title: action === 'accept' ? 'تم قبول الدعوة!' : 'تم رفض الدعوة',
+                        text: data.message,
+                        toast: true,
+                        position: 'top-end',
+                        showConfirmButton: true,
+                        confirmButtonText: 'إغلاق',
+                        background: '#1a1a1c',
+                        color: '#fff'
+                    });
+                    
+                    // We can mark the message as responded locally if we want, 
+                    // but for now, the toast is the primary feedback.
+                } else {
+                    Swal.fire({ icon: 'error', title: 'خطأ', text: data.message });
+                }
+            } catch (e) {
+                console.error('Failed to respond to invitation:', e);
+            }
         },
 
         scrollToBottom() {

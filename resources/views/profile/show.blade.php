@@ -27,6 +27,9 @@
             <div class="mb-4 md:mb-0">
                 <h1 class="text-3xl md:text-4xl font-extrabold tracking-tight text-white flex items-center gap-3">
                     {{ $profileUser->name }}
+                    @if($profileUser->profile->username)
+                        <span class="text-xl text-gray-500 font-medium">{{ $profileUser->profile->username }}</span>
+                    @endif
                     @if(!$isPublic)
                         <span class="text-xs bg-white/10 px-3 py-1 rounded-full text-gray-400 font-normal">حساب خاص 🔒</span>
                     @endif
@@ -69,7 +72,7 @@
                 <h4 class="text-4xl font-extrabold text-white">{{ number_format($stats['photos']) }}</h4>
             </div>
             <div class="glass p-8 rounded-[35px] text-center group hover:bg-white/5 transition-all">
-                <p class="text-[10px] text-gray-500 uppercase tracking-[0.2em] mb-2 font-bold">الاتصالات</p>
+                <p class="text-[10px] text-gray-500 uppercase tracking-[0.2em] mb-2 font-bold">المتابعين</p>
                 <h4 class="text-4xl font-extrabold text-white">{{ number_format($stats['connections']) }}</h4>
             </div>
         @else
@@ -163,8 +166,11 @@
                                         <svg class="w-4 h-4 text-red-500" :class="isLiked('{{ $image->id }}') ? 'fill-current' : 'fill-none'" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path></svg>
                                         <span class="text-[10px] font-bold" x-text="likeCount('{{ $image->id }}', {{ $image->likes_count ?? 0 }})"></span>
                                     </div>
+                                    <button @click.stop="toggleBookmark('{{ $image->id }}')" class="p-1.5 bg-white/10 rounded-full hover:bg-white/30 transition-colors">
+                                        <svg class="w-3.5 h-3.5" :class="isBookmarked('{{ $image->id }}') ? 'fill-yellow-400 text-yellow-400' : 'fill-none text-white'" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"></path></svg>
+                                    </button>
                                     @if($image->allow_download)
-                                        <div class="p-2 bg-white/20 rounded-full hover:bg-white/40 transition-colors">
+                                        <div class="p-1.5 bg-white/20 rounded-full hover:bg-white/40 transition-colors">
                                             <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
                                         </div>
                                     @endif
@@ -241,13 +247,21 @@
 <script>
 document.addEventListener('alpine:init', () => {
     const initialLikedIds = new Set(@json($likedImageIds ?? []));
+    const initialBookmarkedIds = new Set(@json($bookmarkedImageIds ?? []));
 
     Alpine.data('galleryPage', () => ({
         isFollowing: {{ $isFollowing ? 'true' : 'false' }},
         likedIds: new Set(initialLikedIds),
+        bookmarkedIds: new Set(initialBookmarkedIds),
         localCounts: {},
         selectedImage: null,
         showModal: false,
+
+        // Chat Share State
+        showShareModal: false,
+        connections: [],
+        loadingConnections: false,
+        sendingShareTo: null,
 
         openModal(data) {
             this.selectedImage = data;
@@ -296,6 +310,10 @@ document.addEventListener('alpine:init', () => {
             return this.likedIds.has(id);
         },
 
+        isBookmarked(id) {
+            return this.bookmarkedIds.has(id);
+        },
+
         likeCount(id, initialCount) {
             if (this.localCounts[id] === undefined) {
                 this.localCounts[id] = initialCount;
@@ -329,6 +347,113 @@ document.addEventListener('alpine:init', () => {
                 if (wasLiked) { this.likedIds.add(id); this.localCounts[id]++; }
                 else { this.likedIds.delete(id); this.localCounts[id]--; }
                 this.likedIds = new Set(this.likedIds);
+            }
+        },
+
+        async toggleBookmark(id) {
+            const wasBookmarked = this.bookmarkedIds.has(id);
+            if (wasBookmarked) {
+                this.bookmarkedIds.delete(id);
+            } else {
+                this.bookmarkedIds.add(id);
+            }
+            this.bookmarkedIds = new Set(this.bookmarkedIds);
+
+            try {
+                const csrf = document.querySelector('meta[name="csrf-token"]').content;
+                const res = await fetch(`/images/${id}/bookmark`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf }
+                });
+                const json = await res.json();
+                if (!json.success) throw new Error(json.message);
+                
+                if (json.action === 'bookmark') { this.bookmarkedIds.add(id); }
+                else { this.bookmarkedIds.delete(id); }
+                this.bookmarkedIds = new Set(this.bookmarkedIds);
+                
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire({
+                        toast: true,
+                        position: 'bottom-end',
+                        icon: 'success',
+                        title: json.message,
+                        showConfirmButton: false,
+                        timer: 2000
+                    });
+                }
+            } catch (e) {
+                if (wasBookmarked) { this.bookmarkedIds.add(id); }
+                else { this.bookmarkedIds.delete(id); }
+                this.bookmarkedIds = new Set(this.bookmarkedIds);
+            }
+        },
+
+        async openShareModal() {
+            this.showShareModal = true;
+            if (this.connections.length === 0) {
+                this.loadingConnections = true;
+                try {
+                    const res = await fetch('/api/chat/connections', {
+                        headers: { 'Accept': 'application/json' }
+                    });
+                    const data = await res.json();
+                    if (data.connections) {
+                        this.connections = data.connections;
+                    }
+                } catch (e) {
+                    console.error('Failed to load connections:', e);
+                } finally {
+                    this.loadingConnections = false;
+                }
+            }
+        },
+
+        closeShareModal() {
+            this.showShareModal = false;
+        },
+
+        async sendToPartner(partnerId) {
+            if (!this.selectedImage || this.sendingShareTo) return;
+            this.sendingShareTo = partnerId;
+
+            try {
+                const csrf = document.querySelector('meta[name="csrf-token"]').content;
+                const res = await fetch('/api/chat/send', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': csrf
+                    },
+                    body: JSON.stringify({
+                        receiver_id: partnerId,
+                        image_id: this.selectedImage.id,
+                        body: ''
+                    })
+                });
+
+                if (res.ok) {
+                    this.closeShareModal();
+                    if (typeof Swal !== 'undefined') {
+                        Swal.fire({
+                            toast: true,
+                            position: 'bottom-end',
+                            icon: 'success',
+                            title: 'تم إرسال الصورة في المحادثة بنجاح!',
+                            showConfirmButton: false,
+                            timer: 2000
+                        });
+                    }
+                } else {
+                    const data = await res.json();
+                    throw new Error(data.error || 'Failed to send image');
+                }
+            } catch (e) {
+                console.error('Send failed:', e);
+                alert(e.message || 'حدث خطأ أثناء الإرسال');
+            } finally {
+                this.sendingShareTo = null;
             }
         }
     }));

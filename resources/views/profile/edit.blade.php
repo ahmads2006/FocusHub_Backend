@@ -121,23 +121,38 @@
                     watermarkText: '{{ auth()->user()->watermark_text ?? auth()->user()->name }}',
                     textColor: '{{ auth()->user()->watermark_text_color ?? '#ffffff' }}',
                     neonColor: '{{ auth()->user()->watermark_neon_color ?? '#800080' }}',
-                    opacity: {{ auth()->user()->watermark_opacity ?? 0.8 }}
+                    opacity: {{ auth()->user()->watermark_opacity ?? 0.8 }},
+                    useText: {{ auth()->user()->use_text_watermark ? 'true' : 'false' }},
+                    useLogo: {{ auth()->user()->use_logo_watermark ? 'true' : 'false' }},
+                    logoPreview: '{{ auth()->user()->watermark_logo ? asset('storage/' . auth()->user()->watermark_logo) : '' }}'
                 }" class="p-8 space-y-8">
 
                     <!-- Live Watermark Preview -->
                     <div class="relative h-48 rounded-[30px] overflow-hidden border border-white/10 bg-black/40 group">
                         <div class="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?q=80&w=800&auto=format&fit=crop')] bg-cover bg-center opacity-50"></div>
                         <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
-                            <div class="p-4 rounded-xl border border-white/10 backdrop-blur-md flex items-center gap-3"
+                            <div class="p-4 rounded-xl border border-white/10 backdrop-blur-md flex flex-col items-center gap-3"
                                  :style="`background: rgba(255,255,255,0.05); opacity: ${opacity}; border-left: 4px solid ${neonColor}`">
-                                <div class="w-8 h-8 rounded-lg flex items-center justify-center font-black text-xl" :style="`color: ${neonColor}`">V</div>
-                                <span class="font-bold tracking-tight text-lg" :style="`color: ${textColor}; text-shadow: 0 0 10px ${neonColor}44;`" x-text="watermarkText"></span>
+                                
+                                <!-- Logo Preview -->
+                                <template x-if="useLogo && logoPreview">
+                                    <img :src="logoPreview" class="h-12 w-auto object-contain mb-1">
+                                </template>
+                                <template x-if="useLogo && !logoPreview">
+                                    <div class="w-12 h-12 rounded-lg bg-white/10 flex items-center justify-center text-xs text-gray-500 mb-1 border border-dashed border-white/20">LOGO</div>
+                                </template>
+
+                                <!-- Text Preview -->
+                                <div x-show="useText" class="flex items-center gap-2">
+                                    <div class="w-6 h-6 rounded-md flex items-center justify-center font-black text-sm" :style="`color: ${neonColor}`">V</div>
+                                    <span class="font-bold tracking-tight text-lg" :style="`color: ${textColor}; text-shadow: 0 0 10px ${neonColor}44;`" x-text="watermarkText"></span>
+                                </div>
                             </div>
                         </div>
                         <div class="absolute bottom-4 left-4 bg-black/60 backdrop-blur-sm px-3 py-1 rounded-full text-[10px] text-gray-400 font-bold uppercase tracking-widest">معاينة العلامة المائية (Live Preview)</div>
                     </div>
 
-                    <form method="post" action="{{ route('profile.photography.update') }}" class="space-y-8">
+                    <form method="post" action="{{ route('profile.photography.update') }}" enctype="multipart/form-data" class="space-y-8">
                         @csrf
                         @method('put')
 
@@ -155,13 +170,54 @@
                             </div>
 
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6 border-t border-white/5">
-                                <div class="space-y-2">
+                                <!-- Mode Selection -->
+                                <div class="md:col-span-2 space-y-4 mb-2">
+                                    <label class="text-xs text-gray-400 font-bold uppercase tracking-wider block">نوع العلامة المائية (اختر واحدة على الأقل)</label>
+                                    <div class="flex gap-6">
+                                        <label class="flex items-center gap-3 cursor-pointer group">
+                                            <input type="checkbox" name="use_text_watermark" value="1" x-model="useText" class="w-5 h-5 accent-purple-500 rounded-md">
+                                            <span class="text-sm font-medium transition-colors" :class="useText ? 'text-white' : 'text-gray-500'">نص (الاسم)</span>
+                                        </label>
+                                        <label class="flex items-center gap-3 cursor-pointer group">
+                                            <input type="checkbox" name="use_logo_watermark" value="1" x-model="useLogo" class="w-5 h-5 accent-purple-500 rounded-md">
+                                            <span class="text-sm font-medium transition-colors" :class="useLogo ? 'text-white' : 'text-gray-500'">شعار (لوجو)</span>
+                                        </label>
+                                    </div>
+                                    @error('watermark_mode')
+                                        <p class="text-red-500 text-xs mt-1 font-bold">{{ $message }}</p>
+                                    @enderror
+                                </div>
+
+                                <div class="space-y-2" x-show="useText">
                                     <label class="text-xs text-gray-400 font-bold uppercase tracking-wider">نص العلامة المائية</label>
                                     <input type="text" name="watermark_text" x-model="watermarkText"
                                            class="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-purple-500/50" 
                                            placeholder="مثلاً: FocusHub / اسمك">
                                 </div>
+
+                                <div class="space-y-2" x-show="useLogo">
+                                    <label class="text-xs text-gray-400 font-bold uppercase tracking-wider">شعار العلامة المائية (Logo)</label>
+                                    <div class="flex items-center gap-4">
+                                        <div class="w-12 h-12 rounded-xl bg-white/5 border border-white/10 overflow-hidden flex items-center justify-center p-1">
+                                            <template x-if="logoPreview">
+                                                <img :src="logoPreview" class="max-w-full max-h-full object-contain">
+                                            </template>
+                                            <template x-if="!logoPreview">
+                                                <span class="text-[10px] text-gray-600 font-bold">لا يوجد</span>
+                                            </template>
+                                        </div>
+                                        <input type="file" name="watermark_logo" accept="image/*" class="hidden" id="watermark_logo_input"
+                                               @change="const file = $event.target.files[0]; if(file) { const reader = new FileReader(); reader.onload = (e) => { logoPreview = e.target.result; }; reader.readAsDataURL(file); }">
+                                        <button type="button" onclick="document.getElementById('watermark_logo_input').click()"
+                                                class="text-xs bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg transition-colors font-bold uppercase">رفع لوجو</button>
+                                    </div>
+                                </div>
+
                                 <div class="space-y-2">
+                                    <label class="text-xs text-gray-400 font-bold uppercase tracking-wider">درجة الشفافية (<span x-text="opacity"></span>)</label>
+                                    <input type="range" name="watermark_opacity" min="0" max="1" step="0.1" x-model="opacity"
+                                           class="w-full accent-purple-500">
+                                </div>      <div class="space-y-2">
                                     <label class="text-xs text-gray-400 font-bold uppercase tracking-wider">درجة الشفافية (<span x-text="opacity"></span>)</label>
                                     <input type="range" name="watermark_opacity" min="0" max="1" step="0.1" x-model="opacity"
                                            class="w-full accent-purple-500">
@@ -220,11 +276,17 @@
 
             <!-- Password -->
             <div id="password" class="glass rounded-[40px] overflow-hidden border-blue-500/10 border">
-                <div class="p-8 border-b border-white/5">
-                    <h3 class="text-xl font-bold text-blue-400">تغيير السر</h3>
+                <div class="p-8 border-b border-white/5 flex justify-between items-center">
+                    <div>
+                        <h3 class="text-xl font-bold text-blue-400">تغيير كلمة المرور</h3>
+                        <p class="text-sm text-gray-400 mt-1">تتم إدارة كلمات المرور عبر رابط مصادقة آمن يتم إرساله إلى بريدك.</p>
+                    </div>
                 </div>
-                <div class="p-8">
-                    @include('profile.partials.update-password-form')
+                <div class="p-8 flex items-center justify-between bg-blue-500/5">
+                    <p class="text-sm font-bold text-gray-300">هل ترغب في تعيين كلمة مرور جديدة؟</p>
+                    <a href="{{ route('password.request') }}" class="inline-block px-6 py-3 bg-blue-500/20 text-blue-400 hover:bg-blue-500 hover:text-white rounded-xl font-bold transition-colors border border-blue-500/30">
+                        الانتقال لصفحة المصادقة
+                    </a>
                 </div>
             </div>
 

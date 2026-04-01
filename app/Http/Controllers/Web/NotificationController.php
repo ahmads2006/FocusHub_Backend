@@ -3,24 +3,55 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
-
 use Illuminate\Http\Request;
-use App\Mail\VerificationCodeMail;
-use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Auth;
 
 class NotificationController extends Controller
 {
     /**
-     * إرسال رمز تحقق تجريبي - يستخدم للاختبار اليدوي فقط.
-     * في الإنتاج، يتم الإرسال تلقائياً من RegisteredUserController عبر User::sendVerificationEmail()
+     * Get all notifications for the authenticated user.
      */
-    public function index(Request $request)
+    public function index()
     {
-        $user = $request->user();
-        $code = (string) rand(100000, 999999);
+        $user = Auth::user();
+        $notifications = $user->notifications()->latest()->take(20)->get();
+        $unreadCount = $user->unreadNotifications()->count();
 
-        Mail::to($user->email)->send(new VerificationCodeMail($code, $user->name));
+        return response()->json([
+            'success' => true,
+            'notifications' => $notifications,
+            'unread_count' => $unreadCount
+        ]);
+    }
 
-        return view('notifications.index');
+    /**
+     * Mark a specific notification as read.
+     */
+    public function markAsRead($id)
+    {
+        $notification = Auth::user()->notifications()->findOrFail($id);
+        $notification->markAsRead();
+
+        return response()->json(['success' => true]);
+    }
+
+    /**
+     * Mark all notifications as read.
+     */
+    public function markAllAsRead()
+    {
+        Auth::user()->unreadNotifications->markAsRead();
+        return response()->json(['success' => true]);
+    }
+
+    /**
+     * Delete a notification.
+     */
+    public function destroy($id)
+    {
+        $notification = Auth::user()->notifications()->findOrFail($id);
+        $notification->delete();
+
+        return response()->json(['success' => true]);
     }
 }

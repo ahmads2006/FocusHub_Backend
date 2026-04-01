@@ -7,6 +7,7 @@ use App\Models\Image;
 use App\Services\AI\RecommendationEngine;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use App\Notifications\ImageSocialNotification;
 
 class FeedController extends Controller
 {
@@ -53,6 +54,10 @@ class FeedController extends Controller
         // and dispatches the background Job for JSON preference weights.
         $result = $this->engine->toggleLike($user, $image);
 
+        if ($result['action'] === 'like' && $image->user_id !== $user->id) {
+            $image->user->notify(new ImageSocialNotification($user, $image, 'like'));
+        }
+
         return response()->json([
             'success' => true,
             'action' => $result['action'],
@@ -75,6 +80,10 @@ class FeedController extends Controller
             $user->bookmarks()->create(['image_id' => $image->id]);
             $action = 'bookmark';
             $message = 'تم حفظ الصورة بنجاح';
+        }
+
+        if ($action === 'bookmark' && $image->user_id !== $user->id) {
+            $image->user->notify(new ImageSocialNotification($user, $image, 'bookmark'));
         }
 
         return response()->json([

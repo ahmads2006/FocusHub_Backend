@@ -10,6 +10,7 @@ use Exception;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Log;
+use App\Helpers\RestrictedNameHelper;
 
 class SocialAuthController extends Controller
 {
@@ -41,8 +42,13 @@ class SocialAuthController extends Controller
             })->orWhere('email', $socialUser->getEmail())->first();
 
             if (!$user) {
+                $displayName = RestrictedNameHelper::getSafeFallbackName(
+                    $socialUser->getName() ?? $socialUser->getNickname(), 
+                    $socialUser->getEmail()
+                );
+
                 $user = User::create([
-                    'name' => $socialUser->getName() ?? $socialUser->getNickname() ?? 'User',
+                    'name' => $displayName,
                     'email' => $socialUser->getEmail() ?? $socialUser->getId() . "@{$provider}.local",
                     'provider_name' => $provider,
                     'provider_id' => $socialUser->getId(),

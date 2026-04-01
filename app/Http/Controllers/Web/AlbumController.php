@@ -5,12 +5,14 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Controller;
 
 use App\Models\Album;
+use App\Models\Message;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\AlbumDeletionOTP;
 use Illuminate\Support\Facades\Log;
+use App\Notifications\AlbumInvitationNotification;
 
 class AlbumController extends Controller
 {
@@ -29,7 +31,7 @@ class AlbumController extends Controller
         $album->load(['images.user', 'collaborators']);
         
         // Fetch accepted connections for the dropdown
-        $acceptedConnections = Auth::user()->acceptedConnections()->get();
+        $acceptedConnections = Auth::user()->acceptedConnections()->with(['profile', 'verification'])->get();
         
         return view('albums.show', compact('album', 'acceptedConnections'));
     }
@@ -45,23 +47,66 @@ class AlbumController extends Controller
         }
 
         $validated = $request->validate([
-            'email' => 'required|email|exists:users,email',
+            'username' => 'required|string',
             'role' => 'required|in:admin,contributor,viewer',
         ]);
 
-        $userToAdd = User::where('email', $validated['email'])->first();
+        $userToAdd = User::whereHas('profile', function($q) use ($validated) {
+            $q->where('username', $validated['username']);
+        })->first();
+
+        if (!$userToAdd) {
+            return back()->withErrors(['username' => 'لم يتم العثور على مستخدم بهذا الاسم الفريد (@username).']);
+        }
 
         if ($userToAdd->id === $album->user_id) {
-            return back()->withErrors(['email' => 'لا يمكنك إضافة نفسك كمتعاون (أنت مالك الألبوم).']);
+            return back()->withErrors(['username' => 'لا يمكنك إضافة نفسك كمتعاون (أنت مالك الألبوم).']);
         }
 
         if ($album->collaborators->contains($userToAdd->id)) {
-            return back()->withErrors(['email' => 'هذا المستخدم متعاون بالفعل في هذا الألبوم.']);
+            return back()->withErrors(['username' => 'هذا المستخدم متعاون بالفعل في هذا الألبوم.']);
         }
 
         $album->collaborators()->attach($userToAdd->id, ['role' => $validated['role']]);
 
-        return back()->with('success', "تم إضافة {$userToAdd->name} كمتعاون بنجاح.");
+        // Trigger Notification
+        $userToAdd->notify(new AlbumInvitationNotification($album, Auth::user()));
+
+        // Create an interactive chat message
+        Message::create([
+            'sender_id' => Auth::id(),
+            'receiver_id' => $userToAdd->id,
+            'album_id' => $album->id,
+            'body' => "لقد قمت بدعوتك للانضمام إلى الألبوم المشترك: {$album->title}. هل تود الانضمام؟",
+        ]);
+
+        return back()->with('success', "تم إضافة {$userToAdd->name} كمتعاون بنجاح وإرسال دعوة له.");
+    }
+
+    /**
+     * Update the role of a collaborator in the album.
+     */
+    public function updateCollaboratorRole(Request $request, Album $album, User $user)
+    {
+        if (Auth::id() !== $album->user_id) {
+            abort(403);
+        }
+
+        $request->validate([
+            'role' => 'required|in:admin,contributor,viewer',
+        ]);
+
+        if (!$album->collaborators->contains($user->id)) {
+            return back()->withErrors(['role' => 'هذا المستخدم ليس متعاوناً في الألبوم.']);
+        }
+
+        if ($album->user_id === $user->id) {
+            return back()->withErrors(['role' => 'لا يمكن تغيير رتبة مالك الألبوم.']);
+        }
+
+        $album->collaborators()->updateExistingPivot($user->id, ['role' => $request->role]);
+
+        return back()->with('success', 'تم تحديث رتبة المتعاون بنجاح.');
     }
 
     /**
@@ -168,6 +213,10 @@ class AlbumController extends Controller
 
         $album->collaborators()->updateExistingPivot($userId, ['status' => 'accepted']);
 
+        if (request()->expectsJson()) {
+            return response()->json(['success' => true, 'message' => 'تم قبول الدعوة بنجاح.']);
+        }
+
         return back()->with('success', 'تم قبول الدعوة بنجاح.');
     }
 
@@ -186,6 +235,10 @@ class AlbumController extends Controller
         }
 
         $album->collaborators()->detach($userId);
+
+        if (request()->expectsJson()) {
+            return response()->json(['success' => true, 'message' => 'تم رفض الدعوة.']);
+        }
 
         return back()->with('success', 'تم رفض الدعوة.');
     }

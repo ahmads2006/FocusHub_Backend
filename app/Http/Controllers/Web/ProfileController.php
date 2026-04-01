@@ -28,13 +28,28 @@ class ProfileController extends Controller
      */
     public function update(ProfileUpdateRequest $request): RedirectResponse
     {
-        $request->user()->fill($request->validated());
+        $user = $request->user();
+        $profile = $user->profile;
 
-        if ($request->user()->isDirty('email')) {
-            $request->user()->email_verified_at = null;
+        // Check if username is being changed
+        if ($request->has('username') && $request->input('username') !== $profile->username) {
+            // Check 30-day limit
+            $lastChanged = $profile->username_last_changed_at;
+            if ($lastChanged && $lastChanged->diffInDays(now()) < 30) {
+                $daysRemaining = 30 - $lastChanged->diffInDays(now());
+                return back()->withErrors(['username' => "لا يمكنك تغيير اسم المستخدم إلا مرة واحدة كل 30 يومًا. يتبقى $daysRemaining أيام."]);
+            }
+            $profile->username_last_changed_at = now();
         }
 
-        $request->user()->save();
+        $user->fill($request->validated());
+
+        if ($user->isDirty('email')) {
+            $user->email_verified_at = null;
+        }
+
+        $user->save();
+        $profile->save(); // Force save profile for the timestamp change
 
         return Redirect::route('profile.edit')->with('status', 'profile-updated');
     }
@@ -59,23 +74,44 @@ class ProfileController extends Controller
         $user = $request->user();
         
         $validated = $request->validate([
-            'dynamic_watermark' => 'boolean',
-            'auto_orient_default' => 'boolean',
-            'is_public_profile' => 'boolean',
-            'watermark_text' => 'nullable|string|max:50',
-            'watermark_text_color' => 'nullable|string|regex:/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/',
-            'watermark_neon_color' => 'nullable|string|regex:/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/',
-            'watermark_opacity' => 'nullable|numeric|between:0,1',
+            'dynamic_watermark' => ['boolean'],
+            'auto_orient_default' => ['boolean'],
+            'is_public_profile' => ['boolean'],
+            'use_text_watermark' => ['boolean'],
+            'use_logo_watermark' => ['boolean'],
+            'watermark_text' => ['nullable', 'string', 'max:50'],
+            'watermark_logo' => ['nullable', 'image', 'max:1024'],
+            'watermark_text_color' => ['nullable', 'string', 'regex:/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/'],
+            'watermark_neon_color' => ['nullable', 'string', 'regex:/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/'],
+            'watermark_opacity' => ['nullable', 'numeric', 'between:0,1'],
         ]);
 
         $user->dynamic_watermark = $request->has('dynamic_watermark');
         $user->auto_orient_default = $request->has('auto_orient_default');
         $user->is_public_profile = $request->has('is_public_profile');
+        $user->use_text_watermark = $request->has('use_text_watermark');
+        $user->use_logo_watermark = $request->has('use_logo_watermark');
+
+        // Mandatory check if dynamic_watermark is enabled
+        if ($user->dynamic_watermark && !$user->use_text_watermark && !$user->use_logo_watermark) {
+            return back()->withErrors(['watermark_mode' => 'يجب اختيار وسيلة واحدة على الأقل للعلامة المائية (نص أو لوجو).'])->withInput();
+        }
         
         if ($request->filled('watermark_text')) $user->watermark_text = $validated['watermark_text'];
         if ($request->filled('watermark_text_color')) $user->watermark_text_color = $validated['watermark_text_color'];
         if ($request->filled('watermark_neon_color')) $user->watermark_neon_color = $validated['watermark_neon_color'];
         if ($request->has('watermark_opacity')) $user->watermark_opacity = $validated['watermark_opacity'];
+
+        // Handle Logo Upload
+        if ($request->hasFile('watermark_logo')) {
+            // Delete old logo
+            if ($user->watermark_logo) {
+                \Illuminate\Support\Facades\Storage::disk('public')->delete($user->watermark_logo);
+            }
+            // Store new logo
+            $path = $request->file('watermark_logo')->store('watermarks', 'public');
+            $user->watermark_logo = $path;
+        }
 
         $user->save();
 

@@ -15,31 +15,68 @@ class WatermarkService
      */
     public function apply(Image $image, ImageInterface $interventionImage): ImageInterface
     {
-        $photographer = $image->user->name;
-        $date = $image->created_at->format('Y-m-d');
-        $text = "© {$photographer} | FocusHub | {$date}";
-
+        $user = $image->user;
         $width = $interventionImage->width();
         $height = $interventionImage->height();
 
-        // Calculate font size based on image width (roughly 1.5% of width)
+        $useText = $user->use_text_watermark;
+        $useLogo = $user->use_logo_watermark && $user->watermark_logo;
+
+        // Base metrics
         $fontSize = max(14, (int)($width * 0.015));
         $padding = (int)($fontSize * 1.5);
+        $opacity = $user->watermark_opacity ?? 0.5;
 
-        // 1. Draw subtle background bar for readability
-        $barHeight = (int)($fontSize * 2.5);
-        $interventionImage->drawRectangle($width - ($padding * 2 + (strlen($text) * $fontSize * 0.6)), $height - $barHeight - $padding, function ($draw) use ($width, $height, $padding, $barHeight) {
-            $draw->background('rgba(0, 0, 0, 0.4)'); // 40% opacity black
-        });
+        $currentY = $height - $padding;
 
-        // Simplified for Intervention V3 syntax (using closure for styling)
-        $interventionImage->text($text, $width - $padding, $height - (int)($padding * 1.2), function (FontFactory $font) use ($fontSize) {
-            $font->filename(public_path('fonts/Montserrat-Medium.ttf')); // Assuming font is available
-            $font->size($fontSize);
-            $font->color('rgba(255, 255, 255, 0.5)'); // 50% opacity white
-            $font->align('right');
-            $font->valign('bottom');
-        });
+        // 1. Draw Text Watermark if enabled
+        if ($useText) {
+            $photographer = $user->watermark_text ?: $user->name;
+            $date = $image->created_at->format('Y-m-d');
+            $text = "© {$photographer} | {$date}";
+            
+            $textColor = $user->watermark_text_color ?: 'rgba(255, 255, 255, 0.5)';
+            // Convert hex to rgba if needed or keep as is if Intervention handles it
+            
+            $interventionImage->text($text, $width - $padding, $currentY, function (FontFactory $font) use ($fontSize, $opacity, $textColor) {
+                if (file_exists(public_path('fonts/Montserrat-Medium.ttf'))) {
+                    $font->filename(public_path('fonts/Montserrat-Medium.ttf'));
+                }
+                $font->size($fontSize);
+                $font->color($textColor);
+                $font->align('right');
+                $font->valign('bottom');
+            });
+
+            // If we have a logo too, move the Y up for the logo
+            $currentY -= (int)($fontSize * 2);
+        }
+
+        // 2. Draw Logo Watermark if enabled
+        if ($useLogo) {
+            $logoPath = $user->watermark_logo;
+            
+            if (\Illuminate\Support\Facades\Storage::disk('public')->exists($logoPath)) {
+                $logoData = \Illuminate\Support\Facades\Storage::disk('public')->get($logoPath);
+                
+                // Use the driver associated with the intervention image or default to GD/Imagick
+                $manager = \Intervention\Image\ImageManager::gd(); // Fallback to GD
+                $logo = $manager->read($logoData);
+                
+                // Resize logo to roughly 10% of image width
+                $logoWidth = (int)($width * 0.12);
+                $logo->scale(width: $logoWidth);
+                
+                // Position logo above text or at bottom-right
+                $interventionImage->place(
+                    $logo, 
+                    'bottom-right', 
+                    offset_x: $padding, 
+                    offset_y: $height - $currentY,
+                    opacity: (int)($opacity * 100) // Intervention place uses 0-100 for opacity
+                );
+            }
+        }
 
         return $interventionImage;
     }

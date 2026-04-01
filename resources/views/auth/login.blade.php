@@ -159,19 +159,36 @@
 
 
             <!-- Adobe -->
-            <a
-                href="{{ route('auth.social.redirect', 'adobe') }}"
-                class="flex items-center justify-center gap-3 w-full px-4 py-2
-                rounded-xl border border-gray-200 shadow-sm
-                hover:shadow-md transition text-sm font-medium text-gray-700
-                backdrop-blur-md bg-white/40 group overflow-hidden relative"
-            >
-                <div class="absolute inset-0 bg-gradient-to-tr from-red-500/5 to-transparent pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                <svg class="w-5 h-5" viewBox="0 0 24 24">
-                    <path fill="#FF0000" d="M14.582 3H24v18h-9.418L12 15.652zM9.418 3H0v18h9.418L12 15.652zM12 9.157L16.231 18h-2.314l-1.325-2.793h-1.184V18H9.091V6h3.401c1.506 0 2.391.821 2.391 1.954 0 .822-.613 1.203-1.481 1.203H12v-.001zm0 2.306l-1.408 3.149H13.41L12 11.463z"/>
-                </svg>
-                Continue with Adobe
-            </a>
+       {{-- 1. نضغ الـ CSS الخاص بالحركة المتموجة هنا --}}
+<style>
+    @keyframes gradientBackground {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+    }
+
+    .adobe-btn-animated {
+        /* الخلفية المتموجة: أزرق - أحمر - أزرق */
+        background: linear-gradient(-45deg, #007bff, #FA0F00, #0056b3);
+        background-size: 300% 300%;
+        animation: gradientBackground 4s ease infinite; /* سرعة الحركة 4 ثواني */
+    }
+</style>
+
+{{-- 2. زر Adobe المعدل --}}
+<a
+    href="{{ route('auth.social.redirect', 'adobe') }}"
+    {{-- اضفنا الكلاس 'adobe-btn-animated' للحركة، و 'shadow-blue-500/50' للتوهج الأزرق --}}
+    class="adobe-btn-animated flex items-center justify-center gap-3 w-full px-4 py-2 rounded-xl shadow-lg shadow-blue-500/50 hover:shadow-xl hover:shadow-blue-600/60 transition-all duration-300 text-sm font-semibold text-black"
+>
+    {{-- الأيقونة: تم تغيير اللون ليكون أحمر عبر fill-[#FA0F00] --}}
+    <svg class="w-5 h-5 fill-[#FA0F00]" viewBox="0 0 24 24">
+        <path d="M14.582 3H24v18h-9.418L12 15.652zM9.418 3H0v18h9.418L12 15.652zM12 9.157L16.231 18h-2.314l-1.325-2.793h-1.184V18H9.091V6h3.401c1.506 0 2.391.821 2.391 1.954 0 .822-.613 1.203-1.481 1.203H12v-.001zm0 2.306l-1.408 3.149H13.41L12 11.463z"/>
+    </svg>
+
+    {{-- النص باللون الأسود جاهز --}}
+    Sign up with Adobe
+</a>
 
 
         </div>

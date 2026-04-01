@@ -3,25 +3,17 @@
 namespace App\Observers;
 
 use App\Models\Image;
-use Illuminate\Support\Facades\Redis;
+use App\Notifications\AlbumActivityNotification;
+use Illuminate\Support\Facades\Auth;
 
 class ImageObserver
 {
     /**
-     * Handle the Image "updated" event.
+     * Handle the Image "created" event.
      */
-    public function updated(Image $image): void
+    public function created(Image $image): void
     {
-        if ($image->isDirty('privacy')) {
-            // Only affects count if it's currently approved
-            if ($image->moderation && $image->moderation->status === 'approved') {
-                if ($image->privacy === 'public') {
-                    Redis::incr("user:{$image->user_id}:stats:photos");
-                } elseif ($image->getOriginal('privacy') === 'public') {
-                    Redis::decr("user:{$image->user_id}:stats:photos");
-                }
-            }
-        }
+        $this->notifyCollaborators($image, 'uploaded');
     }
 
     /**
@@ -29,8 +21,32 @@ class ImageObserver
      */
     public function deleted(Image $image): void
     {
-        if ($image->privacy === 'public' && $image->moderation && $image->moderation->status === 'approved') {
-            Redis::decr("user:{$image->user_id}:stats:photos");
+        $this->notifyCollaborators($image, 'deleted');
+    }
+
+    /**
+     * Notify all collaborators in the album except the actor.
+     */
+    protected function notifyCollaborators(Image $image, string $action): void
+    {
+        if (!$image->album_id) {
+            return;
+        }
+
+        $album = $image->album;
+        $actor = Auth::user();
+
+        if (!$album || !$actor) {
+            return;
+        }
+
+        // Get owner and collaborators
+        $recipients = $album->collaborators->merge([$album->user])->unique('id');
+
+        foreach ($recipients as $recipient) {
+            if ($recipient->id !== $actor->id) {
+                $recipient->notify(new AlbumActivityNotification($actor, $album, $action));
+            }
         }
     }
 }

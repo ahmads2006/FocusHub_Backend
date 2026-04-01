@@ -161,7 +161,7 @@ class Album extends Model implements HasMedia
     public function collaborators(): BelongsToMany
     {
         return $this->belongsToMany(User::class)
-                    ->withPivot('role')
+                    ->withPivot('role', 'status')
                     ->withTimestamps();
     }
 

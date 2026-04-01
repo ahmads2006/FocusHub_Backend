@@ -13,7 +13,7 @@
         @csrf
     </form>
 
-    <form method="post" action="{{ route('profile.update') }}" class="mt-6 space-y-6">
+    <form method="post" action="{{ route('profile.update') }}" class="mt-6 space-y-6" x-data="{ currentEmail: '{{ $user->email }}', inputEmail: '{{ old('email', $user->email) }}' }">
         @csrf
         @method('patch')
 
@@ -23,10 +23,38 @@
             <x-input-error class="mt-2" :messages="$errors->get('name')" />
         </div>
 
+        <div class="p-4 bg-gray-50 border border-gray-200 rounded-xl">
+            <x-input-label for="username" value="اسم المستخدم الفريد (Handle)" />
+            <div class="relative mt-1">
+                <x-text-input id="username" name="username" type="text" 
+                    class="block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm" 
+                    :value="old('username', $user->profile->username)" 
+                    required 
+                    placeholder="@username" />
+            </div>
+            <p class="mt-2 text-xs text-gray-500">
+                <i class="fas fa-info-circle mr-1"></i>
+                هذا هو اسمك الفريد الذي يبدأ بـ @. يمكنك تغييره **مرة واحدة كل 30 يوماً** فقط.
+            </p>
+            @if($user->profile->username_last_changed_at)
+                <p class="mt-1 text-xs text-indigo-600">
+                    آخر تغيير: {{ $user->profile->username_last_changed_at->diffForHumans() }}
+                </p>
+            @endif
+            <x-input-error class="mt-2" :messages="$errors->get('username')" />
+        </div>
+
         <div>
             <x-input-label for="email" :value="__('Email')" />
-            <x-text-input id="email" name="email" type="email" class="mt-1 block w-full" :value="old('email', $user->email)" required autocomplete="username" />
+            <x-text-input id="email" name="email" type="email" class="mt-1 block w-full" x-model="inputEmail" required autocomplete="username" />
             <x-input-error class="mt-2" :messages="$errors->get('email')" />
+
+            <!-- Conditional password confirmation for email change -->
+            <div x-show="inputEmail !== currentEmail" style="display: none;" class="mt-4 p-4 rounded-xl border border-purple-500/20 bg-purple-500/5 transition-all">
+                <x-input-label for="update_profile_password" value="لتغيير بريدك الإلكتروني، يرجى إدخال كلمة المرور الحالية" class="text-purple-400 font-bold" />
+                <x-text-input id="update_profile_password" name="password" type="password" class="mt-2 block w-full" placeholder="كلمة المرور الحالية" autocomplete="current-password" />
+                <x-input-error class="mt-2" :messages="$errors->get('password')" />
+            </div>
 
             @if ($user instanceof \Illuminate\Contracts\Auth\MustVerifyEmail && ! $user->hasVerifiedEmail())
                 <div>

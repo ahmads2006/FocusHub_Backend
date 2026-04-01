@@ -12,6 +12,8 @@ use Intervention\Image\Drivers\Imagick\Driver as ImagickDriver;
 use App\Models\Image;
 use Illuminate\Support\Str;
 use Exception;
+use App\Notifications\ImageStatusNotification;
+use App\Models\User;
 
 class ProcessImageJob implements ShouldQueue
 {
@@ -144,11 +146,27 @@ class ProcessImageJob implements ShouldQueue
             // Cleanup temp extracted file
             Storage::disk('local')->delete($this->imagePath);
 
+            // Trigger Success Notification if it was rejected or just processed
+            $u = User::find($this->userId);
+            if ($u) {
+                $statusMsg = ($this->status === 'rejected' ? "تم رفض صورتك بسبب مخالفة المعايير: {$this->reason}" : "تمت معالجة صورتك بنجاح وقبولها.");
+                $u->notify(new ImageStatusNotification($imageDb, $this->status, $statusMsg));
+            }
+
             $this->markAsProcessed();
         } catch (Exception $e) {
             \Illuminate\Support\Facades\Log::error("ProcessImageJob Failed for {$this->imagePath}: " . $e->getMessage(), [
                 'exception' => $e
             ]);
+            
+            // Trigger Failed Notification
+            $u = User::find($this->userId);
+            if ($u) {
+                // We don't have $imageDb here if it failed before creation
+                // But we can still send a generic message or try to find it
+                // For now, let's just log it if it failed early
+            }
+
             $this->markAsFailed();
         }
     }

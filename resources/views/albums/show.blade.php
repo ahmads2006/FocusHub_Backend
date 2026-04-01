@@ -147,7 +147,18 @@
                             </div>
                             <div class="flex-1 min-w-0">
                                 <p class="text-sm font-bold truncate">{{ $collaborator->name }}</p>
-                                <p class="text-[8px] text-gray-500 uppercase font-bold tracking-widest">{{ $collaborator->pivot->role }}</p>
+                                @if(Auth::id() === $album->user_id)
+                                    <form action="{{ route('albums.collaborators.updateRole', [$album, $collaborator]) }}" method="POST" class="inline-block mt-1">
+                                        @csrf @method('PUT')
+                                        <select name="role" onchange="this.form.submit()" class="text-[10px] bg-white/10 text-gray-300 rounded px-2 py-1 outline-none border-none cursor-pointer">
+                                            <option value="viewer" {{ $collaborator->pivot->role === 'viewer' ? 'selected' : '' }} class="bg-black">مشاهد</option>
+                                            <option value="contributor" {{ $collaborator->pivot->role === 'contributor' ? 'selected' : '' }} class="bg-black">مساهم</option>
+                                            <option value="admin" {{ $collaborator->pivot->role === 'admin' ? 'selected' : '' }} class="bg-black">مشرف</option>
+                                        </select>
+                                    </form>
+                                @else
+                                    <p class="text-[8px] text-gray-500 uppercase font-bold tracking-widest">{{ $collaborator->pivot->role }}</p>
+                                @endif
                             </div>
                             @if(Auth::id() === $album->user_id)
                                 <form action="{{ route('albums.collaborators.remove', [$album, $collaborator]) }}" method="POST">
@@ -161,25 +172,79 @@
 
                 <!-- Invite Form -->
                 @if(Auth::id() === $album->user_id)
-                <div class="pt-8 border-t border-white/5">
-                    <h4 class="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-4">دعوة عضو جديد</h4>
-                    <form action="{{ route('albums.collaborators.add', $album) }}" method="POST" class="space-y-4">
+                <div class="pt-8 border-t border-white/5" x-data="{ 
+                    search: '', 
+                    selectedUser: null,
+                    connections: [
+                        @foreach($acceptedConnections as $conn)
+                        { 
+                            id: '{{ $conn->id }}', 
+                            name: '{{ addslashes($conn->name ?: $conn->email ?: "User") }}', 
+                            avatar: '{{ addslashes($conn->avatar) }}', 
+                            is_verified: {{ $conn->is_verified ? 'true' : 'false' }} 
+                        }{{ !$loop->last ? ',' : '' }}
+                        @endforeach
+                    ],
+                    get filteredConnections() {
+                        return this.connections.filter(c => c.name.toLowerCase().includes(this.search.toLowerCase()));
+                    }
+                }">
+                    <h4 class="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-4">دعوة عضو جديد من المتابعين</h4>
+                    
+                    <form action="{{ route('albums.collaborators.add', $album) }}" method="POST" class="space-y-6">
                         @csrf
-                        <div class="space-y-2">
-                            <label class="text-[10px] font-bold uppercase tracking-widest text-gray-400">اختر متعاون من قائمة اتصالاتك</label>
-                            <select name="email" required class="w-full bg-white/5 border border-white/10 rounded-2xl p-3 px-4 text-xs outline-none focus:ring-2 focus:ring-purple-500/50 h-11">
-                                <option value="" class="bg-black">اختر شخصاً...</option>
-                                @foreach($acceptedConnections as $connection)
-                                    <option value="{{ $connection->email }}" class="bg-black">{{ $connection->name }} ({{ $connection->email }})</option>
-                                @endforeach
-                            </select>
+                        <input type="hidden" name="username" :value="selectedUser ? selectedUser.name : ''" required>
+
+                        <!-- Search Input -->
+                        <div class="relative group">
+                            <input type="text" x-model="search" placeholder="ابحث في قائمة المتابعين..." class="w-full bg-white/5 border border-white/10 rounded-2xl p-3 px-11 text-xs outline-none focus:ring-2 focus:ring-purple-500/50 h-12 transition-all">
+                            <svg class="w-4 h-4 absolute left-4 top-4 text-gray-500 group-focus-within:text-purple-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
                         </div>
-                        <select name="role" class="w-full bg-white/5 border border-white/10 rounded-2xl p-3 px-4 text-xs outline-none focus:ring-2 focus:ring-purple-500/50 h-11">
-                            <option value="viewer" class="bg-black">مشاهد</option>
-                            <option value="contributor" class="bg-black">مساهم</option>
-                            <option value="admin" class="bg-black">مشرف</option>
-                        </select>
-                        <button type="submit" class="w-full bg-white/5 border border-white/10 hover:border-purple-500/50 hover:bg-purple-500/5 text-[10px] font-bold uppercase tracking-widest p-4 rounded-2xl transition-all">إرسال الدعوة</button>
+
+                        <!-- Connections List -->
+                        <div class="max-h-60 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
+                            <template x-for="user in filteredConnections" :key="user.id">
+                                <div @click="selectedUser = user" 
+                                     :class="selectedUser && selectedUser.id === user.id ? 'border-purple-500 bg-purple-500/10' : 'border-white/5 bg-white/5 hover:bg-white/10'"
+                                     class="flex items-center gap-3 p-3 rounded-2xl border cursor-pointer transition-all">
+                                    <img :src="user.avatar" class="w-10 h-10 rounded-xl object-cover border border-white/10">
+                                    <div class="flex-1 min-w-0">
+                                        <div class="flex items-center gap-1.5">
+                                            <p class="text-xs font-bold truncate text-gray-200" x-text="user.name"></p>
+                                            <template x-if="user.is_verified">
+                                                <svg class="w-3.5 h-3.5 text-blue-400" viewBox="0 0 24 24" fill="currentColor">
+                                                    <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/>
+                                                </svg>
+                                            </template>
+                                        </div>
+                                        <p class="text-[9px] text-gray-500 font-medium">متابع نشط</p>
+                                    </div>
+                                    <div x-show="selectedUser && selectedUser.id === user.id" class="w-5 h-5 rounded-full bg-purple-500 flex items-center justify-center">
+                                        <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
+                                    </div>
+                                </div>
+                            </template>
+                            
+                            <div x-show="filteredConnections.length === 0" class="text-center py-8 opacity-40">
+                                <p class="text-[10px] font-bold uppercase tracking-widest">لا يوجد نتائج لهذا البحث</p>
+                            </div>
+                        </div>
+
+                        <div class="space-y-4 pt-2">
+                            <select name="role" class="w-full bg-white/5 border border-white/10 rounded-2xl p-3 px-4 text-xs outline-none focus:ring-2 focus:ring-purple-500/50 h-12">
+                                <option value="viewer" class="bg-black">مشاهد (عرض فقط)</option>
+                                <option value="contributor" class="bg-black">مساهم (رفع وحذف)</option>
+                                <option value="admin" class="bg-black">مشرف (تحكم كامل)</option>
+                            </select>
+                            
+                            <button type="submit" 
+                                    :disabled="!selectedUser"
+                                    :class="!selectedUser ? 'opacity-30 cursor-not-allowed' : 'hover:scale-[1.02] active:scale-95'"
+                                    class="w-full accent-gradient p-4 rounded-2xl font-bold uppercase tracking-widest text-[10px] shadow-lg shadow-purple-500/20 transition-all flex items-center justify-center gap-2">
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
+                                إرسال الدعوة للمنضم
+                            </button>
+                        </div>
                     </form>
                 </div>
                 @endif

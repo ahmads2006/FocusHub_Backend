@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Web\NotificationController;
 use App\Http\Controllers\Web\ProfileController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\Auth\VerifyCodeController;
@@ -10,7 +11,6 @@ use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Admin\RoleController as AdminRoleController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Auth;
-use App\Http\Controllers\Web\NotificationController;
 use App\Http\Controllers\Web\TaskController;
 use App\Http\Controllers\Web\TimerController;
 use App\Http\Controllers\Web\ActivityController;
@@ -58,6 +58,9 @@ Route::middleware(['auth', 'check.verified', 'check.banned', 'throttle:web'])->g
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
+    Route::post('/notifications/mark-read/{id}', [NotificationController::class, 'markAsRead'])->name('notifications.mark-read');
+    Route::post('/notifications/mark-all-read', [NotificationController::class, 'markAllAsRead'])->name('notifications.mark-all-as-read');
+    Route::delete('/notifications/{id}', [NotificationController::class, 'destroy'])->name('notifications.destroy');
     Route::get('/activities', [ActivityController::class, 'index'])->middleware('permission:view-activity-logs')->name('activities.index');
 
     // إدارة الصور والألبومات (Consolidated)
@@ -106,6 +109,7 @@ Route::middleware(['auth', 'check.verified', 'check.banned', 'throttle:web'])->g
     Route::post('/albums/{album}/request-delete-otp', [AlbumController::class, 'requestDeleteOTP'])->name('albums.request_delete_otp');
     Route::delete('/albums/{album}', [AlbumController::class, 'destroy'])->name('albums.destroy');
     Route::post('/albums/{album}/collaborators', [AlbumController::class, 'addCollaborator'])->name('albums.collaborators.add');
+    Route::put('/albums/{album}/collaborators/{user}', [AlbumController::class, 'updateCollaboratorRole'])->name('albums.collaborators.updateRole');
     Route::delete('/albums/{album}/collaborators/{user}', [AlbumController::class, 'removeCollaborator'])->name('albums.collaborators.remove');
     // Album Invitation Accept/Decline
     Route::post('/albums/{album}/invitation/accept', [AlbumController::class, 'acceptInvitation'])->name('albums.invitation.accept');
@@ -123,13 +127,14 @@ Route::middleware(['auth', 'check.verified', 'check.banned', 'throttle:web'])->g
     Route::get('/connect/{user}/status', [\App\Http\Controllers\Web\ConnectionController::class, 'status'])->name('connect.status');
 
     // ─── Photographers Hub & Live Chat ───────────────────────────
-    Route::get('/photographers', [\App\Http\Controllers\Web\ChatController::class, 'hub'])->name('chat.hub');
+    Route::get('/photographers/{partner?}', [\App\Http\Controllers\Web\ChatController::class, 'hub'])->name('chat.hub');
     Route::get('/api/chat/conversations', [\App\Http\Controllers\Web\ChatController::class, 'conversations'])->name('chat.conversations');
     Route::get('/api/chat/messages/{partner}', [\App\Http\Controllers\Web\ChatController::class, 'messages'])->name('chat.messages');
     Route::post('/api/chat/send', [\App\Http\Controllers\Web\ChatController::class, 'store'])->name('chat.send');
     Route::get('/api/chat/unread-count', [\App\Http\Controllers\Web\ChatController::class, 'unreadCount'])->name('chat.unread');
     Route::get('/api/chat/poll/{partner}', [\App\Http\Controllers\Web\ChatController::class, 'poll'])->name('chat.poll');
     Route::get('/api/chat/my-images', [\App\Http\Controllers\Web\ChatController::class, 'myImages'])->name('chat.my-images');
+    Route::get('/api/chat/connections', [\App\Http\Controllers\Web\ChatController::class, 'connections'])->name('chat.connections');
 });
 
 // ─── Admin Vault — Audit Trail Dashboard (super-admin only) ──────

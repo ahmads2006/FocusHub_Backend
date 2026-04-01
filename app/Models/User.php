@@ -28,8 +28,14 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
     {
         static::created(function (User $user) {
             $user->userStatus()->create([]);
+            
+            $displayName = $user->getAttribute('name');
+            $handle = \App\Helpers\RestrictedNameHelper::generateUniqueHandle($displayName ?: 'User');
+
             $user->profile()->create([
-                'name' => $user->getAttribute('name'),
+                'name' => $displayName,
+                'username' => $handle,
+                'username_last_changed_at' => now(),
                 'bio' => $user->getAttribute('bio'),
                 'profile_picture' => $user->getAttribute('profile_picture'),
                 'avatar' => $user->getAttribute('avatar'),
@@ -47,9 +53,10 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
                 'verification_code' => $user->getAttribute('verification_code'),
                 'is_verified' => $user->getAttribute('is_verified') ?? false,
             ]);
-            if ($user->getAttribute('google_id')) {
+            if ($user->getAttribute('google_id') || $user->getAttribute('adobe_id')) {
                 $user->oauth()->create([
                     'google_id' => $user->getAttribute('google_id'),
+                    'adobe_id' => $user->getAttribute('adobe_id'),
                     'provider_token' => $user->getAttribute('provider_token'),
                 ]);
             }
@@ -81,6 +88,7 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
         'role',
         // Still in fillable to allow creating users with these fields (handled by accessors/mutators or boots)
         'name',
+        'username',
         'bio',
         'profile_picture',
         'verification_code',
@@ -92,6 +100,7 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
         'is_verified',
         'stay_logged_in',
         'google_id',
+        'adobe_id',
         'instagram_id',
         'provider_name',
         'provider_id',
@@ -100,6 +109,9 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
         'provider_token',
         'is_public_profile',
         'watermark_text',
+        'watermark_logo',
+        'use_text_watermark',
+        'use_logo_watermark',
     ];
 
     protected $with = ['userStatus', 'profile', 'settings', 'verification', 'oauth'];
@@ -108,6 +120,7 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
     protected $hidden = [
         'password',
         'remember_token',
+        'email', // Hide email by default for privacy
     ];
 
     protected function casts(): array
@@ -156,6 +169,9 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
     public function getNameAttribute() { return $this->getRelatedAttribute('profile', 'name'); }
     public function setNameAttribute($value) { $this->setRelatedAttribute('profile', 'name', $value); }
 
+    public function getUsernameAttribute() { return $this->getRelatedAttribute('profile', 'username'); }
+    public function setUsernameAttribute($value) { $this->setRelatedAttribute('profile', 'username', $value); }
+
     public function getBioAttribute() { return $this->getRelatedAttribute('profile', 'bio'); }
     public function setBioAttribute($value) { $this->setRelatedAttribute('profile', 'bio', $value); }
 
@@ -177,6 +193,15 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
     public function getWatermarkTextAttribute() { return $this->getRelatedAttribute('settings', 'watermark_text'); }
     public function setWatermarkTextAttribute($value) { $this->setRelatedAttribute('settings', 'watermark_text', $value); }
 
+    public function getWatermarkLogoAttribute() { return $this->getRelatedAttribute('settings', 'watermark_logo'); }
+    public function setWatermarkLogoAttribute($value) { $this->setRelatedAttribute('settings', 'watermark_logo', $value); }
+
+    public function getUseTextWatermarkAttribute() { return (bool) $this->getRelatedAttribute('settings', 'use_text_watermark', true); }
+    public function setUseTextWatermarkAttribute($value) { $this->setRelatedAttribute('settings', 'use_text_watermark', $value); }
+
+    public function getUseLogoWatermarkAttribute() { return (bool) $this->getRelatedAttribute('settings', 'use_logo_watermark', false); }
+    public function setUseLogoWatermarkAttribute($value) { $this->setRelatedAttribute('settings', 'use_logo_watermark', $value); }
+
     public function getWatermarkNeonColorAttribute() { return $this->getRelatedAttribute('settings', 'watermark_neon_color'); }
     public function setWatermarkNeonColorAttribute($value) { $this->setRelatedAttribute('settings', 'watermark_neon_color', $value); }
 
@@ -194,6 +219,9 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
 
     public function getGoogleIdAttribute() { return $this->getRelatedAttribute('oauth', 'google_id'); }
     public function setGoogleIdAttribute($value) { $this->setRelatedAttribute('oauth', 'google_id', $value); }
+
+    public function getAdobeIdAttribute() { return $this->getRelatedAttribute('oauth', 'adobe_id'); }
+    public function setAdobeIdAttribute($value) { $this->setRelatedAttribute('oauth', 'adobe_id', $value); }
 
     public function getProviderTokenAttribute() { return $this->getRelatedAttribute('oauth', 'provider_token'); }
     public function setProviderTokenAttribute($value) { $this->setRelatedAttribute('oauth', 'provider_token', $value); }
