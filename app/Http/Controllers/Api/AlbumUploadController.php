@@ -33,8 +33,8 @@ class AlbumUploadController extends Controller
         $request->validate([
             'album_id' => 'nullable|exists:albums,id',
             'album_name' => 'nullable|string|max:255',
-            // Typically allow zip. Rar can be processed but requires standard zip structure for safety or ext-rar.
-            'archive' => 'required|file|max:512000', // 500MB max
+            // Typically allow zip, rar, and 7z. Max 500MB
+            'archive' => 'required|file|mimes:zip,rar,7z|max:512000',
         ]);
 
         $user = $request->user() ?: \App\Models\User::first(); // Fallback for dev if needed
@@ -190,7 +190,6 @@ class AlbumUploadController extends Controller
                 'user_id'    => $user->id,
                 'title'      => pathinfo($filename, PATHINFO_FILENAME),
                 'filename'   => $filename,
-                'path'       => $s3Path, // Store the Full Path so Laravel knows exactly where to find it later
                 'file_type'  => $extension,
                 'size'       => $file->getSize(),
                 'privacy'    => $inheritedPrivacy,

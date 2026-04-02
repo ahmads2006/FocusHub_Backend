@@ -36,13 +36,46 @@ class ExtractArchiveJob implements ShouldQueue
      */
     public function handle(): void
     {
-        $zip = new ZipArchive;
         $absolutePath = Storage::disk('local')->path($this->filePath);
         $extractPath = Storage::disk('local')->path('quarantine/extracted_' . $this->jobId);
+        
+        if (!file_exists($extractPath)) {
+            mkdir($extractPath, 0755, true);
+        }
 
-        if ($zip->open($absolutePath) === true) {
-            $zip->extractTo($extractPath);
-            $zip->close();
+        $extension = strtolower(pathinfo($absolutePath, PATHINFO_EXTENSION));
+        $extractedSuccessfully = false;
+
+        try {
+            \Illuminate\Support\Facades\Log::info("Starting extraction for job {$this->jobId}. Extension: {$extension}");
+            if ($extension === 'rar') {
+                $result = \Illuminate\Support\Facades\Process::timeout(600)->run(['unrar', 'x', '-y', $absolutePath, $extractPath . '/']);
+                $extractedSuccessfully = $result->successful();
+                if (!$extractedSuccessfully) {
+                    \Illuminate\Support\Facades\Log::error("Unrar failed for job {$this->jobId}: " . $result->errorOutput());
+                }
+            } elseif ($extension === '7z') {
+                $result = \Illuminate\Support\Facades\Process::timeout(600)->run(['7z', 'x', $absolutePath, '-o' . $extractPath, '-y']);
+                $extractedSuccessfully = $result->successful();
+                if (!$extractedSuccessfully) {
+                    \Illuminate\Support\Facades\Log::error("7z failed for job {$this->jobId}: " . $result->errorOutput());
+                }
+            } else {
+                $zip = new \ZipArchive;
+                if ($zip->open($absolutePath) === true) {
+                    $zip->extractTo($extractPath);
+                    $zip->close();
+                    $extractedSuccessfully = true;
+                } else {
+                    \Illuminate\Support\Facades\Log::error("ZipArchive failed to open file for job {$this->jobId}");
+                }
+            }
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error("Archive extraction Exception for job {$this->jobId}: " . $e->getMessage());
+        }
+
+        if ($extractedSuccessfully) {
+            \Illuminate\Support\Facades\Log::info("Extraction successful for job {$this->jobId}. Scanning for images...");
 
             // Find all common image extensions
             $files = Storage::disk('local')->allFiles('quarantine/extracted_' . $this->jobId);

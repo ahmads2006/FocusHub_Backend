@@ -85,12 +85,20 @@
             <div class="space-y-6 flex-1 flex flex-col">
                 <div class="space-y-4 flex-1">
                     <div id="bulk-folder-dropzone" class="relative group h-64 border-2 border-dashed border-blue-500/20 rounded-[32px] hover:border-blue-500/50 transition-all flex flex-col items-center justify-center bg-blue-500/5">
-                        <input type="file" id="bulk_folder_input" webkitdirectory directory multiple class="absolute inset-0 opacity-0 cursor-pointer" onchange="handleFolderSelection(event)">
+                        <input type="file" id="bulk_folder_input" webkitdirectory directory multiple class="absolute inset-0 opacity-0 cursor-pointer z-10" onchange="handleFolderSelection(event)">
+                        
+                        <!-- Hidden input for single Archives -->
+                        <input type="file" id="bulk_archive_input" accept=".zip,.rar,.7z,.tar,.gz" class="hidden" onchange="handleArchiveSelection(event)">
+
                         <div class="p-6 rounded-full bg-blue-500/10 mb-4 group-hover:scale-110 transition-transform">
                             <svg class="w-12 h-12 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"></path></svg>
                         </div>
                         <p class="text-xs font-bold uppercase tracking-widest text-blue-400">اختر مجلد ألبوم كامل</p>
-                        <p class="text-[10px] text-blue-400/50 mt-2 text-center px-8 leading-relaxed">سيتم فحص الصور تلقائياً وضغطها في الخلفية لضمان استقرار جلسة الرفع.</p>
+                        <p class="text-[10px] text-blue-400/50 mt-2 text-center px-8 leading-relaxed mb-4">سيتم فحص الصور تلقائياً وضغطها في الخلفية لضمان استقرار جلسة الرفع.</p>
+                        
+                        <button type="button" onclick="document.getElementById('bulk_archive_input').click()" class="relative z-20 px-4 py-1.5 rounded-full bg-blue-500/20 text-blue-300 text-[10px] font-bold uppercase tracking-widest hover:bg-blue-500/40 transition-colors">
+                            أو رفع ملف مضغوط (ZIP, RAR)
+                        </button>
                     </div>
 
                     <div class="bg-white/5 rounded-[24px] p-6 border border-white/5">
@@ -144,8 +152,24 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script>
     let selectedFiles = [];
+    let isArchiveMode = false;
+    let selectedArchiveFile = null;
+
+    async function handleArchiveSelection(event) {
+        if (event.target.files.length > 0) {
+            isArchiveMode = true;
+            selectedArchiveFile = event.target.files[0];
+            const submitBtn = document.getElementById('bulk-folder-submit');
+            const btnText = document.getElementById('bulk-btn-text');
+            
+            submitBtn.disabled = false;
+            btnText.innerHTML = `رفع ملف: (${selectedArchiveFile.name})`;
+            document.getElementById('bulk-folder-dropzone').classList.add('border-blue-500', 'bg-blue-500/10');
+        }
+    }
 
     async function handleFolderSelection(event) {
+        isArchiveMode = false;
         selectedFiles = Array.from(event.target.files);
         const submitBtn = document.getElementById('bulk-folder-submit');
         const btnText = document.getElementById('bulk-btn-text');
@@ -196,33 +220,38 @@
         statusMsg.innerText = 'جاري التجهيز والأرشفة...';
 
         try {
-            // 2. Client-Side ZIP (to use existing robust backend)
-            const zip = new JSZip();
-            selectedFiles.forEach(file => {
-                zip.file(file.webkitRelativePath || file.name, file);
-            });
-
-            const content = await zip.generateAsync({type:"blob"}, (metadata) => {
-                let p = Math.round(metadata.percent);
-                progressBar.style.width = `${p}%`;
-                percentageText.innerText = `${p}%`;
-            });
-
-            statusMsg.innerText = 'جاري مزامنة الأصول...';
-            progressBar.style.width = '0%';
-            percentageText.innerText = '0%';
-
             const formData = new FormData();
-            formData.append('archive', content, 'folder_upload.zip');
             formData.append('_token', '{{ csrf_token() }}');
-            
-            // Capture folder name from the first file's path for automatic album naming
-            if (selectedFiles.length > 0 && selectedFiles[0].webkitRelativePath) {
-                const folderName = selectedFiles[0].webkitRelativePath.split('/')[0];
-                formData.append('album_name', folderName);
-            }
-
             if(albumId) formData.append('album_id', albumId);
+
+            if (isArchiveMode && selectedArchiveFile) {
+                statusMsg.innerText = 'جاري رفع الملف المضغوط للتحليل...';
+                progressBar.style.width = '50%'; // Simple feedback for direct upload
+                
+                formData.append('archive', selectedArchiveFile);
+                formData.append('album_name', selectedArchiveFile.name.split('.')[0]);
+            } else {
+                // Client-Side ZIP for Directories
+                const zip = new JSZip();
+                selectedFiles.forEach(file => {
+                    zip.file(file.webkitRelativePath || file.name, file);
+                });
+
+                const content = await zip.generateAsync({type:"blob"}, (metadata) => {
+                    let p = Math.round(metadata.percent);
+                    progressBar.style.width = `${p}%`;
+                    percentageText.innerText = `${p}%`;
+                });
+
+                statusMsg.innerText = 'جاري مزامنة المجلد المجمع...';
+                progressBar.style.width = '100%';
+                formData.append('archive', content, 'folder_upload.zip');
+                
+                if (selectedFiles.length > 0 && selectedFiles[0].webkitRelativePath) {
+                    const folderName = selectedFiles[0].webkitRelativePath.split('/')[0];
+                    formData.append('album_name', folderName);
+                }
+            }
 
             const response = await fetch('/api/upload/album', {
                 method: 'POST',

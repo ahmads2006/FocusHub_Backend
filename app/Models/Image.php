@@ -63,7 +63,6 @@ class Image extends Model
         'title',
         'description',
         'filename',
-        'path',
         'size',
         'privacy',
         'labels',

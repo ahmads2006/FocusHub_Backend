@@ -15,6 +15,8 @@ class SupportMessage extends Model
         'is_faq',
     ];
 
+    protected $touches = ['conversation'];
+
     protected $casts = [
         'is_system' => 'boolean',
         'is_faq' => 'boolean',

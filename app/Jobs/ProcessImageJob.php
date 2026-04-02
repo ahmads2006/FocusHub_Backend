@@ -102,7 +102,6 @@ class ProcessImageJob implements ShouldQueue
                 'user_id' => $this->userId,
                 'title' => pathinfo($filename, PATHINFO_FILENAME),
                 'filename' => $filename,
-                'path' => $storagePath, // v15.0 Sync Full Path
                 'file_type' => strtolower(pathinfo($filename, PATHINFO_EXTENSION)),
                 'size' => filesize($absolutePath),
                 'privacy' => ($this->status === 'rejected') ? 'private' : $inheritedPrivacy, 
