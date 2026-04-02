@@ -181,7 +181,7 @@
                             id: '{{ $conn->id }}', 
                             name: '{{ addslashes($conn->name ?: $conn->email ?: "User") }}', 
                             avatar: '{{ addslashes($conn->avatar) }}', 
-                            is_verified: {{ $conn->is_verified ? 'true' : 'false' }} 
+                            is_verified: {{ $conn->is_badge_verified ? 'true' : 'false' }} 
                         }{{ !$loop->last ? ',' : '' }}
                         @endforeach
                     ],

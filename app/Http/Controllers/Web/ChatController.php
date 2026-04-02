@@ -44,7 +44,9 @@ class ChatController extends Controller
             ->pluck('count', 'sender_id')
             ->toArray();
 
-        return view('chat.hub', compact('connections', 'onlineMap', 'unreadCounts', 'partnerId'));
+        $isAdmin = $user->hasRole('admin') || $user->hasRole('super-admin') || $user->hasRole('super_admin') || in_array($user->role, ['admin', 'super_admin']);
+
+        return view('chat.hub', compact('connections', 'onlineMap', 'unreadCounts', 'partnerId', 'isAdmin'));
     }
 
     /**

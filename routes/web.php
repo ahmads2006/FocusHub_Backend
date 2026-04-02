@@ -135,6 +135,23 @@ Route::middleware(['auth', 'check.verified', 'check.banned', 'throttle:web'])->g
     Route::get('/api/chat/poll/{partner}', [\App\Http\Controllers\Web\ChatController::class, 'poll'])->name('chat.poll');
     Route::get('/api/chat/my-images', [\App\Http\Controllers\Web\ChatController::class, 'myImages'])->name('chat.my-images');
     Route::get('/api/chat/connections', [\App\Http\Controllers\Web\ChatController::class, 'connections'])->name('chat.connections');
+
+    // ─── Support Chat ───────────────────────────
+    // User endpoints
+    Route::get('/api/support/conversation', [\App\Http\Controllers\Web\SupportChatController::class, 'getOrCreateConversation'])->name('support.conversation');
+    Route::post('/api/support/send', [\App\Http\Controllers\Web\SupportChatController::class, 'sendMessage'])->name('support.send');
+    Route::get('/api/support/poll/{conversation}', [\App\Http\Controllers\Web\SupportChatController::class, 'pollMessages'])->name('support.poll');
+    
+    // Admin endpoints (Check admin permission inside controller or add middleware if preferred, but doing it in controller for simplicity now)
+    Route::middleware('permission:access-admin-panel')->group(function () {
+        Route::get('/api/support/admin/pending', [\App\Http\Controllers\Web\SupportChatController::class, 'pendingConversations'])->name('support.admin.pending');
+        Route::get('/api/support/admin/count', [\App\Http\Controllers\Web\SupportChatController::class, 'pendingCount'])->name('support.admin.count');
+        Route::post('/api/support/admin/claim/{conversation}', [\App\Http\Controllers\Web\SupportChatController::class, 'claimConversation'])->name('support.admin.claim');
+        Route::get('/api/support/admin/messages/{conversation}', [\App\Http\Controllers\Web\SupportChatController::class, 'adminMessages'])->name('support.admin.messages');
+        Route::post('/api/support/admin/send', [\App\Http\Controllers\Web\SupportChatController::class, 'adminSend'])->name('support.admin.send');
+        Route::get('/api/support/admin/poll/{conversation}', [\App\Http\Controllers\Web\SupportChatController::class, 'adminPoll'])->name('support.admin.poll');
+        Route::post('/api/support/admin/close/{conversation}', [\App\Http\Controllers\Web\SupportChatController::class, 'closeConversation'])->name('support.admin.close');
+    });
 });
 
 // ─── Admin Vault — Audit Trail Dashboard (super-admin only) ──────

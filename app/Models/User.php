@@ -267,6 +267,27 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
     }
 
 
+    /**
+     * علامة التوثيق الزرقاء (Blue Badge).
+     * تُمنح فقط لمن لديه 100 صورة معتمدة (خضراء) أو للأدمن بشكل استثنائي.
+     * هذا منفصل تماماً عن is_verified (تحقق البريد الإلكتروني).
+     */
+    public function getIsBadgeVerifiedAttribute(): bool
+    {
+        // الأدمن يحصل على العلامة دائماً
+        if ($this->hasRole('admin') || $this->hasRole('super-admin') || $this->hasRole('super_admin')
+            || in_array($this->role, ['admin', 'super_admin' , 'support'])) {
+            return true;
+        }
+
+        // عدد الصور المعتمدة (المنطقة الخضراء) >= 100
+        return $this->images()
+            ->whereHas('moderation', function ($q) {
+                $q->where('status', Image::STATUS_APPROVED);
+            })
+            ->count() >= 100;
+    }
+
     public function getIsBannedAttribute(): bool
     {
         return $this->userStatus?->is_banned ?? false;

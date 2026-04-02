@@ -16,3 +16,6 @@ Schedule::command('share-links:rotate')->everyFiveMinutes();
 
 // Decay user preference weights weekly to favor recent interactions
 Schedule::command('preferences:decay')->weekly();
+
+// Auto-close inactive support chats
+Schedule::command('support:autoclose')->everyMinute();
