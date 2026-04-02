@@ -137,12 +137,12 @@ class SightengineAnalyzer implements MediaAnalyzerInterface
             $goreScore = 0;
             if (isset($data['gore']['classes'])) {
                 $goreScore = max(
-                    $data['gore']['classes']['very_bloody'] ?? 0,
-                    $data['gore']['classes']['slightly_bloody'] ?? 0,
-                    $data['gore']['classes']['corpse'] ?? 0,
-                    $data['gore']['classes']['serious_injury'] ?? 0,
-                    $data['gore']['classes']['superficial_injury'] ?? 0,
-                    $data['gore']['classes']['body_organ'] ?? 0
+                    $data['gore']['classes']['very_bloody'] ?? 0.8,
+                    $data['gore']['classes']['slightly_bloody'] ?? 0.6,
+                    $data['gore']['classes']['corpse'] ?? 0.9,
+                    $data['gore']['classes']['serious_injury'] ?? 0.7,
+                    $data['gore']['classes']['superficial_injury'] ?? 0.5,
+                    $data['gore']['classes']['body_organ'] ?? 0.7
                 );
                 if ($goreScore > 0.4) {
                     $isSensitive = true;
@@ -261,6 +261,7 @@ class SightengineAnalyzer implements MediaAnalyzerInterface
             if (isset($data['text']['profanity'])) {
                 foreach ($data['text']['profanity'] as $p) $tags[] = $p['text'];
             }
+          
 
             $sceneType = $data['type'] ?? null;
             if (isset($data['properties']['description'])) {
