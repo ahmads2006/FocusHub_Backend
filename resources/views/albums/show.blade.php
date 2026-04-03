@@ -193,7 +193,7 @@
                     
                     <form action="{{ route('albums.collaborators.add', $album) }}" method="POST" class="space-y-6">
                         @csrf
-                        <input type="hidden" name="username" :value="selectedUser ? selectedUser.name : ''" required>
+                        <input type="hidden" name="user_id" :value="selectedUser ? selectedUser.id : ''" required>
 
                         <!-- Search Input -->
                         <div class="relative group">

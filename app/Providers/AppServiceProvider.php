@@ -39,7 +39,6 @@ class AppServiceProvider extends ServiceProvider
         }
         // Register Observers
         \App\Models\ImageModeration::observe(\App\Observers\ImageModerationObserver::class);
-        \App\Models\AlbumSettings::observe(\App\Observers\AlbumSettingsObserver::class);
         \App\Models\Like::observe(\App\Observers\LikeObserver::class);
         \App\Models\Connection::observe(\App\Observers\ConnectionObserver::class);
         \App\Models\Image::observe(\App\Observers\ImageObserver::class);
@@ -61,9 +60,6 @@ class AppServiceProvider extends ServiceProvider
                 config(['session.same_site' => 'none']);
             }
         }
-
-        // Register Observers
-        \App\Models\AlbumSettings::observe(\App\Observers\AlbumSettingsObserver::class);
 
         // Define the gate for the super admin
         Gate::before(function (User $user) {

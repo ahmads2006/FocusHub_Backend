@@ -9,6 +9,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Notifications\Messages\BroadcastMessage;
+use Illuminate\Broadcasting\PrivateChannel;
 
 class ChatMessageNotification extends Notification implements ShouldQueue, ShouldBroadcast
 {
@@ -26,6 +27,19 @@ class ChatMessageNotification extends Notification implements ShouldQueue, Shoul
     public function via($notifiable)
     {
         return ['database', 'broadcast'];
+    }
+
+    /**
+     * The channels the notification should broadcast on.
+     */
+    public function broadcastOn()
+    {
+        return [new PrivateChannel('App.Models.User.' . $this->sender->id)];
+    }
+
+    public function broadcastType()
+    {
+        return 'chat.message';
     }
 
     public function toBroadcast($notifiable)

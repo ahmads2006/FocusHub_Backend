@@ -85,12 +85,18 @@
                             <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" 
                                  data-src="{{ $photo->url }}" 
                                  alt="{{ $photo->title }}" 
-                                 class="lazy w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110"
-                                 onload="if(this.src === this.dataset.src) this.classList.add('is-loaded')">
-                            <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                 class="lazy w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110 select-none"
+                                 onload="if(this.src === this.dataset.src) this.classList.add('is-loaded')"
+                                 @if($link->permission !== 'download') oncontextmenu="return false;" draggable="false" @endif>
+                            <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
+                            
+                            @if($link->permission !== 'download')
+                                <!-- Invisible overlay to block right click and dragging completely -->
+                                <div class="absolute inset-0 z-20" oncontextmenu="return false;"></div>
+                            @endif
                             
                             @if($link->permission === 'download')
-                            <div class="absolute top-4 left-4 opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all duration-500">
+                            <div class="absolute top-4 left-4 z-30 opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all duration-500">
                                 <a href="{{ $photo->getOriginalUrl() }}" download class="glass p-3 rounded-2xl flex items-center justify-center text-white hover:bg-white/10 transition-colors">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
                                 </a>

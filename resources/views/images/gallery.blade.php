@@ -137,11 +137,17 @@
 
   /* Shimmer */
   @keyframes shimmer { from { transform:translateX(-100%); } to { transform:translateX(200%); } }
-  .shimmer { position: relative; overflow: hidden; }
+  .shimmer { position: relative; overflow: hidden; background: var(--ink-3); }
   .shimmer::after {
     content: ''; position: absolute; inset: 0;
-    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.04), transparent);
-    animation: shimmer 2.8s infinite;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent);
+    animation: shimmer 1.5s infinite;
+    z-index: 5;
+  }
+  .shimmer.loaded::after { display: none; }
+  @keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
   }
 
   /* Fade-up stagger */
@@ -313,7 +319,7 @@
         @php
           $isOwner      = auth()->id() === $image->user_id;
           $protAttrs    = !$isOwner ? 'oncontextmenu="return false;" ondragstart="return false;"' : '';
-          $imgUrl       = $image->url;
+          $imgUrl       = app(\App\Services\Core\AssetDeliveryService::class)->getUrl($image, 'card');
           $isSensitive  = $image->is_sensitive || in_array($image->status, ['rejected', 'pending_review']);
           $reasons      = explode(',', $image->sensitivity_reason ?? '');
 
@@ -360,12 +366,13 @@
                             download_url: '{{ $image->allow_download ? route('images.download', $image) : '#' }}'
                           })">
 
-            <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
-                 data-src="{{ $imgUrl }}"
-                 alt="{{ $image->title ?: 'Photograph' }}"
-                 class="card-img w-full h-full object-cover lazy select-none transition-transform duration-700 group-hover:scale-110"
-                 onload="this.classList.add('is-loaded')"
-                 width="400" height="300" loading="lazy">
+             <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+                  data-src="{{ $imgUrl }}"
+                  alt="{{ $image->title ?: 'Photograph' }}"
+                  class="card-img w-full h-full object-cover {{ $loop->index < 10 ? '' : 'lazy' }} select-none transition-transform duration-700 group-hover:scale-110"
+                  onload="this.classList.add('is-loaded')"
+                  @if($loop->index < 10) src="{{ $imgUrl }}" @endif
+                  width="400" height="300" loading="{{ $loop->index < 10 ? 'eager' : 'lazy' }}">
 
             {{-- Hover overlay --}}
             <div class="card-overlay absolute inset-0 z-10 flex flex-col justify-end p-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
@@ -656,7 +663,7 @@
     <div id="list-container" class="space-y-3">
     @fragment('list-items')
     @forelse($images as $image)
-      @php $isOwner = auth()->id() === $image->user_id; $imgUrl = $image->url; @endphp
+      @php $isOwner = auth()->id() === $image->user_id; $imgUrl = app(\App\Services\Core\AssetDeliveryService::class)->getUrl($image, 'list'); @endphp
       <div class="list-row fade-up cursor-pointer group"
            @click="openModal({
                     id: '{{ $image->id }}',
@@ -678,9 +685,10 @@
         <div class="rounded-xl overflow-hidden flex-shrink-0 group-hover:ring-2 ring-purple-500/50 transition-all" style="width:72px;height:56px;background:var(--ink-3);">
           <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
                data-src="{{ $imgUrl }}" alt="{{ $image->title }}"
-               class="lazy w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+               class="{{ $loop->index < 10 ? '' : 'lazy' }} w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                onload="this.classList.add('is-loaded')"
-               loading="lazy">
+               @if($loop->index < 10) src="{{ $imgUrl }}" @endif
+               loading="{{ $loop->index < 10 ? 'eager' : 'lazy' }}">
         </div>
         <div class="min-w-0">
           <p class="font-body font-medium text-sm truncate" style="color:var(--text);">{{ $image->title ?: 'Untitled' }}</p>
@@ -817,7 +825,7 @@ window.setLazyLoad = function() {
           }
         }
       });
-    }, { rootMargin: '200px 0px', threshold: 0.1 });
+    }, { rootMargin: '400px 0px', threshold: 0.1 });
     document.querySelectorAll('img.lazy').forEach(img => obs.observe(img));
   } else {
     document.querySelectorAll('img.lazy').forEach(img => { 

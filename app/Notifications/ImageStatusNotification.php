@@ -9,6 +9,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Notifications\Messages\BroadcastMessage;
+use Illuminate\Broadcasting\PrivateChannel;
 
 class ImageStatusNotification extends Notification implements ShouldQueue, ShouldBroadcast
 {
@@ -30,6 +31,19 @@ class ImageStatusNotification extends Notification implements ShouldQueue, Shoul
         return ['database', 'broadcast'];
     }
 
+    /**
+     * The channels the notification should broadcast on.
+     */
+    public function broadcastOn()
+    {
+        return [new PrivateChannel('App.Models.User.' . $this->image->user_id)];
+    }
+
+    public function broadcastType()
+    {
+        return 'image.status';
+    }
+
     public function toBroadcast($notifiable)
     {
         return new BroadcastMessage([
@@ -47,7 +61,7 @@ class ImageStatusNotification extends Notification implements ShouldQueue, Shoul
             'status' => $this->status, // 'success', 'failed', 'rejected'
             'message' => $this->message,
             'image_title' => $this->image->title,
-            'action_url' => route('images.show', $this->image->id),
+            'action_url' => route('images.gallery') . '#image-' . $this->image->id,
         ];
     }
 }

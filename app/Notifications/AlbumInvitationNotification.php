@@ -10,6 +10,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Notifications\Messages\BroadcastMessage;
+use Illuminate\Broadcasting\PrivateChannel;
 
 class AlbumInvitationNotification extends Notification implements ShouldQueue, ShouldBroadcast
 {
@@ -27,6 +28,22 @@ class AlbumInvitationNotification extends Notification implements ShouldQueue, S
     public function via($notifiable)
     {
         return ['database', 'broadcast'];
+    }
+
+    /**
+     * The channels the notification should broadcast on.
+     */
+    public function broadcastOn()
+    {
+        return [new PrivateChannel('App.Models.User.' . $this->inviter->id)];
+    }
+
+    /**
+     * The event name for broadcasting.
+     */
+    public function broadcastType()
+    {
+        return 'album.invitation';
     }
 
     public function toBroadcast($notifiable)
@@ -47,7 +64,7 @@ class AlbumInvitationNotification extends Notification implements ShouldQueue, S
             'inviter_id' => $this->inviter->id,
             'inviter_name' => $this->inviter->name,
             'message' => "قام {$this->inviter->name} بدعوتك للانضمام إلى الألبوم التعاوني: {$this->album->title}",
-            'action_url' => route('chat.hub', ['partner' => $this->inviter->id]), // Redirect to chat with inviter
+            'action_url' => route('chat.hub', ['partner' => $this->inviter->id]),
         ];
     }
 }

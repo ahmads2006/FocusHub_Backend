@@ -8,6 +8,7 @@ use Illuminate\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Notifications\Messages\BroadcastMessage;
+use Illuminate\Broadcasting\PrivateChannel;
 
 class SupportRequestNotification extends Notification implements ShouldQueue, ShouldBroadcast
 {
@@ -23,6 +24,19 @@ class SupportRequestNotification extends Notification implements ShouldQueue, Sh
     public function via($notifiable)
     {
         return ['database', 'broadcast'];
+    }
+
+    /**
+     * The channels the notification should broadcast on.
+     */
+    public function broadcastOn()
+    {
+        return [new PrivateChannel('App.Models.User.' . $this->requester->id)];
+    }
+
+    public function broadcastType()
+    {
+        return 'support.request';
     }
 
     public function toBroadcast($notifiable)

@@ -96,48 +96,4 @@ class ImageKitService
         ]);
     }
 
-    /**
-     * Get a blurred URL for sensitive content (Yellow layer).
-     */
-    /* public function getBlurredUrl(string $path, bool $signed = true): string
-    {
-        return $this->imagekit->url([
-         'path' => $path,
-            'signed' => $signed,
-            'expireSeconds' => 3600, // 1 hour for previews
-            'transformation' => [
-                [
-                    'format' => 'webp',
-                    'quality' => 'auto',
-                    'blur' => '10', // Significant blur
-                ],
-                [
-                    'overlayText' => 'SENSITIVE CONTENT',
-                    'overlayTextFontSize' => '40',
-                    'overlayTextColor' => 'FFFFFF',
-                    'overlayAlpha' => '80',
-                    'overlayX' => 'center',
-                    'overlayY' => 'center',
-                ]
-            ],
-        ]);
-    }    
-   
-    /*
-     * Get a tiny, blurred placeholder URL (LQIP) for the Blur-up technique.
-     */
-   /* public function getPlaceholderUrl(string $path): string
-    {
-        return $this->imagekit->url([
-            'path' => $path,
-            'transformation' => [
-                [
-                    'width' => '20',
-                    'blur' => '30',
-                    'quality' => '10',
-                    'format' => 'webp',
-                ]
-            ],
-        ]);
-    }    */
 }

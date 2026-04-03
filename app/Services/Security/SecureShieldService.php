@@ -147,13 +147,15 @@ class SecureShieldService
         $patchWidth = max($patchWidth, 350);
         $patchHeight = max($patchHeight, 100);
         
-        // Use smart position if available, otherwise default to bottom-left
-        $x = $position['x'] ?? (int)($width * 0.05);
-        $y = $position['y'] ?? (int)($height * 0.83);
+        // Force Bottom-Right alignment correctly with padding
+        $padding = max(20, (int)($width * 0.03));
+        
+        $x = $width - $patchWidth - $padding;
+        $y = $height - $patchHeight - $padding;
 
-        // Adjust x, y to be top-left of the patch for drawing
-        $x = max(0, $x - ($patchWidth / 2));
-        $y = max(0, $y - ($patchHeight / 2));
+        // Ensure we don't go out of bounds on very small images
+        $x = max(0, $x);
+        $y = max(0, $y);
         
         // 1. Frosted Glass Bounding Box
         $img->drawRectangle($x, $y, function (RectangleFactory $rect) use ($patchWidth, $patchHeight) {

@@ -69,39 +69,20 @@ class RecommendationEngine
      * - 20% Discovery Match: Based on secondary tags (6-15) to expand taste.
      * - 30% Random/Trending: Pure trending or random to break the filter bubble.
      */
-    public function getForYouFeed(User $user, int $limit = 20, bool $includeOwnImages = false)
+    public function getForYouFeed(User $user, int $limit = 500, bool $includeOwnImages = false)
     {
         $startTime = microtime(true);
-        $cacheKey = "feed:for_you:{$user->id}:" . ($includeOwnImages ? 'all' : 'others');
+        $cacheKey = "feed:for_you:{$user->id}:" . ($includeOwnImages ? 'all' : 'others') . ":v8"; // Version bump for new logic
 
         // Use Redis Cache Tags tied to the user ID.
         $feed = Cache::tags(["user:{$user->id}", 'feeds'])->remember($cacheKey, 300, function () use ($user, $limit, $includeOwnImages) {
             $prefs = UserPreference::where('user_id', $user->id)->first();
 
-            // Cold Start Fallback — no prefs yet
-            if (!$prefs || (empty($prefs->tag_weights) && empty($prefs->creator_weights))) {
-                return $this->getTrendingFeed($limit, $includeOwnImages);
-            }
-
-            // --- Parse preference weights ---
-            $tagWeights = $prefs->tag_weights ?? [];
-            arsort($tagWeights);
-            $allTagKeys = array_keys($tagWeights);
-
-            $creatorWeights = $prefs->creator_weights ?? [];
-            arsort($creatorWeights);
-            $topCreators = array_keys(array_slice($creatorWeights, 0, 5, true));
-
-            // --- Feed Bucket Sizes ---
-            $directCount    = (int) ceil($limit * 0.50);  // 50%
-            $discoveryCount = (int) ceil($limit * 0.20);  // 20%
-            $randomCount    = $limit - $directCount - $discoveryCount; // 30%
-
             // --- Hidden images (not interested) from Redis ---
             $hiddenIds = Redis::smembers("hidden_images:{$user->id}") ?? [];
 
-            // Base query constraints (shared across all buckets)
-            $baseConstraints = function ($q) use ($user, $hiddenIds, $includeOwnImages) {
+            // Base query constraints for UNLIKED items (Discovery Phase)
+            $unlikedConstraints = function ($q) use ($user, $hiddenIds, $includeOwnImages) {
                 $q->where('privacy', 'public')
                   ->whereDoesntHave('likes', fn($lq) => $lq->where('user_id', $user->id));
                 
@@ -114,11 +95,26 @@ class RecommendationEngine
                 }
             };
 
-            // ── BUCKET 1: 50% Direct Match (top 5 tags + top creators) ──────
+            // Bucket Sizes (Aim for the limit with unliked content first)
+            $directCount    = (int) ceil($limit * 0.50);  // 50%
+            $discoveryCount = (int) ceil($limit * 0.20);  // 20%
+            $randomCount    = $limit - $directCount - $discoveryCount; // 30%
+
+            // 1. Parse Preferences
+            $tagWeights = $prefs->tag_weights ?? [];
+            arsort($tagWeights);
+            $allTagKeys = array_keys($tagWeights);
             $topTags = array_slice($allTagKeys, 0, 5);
+            $secondaryTags = array_slice($allTagKeys, 5, 10);
+
+            $creatorWeights = $prefs->creator_weights ?? [];
+            arsort($creatorWeights);
+            $topCreators = array_keys(array_slice($creatorWeights, 0, 5, true));
+
+            // ── BUCKET 1: Direct Match (Unliked) ──
             $directResults = collect();
             if (!empty($topTags) || !empty($topCreators)) {
-                $q = Image::query()->tap($baseConstraints);
+                $q = Image::query()->tap($unlikedConstraints);
                 if (!empty($topTags)) {
                     $json = json_encode($topTags);
                     $q->whereRaw("JSON_OVERLAPS(JSON_EXTRACT(labels, '$[*].description'), ?) OR JSON_OVERLAPS(labels, ?)", [$json, $json]);
@@ -130,14 +126,13 @@ class RecommendationEngine
                 $directResults = $q->latest()->take($directCount)->get();
             }
 
-            // ── BUCKET 2: 20% Discovery Match (secondary tags 6-15) ──────────
-            $secondaryTags = array_slice($allTagKeys, 5, 10);
+            // ── BUCKET 2: Discovery Match (Unliked) ──
             $discoveryResults = collect();
             if (!empty($secondaryTags)) {
                 $json = json_encode($secondaryTags);
                 $excludeIds = array_merge($hiddenIds, $directResults->pluck('id')->toArray());
                 $discoveryResults = Image::query()
-                    ->tap($baseConstraints)
+                    ->tap($unlikedConstraints)
                     ->whereNotIn('id', $excludeIds)
                     ->whereRaw("JSON_OVERLAPS(JSON_EXTRACT(labels, '$[*].description'), ?) OR JSON_OVERLAPS(labels, ?)", [$json, $json])
                     ->latest()
@@ -145,43 +140,33 @@ class RecommendationEngine
                     ->get();
             }
 
-            $excludeIds = array_merge(
-                $hiddenIds,
-                $directResults->pluck('id')->toArray(),
-                $discoveryResults->pluck('id')->toArray()
-            );
-
-            // ── BUCKET 3: Trending / Latest Fallback (Fill the remaining slots) ──
-            // Dynamically calculate remaining slots to ensure we always hit the $limit
-            $remainingCount = max(0, $limit - $directResults->count() - $discoveryResults->count());
-
-            // Fetch images based on likes count, then latest date, excluding already shown
-            $randomResults = Image::query()
-                ->tap($baseConstraints)
+            // ── BUCKET 3: Trending/Latest Fallback (Unliked) ──
+            $excludeIds = array_merge($hiddenIds, $directResults->pluck('id')->toArray(), $discoveryResults->pluck('id')->toArray());
+            $remainingFreshCount = max(0, $limit - $directResults->count() - $discoveryResults->count());
+            
+            $freshResults = Image::query()
+                ->tap($unlikedConstraints)
                 ->whereNotIn('id', $excludeIds)
                 ->withCount('likes')
                 ->orderBy('likes_count', 'desc')
                 ->latest()
-                ->take($remainingCount)
+                ->take($remainingFreshCount)
                 ->get();
-            
-            // Absolute fallback: if still empty, try pure random
-            if ($randomResults->isEmpty()) {
-                $randomResults = Image::query()
-                    ->tap($baseConstraints)
-                    ->whereNotIn('id', $excludeIds)
-                    ->inRandomOrder()
-                    ->take($remainingCount)
-                    ->get();
-            }
 
-            // ── Merge and shuffle to make feed look natural ───────────────────
-            return $directResults
-                ->merge($discoveryResults)
-                ->merge($randomResults)
-                ->unique('id')
-                ->shuffle()
-                ->values();
+            // ── BUCKET 4: Historical Likes (Show last) ──
+            // Only fetch if we need more to hit the total pool limit, or just fetch the most recent likes
+            $likedResults = Image::query()
+                ->where('privacy', 'public')
+                ->whereHas('likes', fn($lq) => $lq->where('user_id', $user->id))
+                ->latest()
+                ->take(100) // Limit historical to last 100 to avoid huge pools
+                ->get();
+
+            // Shuffle the fresh discovery pool to look natural
+            $freshDiscoveryPool = $directResults->merge($discoveryResults)->merge($freshResults)->unique('id')->shuffle();
+
+            // Append Liked content at the end
+            return $freshDiscoveryPool->merge($likedResults)->unique('id')->values();
         });
 
         // 3. Emit Feed Datadog Metrics

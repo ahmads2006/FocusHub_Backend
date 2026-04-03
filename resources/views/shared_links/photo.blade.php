@@ -25,8 +25,14 @@
             <!-- Asset Card -->
             <div class="glass-dark rounded-[40px] border border-white/5 overflow-hidden shadow-2xl flex flex-col lg:flex-row min-h-[600px]">
                 <!-- Image Side -->
-                <div class="lg:w-2/3 bg-black/40 flex items-center justify-center p-4 min-h-[400px]">
-                    <img src="{{ $photo->url }}" alt="{{ $photo->title }}" class="max-w-full max-h-[80vh] shadow-2xl rounded-lg">
+                <div class="relative lg:w-2/3 bg-black/40 flex items-center justify-center p-4 min-h-[400px]">
+                    <img src="{{ $photo->url }}" alt="{{ $photo->title }}" class="max-w-full max-h-[80vh] shadow-2xl rounded-lg select-none"
+                         @if($link->permission !== 'download') oncontextmenu="return false;" draggable="false" @endif>
+                    
+                    @if($link->permission !== 'download')
+                        <!-- Invisible overlay to block right click and dragging completely -->
+                        <div class="absolute inset-0 z-10" oncontextmenu="return false;"></div>
+                    @endif
                 </div>
 
                 <!-- Info Side -->

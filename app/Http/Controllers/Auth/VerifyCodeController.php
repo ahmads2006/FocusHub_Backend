@@ -40,6 +40,8 @@ class VerifyCodeController extends Controller
                 ->withErrors(['code' => 'انتهت صلاحية الجلسة. يرجى تسجيل الدخول من جديد.']);
         }
 
+        $user = User::find($userId);
+
         if (!$user) {
             return redirect()->route('register')
                 ->withErrors(['code' => 'المستخدم غير موجود.']);

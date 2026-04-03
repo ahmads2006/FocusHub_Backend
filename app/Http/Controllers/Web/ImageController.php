@@ -52,7 +52,7 @@ class ImageController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'image' => 'required|image|mimes:jpeg,png,jpg,webp|max:10240',
+            'image' => 'required|image|mimes:jpeg,png,jpg,webp,gif,heic,heif|max:10240',
             'privacy' => 'in:public,private',
             'album_id' => 'nullable|exists:albums,id',
             'title' => 'nullable|string|max:255',
@@ -274,21 +274,21 @@ class ImageController extends Controller
 
         if ($selectedTag) {
             $query->whereRaw('JSON_CONTAINS(labels, ?)', [json_encode($selectedTag)]);
-            $images = $query->latest()->paginate(12);
+            $images = $query->latest()->paginate(20);
         } else {
             // No tag selected. If user is logged in, use personalized For You engine
             $user = auth()->user();
             if ($user) {
                 // Fetch up to 60 personalized images (5 pages of 12)
                 $recommendationEngine = app(\App\Services\AI\RecommendationEngine::class);
-                $feedPool = $recommendationEngine->getForYouFeed($user, 60, true);
+                $feedPool = $recommendationEngine->getForYouFeed($user, 500, true);
 
                 // Eager load relationships necessary for the gallery view
                 $feedPool->load(['settings', 'user', 'labelData']);
                 $feedPool->loadCount('likes');
 
                 // Manual pagination of the collection
-                $perPage = 12;
+                $perPage = 20;
                 $page = \Illuminate\Pagination\Paginator::resolveCurrentPage() ?: 1;
                 $slice = $feedPool->slice(($page - 1) * $perPage, $perPage)->values();
 
@@ -301,7 +301,7 @@ class ImageController extends Controller
                 );
             } else {
                 // Guests fallback to latest timeline
-                $images = $query->latest()->paginate(12);
+                $images = $query->latest()->paginate(20);
             }
         }
 

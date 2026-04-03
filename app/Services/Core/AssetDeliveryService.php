@@ -57,6 +57,14 @@ class AssetDeliveryService
             case 'square':
                 return $isInCloud ? $imageKit->getOptimizedUrl($path, 400, 400) : $image->getThumbnailUrl('square');
 
+            case 'card':
+                // Optimized 4:3 aspect ratio for gallery cards
+                return $isInCloud ? $imageKit->getOptimizedUrl($path, 400, 300) : $image->getThumbnailUrl('medium');
+
+            case 'list':
+                // Small version for list items/miniatures
+                return $isInCloud ? $imageKit->getOptimizedUrl($path, 200, 150) : $image->getThumbnailUrl('avatar');
+
             case 'gallery':
             case 'preview':
                 return $isInCloud ? $imageKit->getOptimizedUrl($path, 800) : $image->getThumbnailUrl('medium');

@@ -47,24 +47,22 @@ class AlbumController extends Controller
         }
 
         $validated = $request->validate([
-            'username' => 'required|string',
+            'user_id' => 'required|string',
             'role' => 'required|in:admin,contributor,viewer',
         ]);
 
-        $userToAdd = User::whereHas('profile', function($q) use ($validated) {
-            $q->where('username', $validated['username']);
-        })->first();
+        $userToAdd = User::find($validated['user_id']);
 
         if (!$userToAdd) {
-            return back()->withErrors(['username' => 'لم يتم العثور على مستخدم بهذا الاسم الفريد (@username).']);
+            return back()->withErrors(['user_id' => 'لم يتم العثور على المستخدم المطلوب.']);
         }
 
         if ($userToAdd->id === $album->user_id) {
-            return back()->withErrors(['username' => 'لا يمكنك إضافة نفسك كمتعاون (أنت مالك الألبوم).']);
+            return back()->withErrors(['user_id' => 'لا يمكنك إضافة نفسك كمتعاون (أنت مالك الألبوم).']);
         }
 
         if ($album->collaborators->contains($userToAdd->id)) {
-            return back()->withErrors(['username' => 'هذا المستخدم متعاون بالفعل في هذا الألبوم.']);
+            return back()->withErrors(['user_id' => 'هذا المستخدم متعاون بالفعل في هذا الألبوم.']);
         }
 
         $album->collaborators()->attach($userToAdd->id, ['role' => $validated['role']]);

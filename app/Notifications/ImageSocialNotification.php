@@ -10,6 +10,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Notifications\Messages\BroadcastMessage;
+use Illuminate\Broadcasting\PrivateChannel;
 
 class ImageSocialNotification extends Notification implements ShouldQueue, ShouldBroadcast
 {
@@ -29,6 +30,19 @@ class ImageSocialNotification extends Notification implements ShouldQueue, Shoul
     public function via($notifiable)
     {
         return ['database', 'broadcast'];
+    }
+
+    /**
+     * The channels the notification should broadcast on.
+     */
+    public function broadcastOn()
+    {
+        return [new PrivateChannel('App.Models.User.' . $this->actor->id)];
+    }
+
+    public function broadcastType()
+    {
+        return 'image.social';
     }
 
     public function toBroadcast($notifiable)
@@ -54,7 +68,7 @@ class ImageSocialNotification extends Notification implements ShouldQueue, Shoul
             'image_title' => $this->image->title,
             'message' => $message,
             
-            'action_url' => route('images.gallery') . '#image-' . $this->image->id, // Link to gallery
+            'action_url' => route('images.gallery') . '#image-' . $this->image->id,
         ];
     }
 }

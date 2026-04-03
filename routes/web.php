@@ -97,11 +97,11 @@ Route::middleware(['auth', 'check.verified', 'check.banned', 'throttle:web'])->g
     Route::get('/gallery', [ImageController::class, 'gallery'])->name('images.gallery');
     
 
-    // Laboratory (Feature Testing)
+    // Laboratory (Feature Testing) - restricted to Super Admin
     Route::get('/lab', function() {
         return view('lab.dashboard');
-    })->name('lab.index');
-    Route::post('/lab/process', [\App\Http\Controllers\Web\LabController::class, 'process'])->name('lab.process');
+    })->middleware('CheckSuperAdmin')->name('lab.index');
+    Route::post('/lab/process', [\App\Http\Controllers\Web\LabController::class, 'process'])->middleware('CheckSuperAdmin')->name('lab.process');
 
     // Album Collaboration & Management
     Route::get('/albums/{album}', [AlbumController::class, 'show'])->name('albums.show');
@@ -142,7 +142,7 @@ Route::middleware(['auth', 'check.verified', 'check.banned', 'throttle:web'])->g
     Route::post('/api/support/send', [\App\Http\Controllers\Web\SupportChatController::class, 'sendMessage'])->name('support.send');
     Route::get('/api/support/poll/{conversation}', [\App\Http\Controllers\Web\SupportChatController::class, 'pollMessages'])->name('support.poll');
     
-    // Admin endpoints (Check admin permission inside controller or add middleware if preferred, but doing it in controller for simplicity now)
+    // Admin endpoints
     Route::middleware('permission:access-admin-panel')->group(function () {
         Route::get('/api/support/admin/pending', [\App\Http\Controllers\Web\SupportChatController::class, 'pendingConversations'])->name('support.admin.pending');
         Route::get('/api/support/admin/count', [\App\Http\Controllers\Web\SupportChatController::class, 'pendingCount'])->name('support.admin.count');

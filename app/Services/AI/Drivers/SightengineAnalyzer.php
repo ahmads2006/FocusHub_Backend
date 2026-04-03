@@ -100,66 +100,12 @@ class SightengineAnalyzer implements MediaAnalyzerInterface
                 $tags[] = $data['properties']['description'];
             }
 
-            // --- Safety Analysis (v15.0: Specialized Pipeline) ---
-            $isSensitive = false;
-            $sensitivityReasons = [];
-            
-            // 1. Nudity check
-            $nudityNone = $data['nudity']['none'] ?? 1;
-            if ($nudityNone < 0.5) {
-                $isSensitive = true;
-                $sensitivityReasons[] = 'nudity';
-            }
-            
-            // 2. Weapon check (Properly handle array of classes)
-            if (!$isSensitive && isset($data['weapon'])) {
-                foreach ($data['weapon'] as $class => $score) {
-                    if (is_numeric($score) && $score > 0.5) {
-                        $isSensitive = true;
-                        $sensitivityReasons[] = 'weapon';
-                        break;
-                    }
-                }
-            }
-            
-            // 3. Offensive check
-            if (!$isSensitive && isset($data['offensive'])) {
-                foreach ($data['offensive'] as $type => $score) {
-                    if (is_numeric($score) && $score > 0.5) {
-                        $isSensitive = true;
-                        $sensitivityReasons[] = 'offensive';
-                        break;
-                    }
-                }
-            }
-
-            // 4. Gore / Violence check (threshold 0.4)
-            $goreScore = 0;
-            if (isset($data['gore']['classes'])) {
-                $goreScore = max(
-                    $data['gore']['classes']['very_bloody'] ?? 0.8,
-                    $data['gore']['classes']['slightly_bloody'] ?? 0.6,
-                    $data['gore']['classes']['corpse'] ?? 0.9,
-                    $data['gore']['classes']['serious_injury'] ?? 0.7,
-                    $data['gore']['classes']['superficial_injury'] ?? 0.5,
-                    $data['gore']['classes']['body_organ'] ?? 0.7
-                );
-                if ($goreScore > 0.4) {
-                    $isSensitive = true;
-                    $sensitivityReasons[] = 'gore';
-                }
-            }
-
-            // --- Safety Verdict (The Master Decision) ---
-            $safetyVerdict = 'approved';
-            if ($isSensitive) {
-                // Hard reject: gore, nudity, or corpse
-                if ($goreScore > 0.4 || $nudityNone < 0.3 || in_array('gore', $sensitivityReasons)) {
-                    $safetyVerdict = 'rejected';
-                } else {
-                    $safetyVerdict = 'pending_review';
-                }
-            }
+            // --- Strict Safety Analysis ---
+            $safety = $this->evaluateSafety($data);
+            $isSensitive = $safety['isSensitive'];
+            $sensitivityReasons = $safety['sensitivityReasons'];
+            $goreScore = $safety['goreScore'];
+            $safetyVerdict = $safety['safetyVerdict'];
 
             // --- Quality Grade from Sightengine quality model ---
             $qualityGrade = 'high_quality';
@@ -268,65 +214,12 @@ class SightengineAnalyzer implements MediaAnalyzerInterface
                 $tags[] = $data['properties']['description'];
             }
 
-            // --- Safety Analysis (v15.0: Specialized Pipeline) ---
-            $isSensitive = false;
-            $sensitivityReasons = [];
-            
-            // 1. Nudity check
-            $nudityNone = $data['nudity']['none'] ?? 1;
-            if ($nudityNone < 0.5) {
-                $isSensitive = true;
-                $sensitivityReasons[] = 'nudity';
-            }
-            
-            // 2. Weapon check
-            if (!$isSensitive && isset($data['weapon'])) {
-                foreach ($data['weapon'] as $class => $score) {
-                    if (is_numeric($score) && $score > 0.5) {
-                        $isSensitive = true;
-                        $sensitivityReasons[] = 'weapon';
-                        break;
-                    }
-                }
-            }
-            
-            // 3. Offensive check
-            if (!$isSensitive && isset($data['offensive'])) {
-                foreach ($data['offensive'] as $type => $score) {
-                    if (is_numeric($score) && $score > 0.5) {
-                        $isSensitive = true;
-                        $sensitivityReasons[] = 'offensive';
-                        break;
-                    }
-                }
-            }
-
-            // 4. Gore / Violence check (threshold 0.4)
-            $goreScore = 0;
-            if (isset($data['gore']['classes'])) {
-                $goreScore = max(
-                    $data['gore']['classes']['very_bloody'] ?? 0,
-                    $data['gore']['classes']['slightly_bloody'] ?? 0,
-                    $data['gore']['classes']['corpse'] ?? 0,
-                    $data['gore']['classes']['serious_injury'] ?? 0,
-                    $data['gore']['classes']['superficial_injury'] ?? 0,
-                    $data['gore']['classes']['body_organ'] ?? 0
-                );
-                if ($goreScore > 0.4) {
-                    $isSensitive = true;
-                    $sensitivityReasons[] = 'gore';
-                }
-            }
-
-            // --- Safety Verdict ---
-            $safetyVerdict = 'approved';
-            if ($isSensitive) {
-                if ($goreScore > 0.4 || $nudityNone < 0.3 || in_array('gore', $sensitivityReasons)) {
-                    $safetyVerdict = 'rejected';
-                } else {
-                    $safetyVerdict = 'pending_review';
-                }
-            }
+            // --- Strict Safety Analysis ---
+            $safety = $this->evaluateSafety($data);
+            $isSensitive = $safety['isSensitive'];
+            $sensitivityReasons = $safety['sensitivityReasons'];
+            $goreScore = $safety['goreScore'];
+            $safetyVerdict = $safety['safetyVerdict'];
 
             $qualityGrade = 'high_quality';
             $blurScore = $data['quality']['blur'] ?? null;
@@ -384,5 +277,119 @@ class SightengineAnalyzer implements MediaAnalyzerInterface
         }
 
         return 'other';
+    }
+
+    /**
+     * Unified, strict safety evaluation logic matching the modern Sightengine API structure.
+     */
+    protected function evaluateSafety(array $data): array
+    {
+        $isSensitive = false;
+        $sensitivityReasons = [];
+
+        // 1. Nudity Check (Robust Parsing)
+        $nudityRisk = 0;
+        if (isset($data['nudity'])) {
+            $nudityRisk = max(
+                $data['nudity']['sexual_activity'] ?? 0,
+                $data['nudity']['sexual_display'] ?? 0,
+                $data['nudity']['erotica'] ?? 0,
+                $data['nudity']['suggestive'] ?? 0
+            );
+            
+            $safeScore = $data['nudity']['safe'] ?? $data['nudity']['none'] ?? 1;
+            
+            if ($nudityRisk > 0.5 || $safeScore < 0.5) {
+                $isSensitive = true;
+                $sensitivityReasons[] = 'nudity';
+            }
+        }
+
+        // 2. Weapon Check (Parse arrays or single probs properly, without masking)
+        if (isset($data['weapon'])) {
+            $weaponItems = $data['weapon']['classes'] ?? $data['weapon'];
+            if (is_numeric($weaponItems)) {
+                if ($weaponItems > 0.5) {
+                    $isSensitive = true;
+                    $sensitivityReasons[] = 'weapon';
+                }
+            } elseif (is_array($weaponItems)) {
+                foreach ($weaponItems as $score) {
+                    if (is_numeric($score) && $score > 0.5) {
+                        $isSensitive = true;
+                        $sensitivityReasons[] = 'weapon';
+                        break;
+                    }
+                }
+            }
+        }
+
+        // 3. Offensive Check (Parse properly without masking)
+        if (isset($data['offensive'])) {
+            $offItems = $data['offensive']['classes'] ?? $data['offensive'];
+            if (is_numeric($offItems)) {
+                if ($offItems > 0.5) {
+                    $isSensitive = true;
+                    $sensitivityReasons[] = 'offensive';
+                }
+            } elseif (is_array($offItems)) {
+                foreach ($offItems as $score) {
+                    if (is_numeric($score) && $score > 0.5) {
+                        $isSensitive = true;
+                        $sensitivityReasons[] = 'offensive';
+                        break;
+                    }
+                }
+            }
+        }
+
+        // 4. Gore / Violence Check
+        $goreScore = 0;
+        if (isset($data['gore'])) {
+            if (isset($data['gore']['prob'])) {
+                $goreScore = $data['gore']['prob'];
+            } elseif (isset($data['gore']['classes'])) {
+                $goreScore = max(
+                    $data['gore']['classes']['very_bloody'] ?? 0,
+                    $data['gore']['classes']['slightly_bloody'] ?? 0,
+                    $data['gore']['classes']['corpse'] ?? 0,
+                    $data['gore']['classes']['serious_injury'] ?? 0,
+                    $data['gore']['classes']['superficial_injury'] ?? 0,
+                    $data['gore']['classes']['body_organ'] ?? 0
+                );
+            } else {
+                $goreScore = max(
+                    $data['gore']['very_bloody'] ?? 0,
+                    $data['gore']['slightly_bloody'] ?? 0,
+                    $data['gore']['corpse'] ?? 0,
+                    $data['gore']['serious_injury'] ?? 0,
+                    $data['gore']['superficial_injury'] ?? 0,
+                    $data['gore']['body_organ'] ?? 0
+                );
+            }
+
+            if ($goreScore > 0.4) {
+                $isSensitive = true;
+                $sensitivityReasons[] = 'gore';
+            }
+        }
+
+        // 5. Verdict Assignment
+        $safetyVerdict = 'approved';
+        if ($isSensitive) {
+            // Hard reject conditions: High gore, high nudity risk
+            if ($goreScore > 0.4 || $nudityRisk > 0.7 || in_array('gore', $sensitivityReasons)) {
+                $safetyVerdict = 'rejected';
+            } else {
+                $safetyVerdict = 'pending_review';
+            }
+        }
+
+        return [
+            'isSensitive' => $isSensitive,
+            'sensitivityReasons' => $sensitivityReasons,
+            'goreScore' => $goreScore,
+            'safetyVerdict' => $safetyVerdict,
+        ];
     }
 }

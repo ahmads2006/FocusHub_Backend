@@ -18,11 +18,10 @@ class VerificationService
                 $q->where('status', 'approved');
             })
             ->whereHas('aiMetadata', function ($q) {
-                // Assuming aiMetadata contains gore/nudity scores as JSON structure
-                // Sightengine analyzer maps gore => 0.0
-                $q->where('driver_name', 'sightengine')
-                  ->whereJsonContains('data->goreScore', 0)
-                  ->whereJsonContains('data->nudityScore', 0);
+                // Fixed: The column is 'is_sensitive' (boolean) and it is already calculated
+                // by the AI drivers correctly. This avoids querying the non-existent 'data' column.
+                $q->where('is_sensitive', false)
+                  ->where('driver_name', 'sightengine');
             })
             ->count();
 
