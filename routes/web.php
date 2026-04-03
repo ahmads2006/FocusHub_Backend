@@ -84,6 +84,7 @@ Route::middleware(['auth', 'check.verified', 'check.banned', 'throttle:web'])->g
     Route::post('/images/{image}/like', [\App\Http\Controllers\Web\FeedController::class, 'like'])->middleware('throttle:likes')->name('images.like');
     Route::post('/images/{image}/bookmark', [\App\Http\Controllers\Web\FeedController::class, 'bookmark'])->middleware('throttle:likes')->name('images.bookmark');
     Route::post('/images/{image}/view', [\App\Http\Controllers\Web\FeedController::class, 'trackView'])->name('images.view');
+    Route::post('/images/{image}/dwell', [\App\Http\Controllers\Web\FeedController::class, 'trackDwell'])->name('images.dwell');
     Route::post('/images/{image}/not-interested', [\App\Http\Controllers\Web\FeedController::class, 'notInterested'])->name('images.not_interested');
 
 

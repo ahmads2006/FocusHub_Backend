@@ -279,22 +279,33 @@ class ImageController extends Controller
             // No tag selected. If user is logged in, use personalized For You engine
             $user = auth()->user();
             if ($user) {
-                // Fetch up to 60 personalized images (5 pages of 12)
+                // Fetch up to 500 personalized image IDs (Extremely fast, low RAM)
                 $recommendationEngine = app(\App\Services\AI\RecommendationEngine::class);
-                $feedPool = $recommendationEngine->getForYouFeed($user, 500, true);
+                $feedIds = $recommendationEngine->getForYouFeedIds($user, 500, true);
 
-                // Eager load relationships necessary for the gallery view
-                $feedPool->load(['settings', 'user', 'labelData']);
-                $feedPool->loadCount('likes');
-
-                // Manual pagination of the collection
+                // Manual pagination of the lightweight integer array
                 $perPage = 20;
                 $page = \Illuminate\Pagination\Paginator::resolveCurrentPage() ?: 1;
-                $slice = $feedPool->slice(($page - 1) * $perPage, $perPage)->values();
+                $totalCount = count($feedIds);
+
+                // Slice only the IDs needed for THIS specific page
+                $slicedIds = array_slice($feedIds, ($page - 1) * $perPage, $perPage);
+
+                // Hydrate ONLY the 20 models needed for this page
+                if (!empty($slicedIds)) {
+                    $placeholders = implode(',', array_fill(0, count($slicedIds), '?'));
+                    $models = Image::whereIn('id', $slicedIds)
+                        ->with(['settings', 'user', 'labelData'])
+                        ->withCount('likes')
+                        ->orderByRaw("FIELD(id, {$placeholders})", $slicedIds)
+                        ->get();
+                } else {
+                    $models = collect();
+                }
 
                 $images = new \Illuminate\Pagination\LengthAwarePaginator(
-                    $slice,
-                    $feedPool->count(),
+                    $models,
+                    $totalCount,
                     $perPage,
                     $page,
                     ['path' => \Illuminate\Pagination\Paginator::resolveCurrentPath(), 'query' => $request->query()]

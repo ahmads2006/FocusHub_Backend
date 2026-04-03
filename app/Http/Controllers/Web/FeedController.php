@@ -118,6 +118,30 @@ class FeedController extends Controller
     }
 
     /**
+     * Implicit Feedback: Track when a user dwells (deeply views) an image for > 3 seconds.
+     */
+    public function trackDwell(Request $request, Image $image)
+    {
+        $user = Auth::user();
+        if ($user && $user->id !== $image->user_id) {
+            $debounceKey = "dwelled:{$user->id}:{$image->id}";
+
+            // Debounce: Only track dwell if not dwelled in the last 12 hours
+            if (!\Illuminate\Support\Facades\Redis::exists($debounceKey)) {
+                // Set expiry for 12 hours
+                \Illuminate\Support\Facades\Redis::setex($debounceKey, 43200, 1);
+                
+                // Dispatch with a much higher fractional weight (0.5) for a deep view
+                \App\Jobs\UpdateUserPreferencesJob::dispatch($user->id, $image->id, 0.5);
+            }
+        }
+
+        return response()->json([
+            'success' => true
+        ]);
+    }
+
+    /**
      * Negative Signals: heavily penalize image tags when a user is not interested.
      */
     public function notInterested(Request $request, Image $image)

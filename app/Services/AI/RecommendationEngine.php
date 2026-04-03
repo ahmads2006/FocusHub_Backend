@@ -64,18 +64,16 @@ class RecommendationEngine
     }
 
     /**
-     * Gets the personalized feed using the 50/20/30 distribution strategy.
-     * - 50% Direct Match: Based on top 5 tags/creators (what user loves most).
-     * - 20% Discovery Match: Based on secondary tags (6-15) to expand taste.
-     * - 30% Random/Trending: Pure trending or random to break the filter bubble.
+     * Gets the personalized feed IDs using the 50/20/30 distribution strategy.
+     * Caches lightweight integer arrays instead of full heavy Models.
      */
-    public function getForYouFeed(User $user, int $limit = 500, bool $includeOwnImages = false)
+    public function getForYouFeedIds(User $user, int $limit = 500, bool $includeOwnImages = false)
     {
         $startTime = microtime(true);
-        $cacheKey = "feed:for_you:{$user->id}:" . ($includeOwnImages ? 'all' : 'others') . ":v8"; // Version bump for new logic
+        $cacheKey = "feed:for_you_ids:{$user->id}:" . ($includeOwnImages ? 'all' : 'others') . ":v9"; // Version bump for ID logic
 
         // Use Redis Cache Tags tied to the user ID.
-        $feed = Cache::tags(["user:{$user->id}", 'feeds'])->remember($cacheKey, 300, function () use ($user, $limit, $includeOwnImages) {
+        $feedIds = Cache::tags(["user:{$user->id}", 'feeds'])->remember($cacheKey, 300, function () use ($user, $limit, $includeOwnImages) {
             $prefs = UserPreference::where('user_id', $user->id)->first();
 
             // --- Hidden images (not interested) from Redis ---
@@ -123,61 +121,75 @@ class RecommendationEngine
                     $placeholders = implode(',', array_fill(0, count($topCreators), '?'));
                     $q->orderByRaw("FIELD(user_id, {$placeholders}) DESC", $topCreators);
                 }
-                $directResults = $q->latest()->take($directCount)->get();
+                $directResults = collect($q->latest()->take($directCount)->pluck('id'));
             }
 
             // ── BUCKET 2: Discovery Match (Unliked) ──
             $discoveryResults = collect();
             if (!empty($secondaryTags)) {
                 $json = json_encode($secondaryTags);
-                $excludeIds = array_merge($hiddenIds, $directResults->pluck('id')->toArray());
-                $discoveryResults = Image::query()
+                $excludeIds = array_merge($hiddenIds, $directResults->toArray());
+                $discoveryResults = collect(Image::query()
                     ->tap($unlikedConstraints)
                     ->whereNotIn('id', $excludeIds)
                     ->whereRaw("JSON_OVERLAPS(JSON_EXTRACT(labels, '$[*].description'), ?) OR JSON_OVERLAPS(labels, ?)", [$json, $json])
                     ->latest()
                     ->take($discoveryCount)
-                    ->get();
+                    ->pluck('id'));
             }
 
             // ── BUCKET 3: Trending/Latest Fallback (Unliked) ──
-            $excludeIds = array_merge($hiddenIds, $directResults->pluck('id')->toArray(), $discoveryResults->pluck('id')->toArray());
+            $excludeIds = array_merge($hiddenIds, $directResults->toArray(), $discoveryResults->toArray());
             $remainingFreshCount = max(0, $limit - $directResults->count() - $discoveryResults->count());
             
-            $freshResults = Image::query()
+            $freshResults = collect(Image::query()
                 ->tap($unlikedConstraints)
                 ->whereNotIn('id', $excludeIds)
                 ->withCount('likes')
                 ->orderBy('likes_count', 'desc')
                 ->latest()
                 ->take($remainingFreshCount)
-                ->get();
+                ->pluck('id'));
 
             // ── BUCKET 4: Historical Likes (Show last) ──
-            // Only fetch if we need more to hit the total pool limit, or just fetch the most recent likes
-            $likedResults = Image::query()
+            $likedResults = collect(Image::query()
                 ->where('privacy', 'public')
                 ->whereHas('likes', fn($lq) => $lq->where('user_id', $user->id))
                 ->latest()
-                ->take(100) // Limit historical to last 100 to avoid huge pools
-                ->get();
+                ->take(100) 
+                ->pluck('id'));
 
             // Shuffle the fresh discovery pool to look natural
-            $freshDiscoveryPool = $directResults->merge($discoveryResults)->merge($freshResults)->unique('id')->shuffle();
+            $freshDiscoveryPool = $directResults->merge($discoveryResults)->merge($freshResults)->unique()->shuffle();
 
-            // Append Liked content at the end
-            return $freshDiscoveryPool->merge($likedResults)->unique('id')->values();
+            // Append Liked content at the end and return as simple array of IDs
+            return $freshDiscoveryPool->merge($likedResults)->unique()->values()->toArray();
         });
 
         // 3. Emit Feed Datadog Metrics
         $latencyMs = (microtime(true) - $startTime) * 1000;
         $this->emitDatadogMetric('distribution', 'opticvault.recommendation.latency', $latencyMs);
         
-        // Track Hit Rate simply: if latency is very low (< 5ms), it was likely a Cache Hit
         $status = $latencyMs < 10 ? 'hit' : 'miss';
         $this->emitDatadogMetric('count', 'opticvault.redis.hit_rate', 1, ["status:{$status}"]);
 
-        return $feed;
+        return $feedIds;
+    }
+
+    /**
+     * Backward-compatible method returning fully hydrated Models for API endpoints
+     */
+    public function getForYouFeed(User $user, int $limit = 500, bool $includeOwnImages = false)
+    {
+        $ids = $this->getForYouFeedIds($user, $limit, $includeOwnImages);
+        if (empty($ids)) return collect();
+
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        return Image::whereIn('id', $ids)
+            ->with(['settings', 'user', 'labelData'])
+            ->withCount('likes')
+            ->orderByRaw("FIELD(id, {$placeholders})", $ids)
+            ->get();
     }
 
     /**

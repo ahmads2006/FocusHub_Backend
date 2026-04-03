@@ -917,16 +917,34 @@ document.addEventListener('alpine:init', () => {
         });
     },
 
+    dwellStartTime: null,
+
     openModal(data) {
         this.selectedImage = data;
         this.showModal = true;
         this.checkFollowStatus(data.user.id);
         document.body.style.overflow = 'hidden';
+        this.dwellStartTime = Date.now();
     },
 
     closeModal() {
         this.showModal = false;
         document.body.style.overflow = 'auto';
+
+        if (this.dwellStartTime && this.selectedImage) {
+            let dwellTime = Date.now() - this.dwellStartTime;
+            if (dwellTime >= 3000) {
+                // Send dwell event (Deep View) automatically
+                try {
+                    const csrf = document.querySelector('meta[name="csrf-token"]').content;
+                    fetch(`/images/${this.selectedImage.id}/dwell`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf }
+                    }).catch(() => {});
+                } catch(e) {}
+            }
+            this.dwellStartTime = null;
+        }
     },
 
     isNature() {

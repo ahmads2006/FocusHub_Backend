@@ -79,8 +79,11 @@ class UpdateUserPreferencesJob implements ShouldQueue
                 'creator_weights' => $creatorWeights,
             ]);
 
-            // 4. Invalidate the specific User's 'For You' Feed Cache
-            Cache::tags(["user:{$this->userId}", 'feeds'])->flush();
+            // Cache Invalidation Note:
+            // We intentionally do NOT flush the feed cache here anymore.
+            // Fast/heavy implicit actions (like View Tracking) will update the weights
+            // silently without destroying the user's current feed cache. Explicit
+            // actions (Like/Unlike) already flush the cache manually in the Controller.
 
             // Datadog Tracking happens via the Engine (Gauge), but we can log securely here.
             Log::channel('datadog')->debug('User preferences updated successfully via Job', [
