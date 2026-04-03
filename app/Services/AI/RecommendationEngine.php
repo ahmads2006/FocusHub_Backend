@@ -110,7 +110,7 @@ class RecommendationEngine
             $topCreators = array_keys(array_slice($creatorWeights, 0, 5, true));
 
             // ── BUCKET 1: Direct Match (Unliked) ──
-            $directResults = collect();
+            $directResults = [];
             if (!empty($topTags) || !empty($topCreators)) {
                 $q = Image::query()->tap($unlikedConstraints);
                 if (!empty($topTags)) {
@@ -121,49 +121,69 @@ class RecommendationEngine
                     $placeholders = implode(',', array_fill(0, count($topCreators), '?'));
                     $q->orderByRaw("FIELD(user_id, {$placeholders}) DESC", $topCreators);
                 }
-                $directResults = collect($q->latest()->take($directCount)->pluck('id'));
+                $directResults = $q->latest()->take($directCount)->get(['id', 'user_id', 'labels'])->toArray();
             }
 
+            $directIds = array_column($directResults, 'id');
+
             // ── BUCKET 2: Discovery Match (Unliked) ──
-            $discoveryResults = collect();
+            $discoveryResults = [];
             if (!empty($secondaryTags)) {
                 $json = json_encode($secondaryTags);
-                $excludeIds = array_merge($hiddenIds, $directResults->toArray());
-                $discoveryResults = collect(Image::query()
+                $excludeIds = array_merge($hiddenIds, $directIds);
+                $discoveryResults = Image::query()
                     ->tap($unlikedConstraints)
                     ->whereNotIn('id', $excludeIds)
                     ->whereRaw("JSON_OVERLAPS(JSON_EXTRACT(labels, '$[*].description'), ?) OR JSON_OVERLAPS(labels, ?)", [$json, $json])
                     ->latest()
                     ->take($discoveryCount)
-                    ->pluck('id'));
+                    ->get(['id', 'user_id', 'labels'])
+                    ->toArray();
             }
 
+            $discoveryIds = array_column($discoveryResults, 'id');
+
             // ── BUCKET 3: Trending/Latest Fallback (Unliked) ──
-            $excludeIds = array_merge($hiddenIds, $directResults->toArray(), $discoveryResults->toArray());
-            $remainingFreshCount = max(0, $limit - $directResults->count() - $discoveryResults->count());
+            $excludeIds = array_merge($hiddenIds, $directIds, $discoveryIds);
+            $remainingFreshCount = max(0, $limit - count($directResults) - count($discoveryResults));
             
-            $freshResults = collect(Image::query()
+            $freshResults = Image::query()
                 ->tap($unlikedConstraints)
                 ->whereNotIn('id', $excludeIds)
                 ->withCount('likes')
                 ->orderBy('likes_count', 'desc')
                 ->latest()
                 ->take($remainingFreshCount)
-                ->pluck('id'));
+                ->get(['id', 'user_id', 'labels'])
+                ->toArray();
 
             // ── BUCKET 4: Historical Likes (Show last) ──
-            $likedResults = collect(Image::query()
+            $likedResults = Image::query()
                 ->where('privacy', 'public')
                 ->whereHas('likes', fn($lq) => $lq->where('user_id', $user->id))
                 ->latest()
                 ->take(100) 
-                ->pluck('id'));
+                ->pluck('id')
+                ->toArray();
 
-            // Shuffle the fresh discovery pool to look natural
-            $freshDiscoveryPool = $directResults->merge($discoveryResults)->merge($freshResults)->unique()->shuffle();
+            // Merge unliked models into a pool
+            $freshDiscoveryPool = array_merge($directResults, $discoveryResults, $freshResults);
+            
+            // Uniquify based on ID
+            $uniquePool = [];
+            $seenIds = [];
+            foreach ($freshDiscoveryPool as $item) {
+                if (!isset($seenIds[$item['id']])) {
+                    $seenIds[$item['id']] = true;
+                    $uniquePool[] = $item;
+                }
+            }
+
+            // Apply Smart Spacing
+            $spacedIds = $this->smartSpaceItems($uniquePool);
 
             // Append Liked content at the end and return as simple array of IDs
-            return $freshDiscoveryPool->merge($likedResults)->unique()->values()->toArray();
+            return array_values(array_unique(array_merge($spacedIds, $likedResults)));
         });
 
         // 3. Emit Feed Datadog Metrics
@@ -238,6 +258,106 @@ class RecommendationEngine
     public function invalidateUserFeedCache($userId): void
     {
         Cache::tags(["user:{$userId}", 'feeds'])->flush();
+    }
+
+    /**
+     * Smart Spacing Algorithm (Anti-Clustering)
+     * Distributes images so that the same creator or the same primary tag
+     * does not appear consecutively in the feed.
+     */
+    protected function smartSpaceItems(array $items)
+    {
+        $buffer = []; 
+        $penaltyBox = []; 
+        $lastCreatorId = null;
+        $lastPrimaryTag = null;
+        
+        // Ensure random initial distribution before intelligent sorting
+        $itemsCollection = collect($items)->shuffle()->all();
+
+        while (!empty($itemsCollection) || !empty($penaltyBox)) {
+            $placed = false;
+            
+            // Try to place an item from the main pool
+            foreach ($itemsCollection as $index => $item) {
+                // Determine primary tag
+                $primaryTag = null;
+                $labels = is_string($item['labels'] ?? null) ? json_decode($item['labels'], true) : ($item['labels'] ?? []);
+                if (!empty($labels)) {
+                    $firstLabel = $labels[0];
+                    $primaryTag = is_string($firstLabel) ? $firstLabel : ($firstLabel['description'] ?? null);
+                }
+
+                // Check conflict
+                $creatorConflict = ($item['user_id'] === $lastCreatorId);
+                $tagConflict = ($primaryTag !== null && $primaryTag === $lastPrimaryTag);
+
+                if (!$creatorConflict && !$tagConflict) {
+                    $buffer[] = $item['id'];
+                    $lastCreatorId = $item['user_id'];
+                    $lastPrimaryTag = $primaryTag;
+                    unset($itemsCollection[$index]);
+                    $itemsCollection = array_values($itemsCollection);
+                    $placed = true;
+                    break;
+                }
+            }
+
+            if (!$placed && !empty($penaltyBox)) {
+                // Try penalty box
+                foreach ($penaltyBox as $index => $item) {
+                    $primaryTag = null;
+                    $labels = is_string($item['labels'] ?? null) ? json_decode($item['labels'], true) : ($item['labels'] ?? []);
+                    if (!empty($labels)) {
+                        $firstLabel = $labels[0];
+                        $primaryTag = is_string($firstLabel) ? $firstLabel : ($firstLabel['description'] ?? null);
+                    }
+
+                    $creatorConflict = ($item['user_id'] === $lastCreatorId);
+                    $tagConflict = ($primaryTag !== null && $primaryTag === $lastPrimaryTag);
+
+                    if (!$creatorConflict && !$tagConflict) {
+                        $buffer[] = $item['id'];
+                        $lastCreatorId = $item['user_id'];
+                        $lastPrimaryTag = $primaryTag;
+                        unset($penaltyBox[$index]);
+                        $penaltyBox = array_values($penaltyBox);
+                        $placed = true;
+                        break;
+                    }
+                }
+            }
+
+            // If we are absolutely stuck, force insert to keep moving
+            if (!$placed) {
+                if (!empty($itemsCollection)) {
+                    $item = array_shift($itemsCollection);
+                    $penaltyBox[] = $item; // Wait, actually just force into buffer
+                    $buffer[] = $item['id'];
+                    $lastCreatorId = $item['user_id'];
+                    
+                    $labels = is_string($item['labels'] ?? null) ? json_decode($item['labels'], true) : ($item['labels'] ?? []);
+                    $lastPrimaryTag = null;
+                    if (!empty($labels)) {
+                        $firstLabel = $labels[0];
+                        $lastPrimaryTag = is_string($firstLabel) ? $firstLabel : ($firstLabel['description'] ?? null);
+                    }
+                } elseif (!empty($penaltyBox)) {
+                    $item = array_shift($penaltyBox);
+                    $buffer[] = $item['id'];
+                    $lastCreatorId = $item['user_id'];
+                    
+                    $labels = is_string($item['labels'] ?? null) ? json_decode($item['labels'], true) : ($item['labels'] ?? []);
+                    $lastPrimaryTag = null;
+                    if (!empty($labels)) {
+                        $firstLabel = $labels[0];
+                        $lastPrimaryTag = is_string($firstLabel) ? $firstLabel : ($firstLabel['description'] ?? null);
+                    }
+                }
+            }
+        }
+
+        return $buffer;
     }
 }
 
