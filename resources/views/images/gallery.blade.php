@@ -257,6 +257,32 @@
   .blur-up.is-loaded {
     filter: blur(0);
   }
+
+  /* Search Bar */
+  .search-glass {
+    transition: all .35s cubic-bezier(.23,1,.32,1);
+  }
+  .search-glass--focused {
+    border-color: var(--gold) !important;
+    box-shadow: 0 0 24px rgba(200,169,110,0.12), 0 4px 16px rgba(0,0,0,0.3) !important;
+    background: rgba(255,255,255,0.06) !important;
+  }
+  .search-glass input::placeholder {
+    color: var(--text-dim);
+    font-size: 13px;
+  }
+
+  /* AI Caption */
+  .ai-caption {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    letter-spacing: .03em;
+    color: var(--text-dim);
+    line-height: 1.4;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 </style>
 @endpush
 
@@ -293,10 +319,64 @@
 
   <div class="gold-line"></div>
 
+  {{-- ── Smart Search Bar ── --}}
+  <div class="relative" x-data="{ focused: false }">
+    <form action="{{ route('images.gallery') }}" method="GET" class="relative group">
+      <div class="search-glass flex items-center gap-3 px-5 py-3 rounded-2xl transition-all duration-300"
+           :class="focused ? 'search-glass--focused' : ''"
+           style="background: rgba(255,255,255,0.04); border: 1px solid var(--border); backdrop-filter: blur(16px);">
+        {{-- Search Icon --}}
+        <svg class="w-4 h-4 flex-shrink-0 transition-colors duration-200" 
+             :style="focused ? 'color: var(--gold)' : 'color: var(--text-dim)'"
+             fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+        </svg>
+        {{-- Input --}}
+        <input type="text" name="q" 
+               value="{{ $searchQuery ?? '' }}"
+               placeholder="ابحث بالمحتوى... (forest, architecture, طبيعة)"
+               class="flex-1 bg-transparent border-none outline-none font-body text-sm"
+               style="color: var(--text); caret-color: var(--gold);"
+               autocomplete="off"
+               @focus="focused = true" @blur="focused = false"
+               id="gallery-search-input"
+               dir="auto">
+        {{-- Clear button --}}
+        @if($searchQuery)
+          <a href="{{ route('images.gallery') }}" 
+             class="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center transition-all hover:scale-110"
+             style="background: rgba(232,99,122,0.12); color: var(--rose);"
+             title="مسح البحث">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </a>
+        @endif
+        {{-- Submit --}}
+        <button type="submit" 
+                class="flex-shrink-0 px-4 py-1.5 rounded-xl font-mono-alt text-[9px] tracking-widest uppercase font-bold transition-all hover:scale-105"
+                style="background: linear-gradient(135deg, var(--gold), #d4b878); color: var(--ink); box-shadow: 0 4px 12px rgba(200,169,110,0.2);">
+          بحث
+        </button>
+      </div>
+    </form>
+    @if($searchQuery)
+      <div class="mt-2 flex items-center gap-2">
+        <span class="font-mono-alt text-[10px] tracking-widest uppercase" style="color: var(--text-dim);">
+          نتائج البحث عن:
+        </span>
+        <span class="font-body text-sm font-semibold" style="color: var(--gold);">"{{ $searchQuery }}"</span>
+        <span class="font-mono-alt text-[10px]" style="color: var(--text-dim);">
+          ({{ $images->total() }} {{ $images->total() == 1 ? 'نتيجة' : 'نتيجة' }})
+        </span>
+      </div>
+    @endif
+  </div>
+
   {{-- ── Filter Pills ── --}}
   <div class="flex items-center gap-3 overflow-x-auto py-2 no-scrollbar">
     <a href="{{ route('images.gallery') }}" 
-       class="filter-pill {{ !$selectedTag ? 'active' : '' }}">
+       class="filter-pill {{ !$selectedTag && !$searchQuery ? 'active' : '' }}">
       <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><path d="M1 3h8M1 5h8M1 7h8"/></svg>
       All
     </a>

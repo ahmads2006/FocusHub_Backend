@@ -266,13 +266,39 @@ class ImageController extends Controller
     public function gallery(Request $request)
     {
         $selectedTag = $request->query('tag');
+        $searchQuery = $request->query('q');
         
         // Setup base query for filtering or guest users
         $query = Image::where('privacy', 'public')
-            ->with(['settings', 'user', 'labelData'])
+            ->with(['settings', 'user', 'labelData', 'aiMetadata'])
             ->withCount('likes');
 
-        if ($selectedTag) {
+        // --- AI-Powered Smart Search ---
+        if ($searchQuery) {
+            $search = trim($searchQuery);
+            $query->where(function($q) use ($search) {
+                // 1. Search in title
+                $q->where('title', 'LIKE', "%{$search}%")
+                  // 2. Search in description
+                  ->orWhere('description', 'LIKE', "%{$search}%")
+                  // 3. Search in legacy labels JSON column
+                  ->orWhereRaw("JSON_SEARCH(labels, 'one', ?, NULL, '$[*]') IS NOT NULL", ["%{$search}%"])
+                  // 4. Search in AI metadata (category, caption, extracted_tags)
+                  ->orWhereHas('aiMetadata', function($ai) use ($search) {
+                      $ai->where('category', 'LIKE', "%{$search}%")
+                         ->orWhere('caption', 'LIKE', "%{$search}%")
+                         ->orWhereRaw("JSON_SEARCH(extracted_tags, 'one', ?, NULL, '$[*]') IS NOT NULL", ["%{$search}%"]);
+                  })
+                  // 5. Search in Spatie tags
+                  ->orWhereHas('tags', function($t) use ($search) {
+                      $t->where('name->en', 'LIKE', "%{$search}%")
+                        ->orWhere('name->ar', 'LIKE', "%{$search}%")
+                        ->orWhere('name', 'LIKE', "%{$search}%");
+                  });
+            });
+
+            $images = $query->latest()->paginate(20);
+        } elseif ($selectedTag) {
             $query->whereRaw('JSON_CONTAINS(labels, ?)', [json_encode($selectedTag)]);
             $images = $query->latest()->paginate(20);
         } else {
@@ -295,7 +321,7 @@ class ImageController extends Controller
                 if (!empty($slicedIds)) {
                     $placeholders = implode(',', array_fill(0, count($slicedIds), '?'));
                     $models = Image::whereIn('id', $slicedIds)
-                        ->with(['settings', 'user', 'labelData'])
+                        ->with(['settings', 'user', 'labelData', 'aiMetadata'])
                         ->withCount('likes')
                         ->orderByRaw("FIELD(id, {$placeholders})", $slicedIds)
                         ->get();
@@ -348,13 +374,13 @@ class ImageController extends Controller
         // Infinite Scroll AJAX Response
         if ($request->ajax()) {
             return response()->json([
-                'grid_html' => view('images.gallery', compact('images', 'likedImageIds', 'bookmarkedImageIds', 'categories', 'selectedTag'))->fragment('grid-items'),
-                'list_html' => view('images.gallery', compact('images', 'likedImageIds', 'bookmarkedImageIds', 'categories', 'selectedTag'))->fragment('list-items'),
+                'grid_html' => view('images.gallery', compact('images', 'likedImageIds', 'bookmarkedImageIds', 'categories', 'selectedTag', 'searchQuery'))->fragment('grid-items'),
+                'list_html' => view('images.gallery', compact('images', 'likedImageIds', 'bookmarkedImageIds', 'categories', 'selectedTag', 'searchQuery'))->fragment('list-items'),
                 'has_more' => $images->hasMorePages(),
                 'next_page_url' => $images->nextPageUrl(),
             ]);
         }
 
-        return view('images.gallery', compact('images', 'likedImageIds', 'bookmarkedImageIds', 'categories', 'selectedTag'));
+        return view('images.gallery', compact('images', 'likedImageIds', 'bookmarkedImageIds', 'categories', 'selectedTag', 'searchQuery'));
     }
 }
