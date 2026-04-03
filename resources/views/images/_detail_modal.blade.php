@@ -78,8 +78,8 @@
 
                 {{-- Tags --}}
                 <div class="flex flex-wrap gap-2 pt-2">
-                    <template x-for="label in selectedImage?.labels || []" :key="label.description">
-                        <span class="text-[10px] bg-white/5 border border-white/5 px-3 py-1 rounded-full text-gray-400 transition-colors hover:border-violet-500/30" x-text="'#' + label.description"></span>
+                    <template x-for="(label, i) in selectedImage?.labels || []" :key="i">
+                        <span class="text-[10px] bg-white/5 border border-white/5 px-3 py-1 rounded-full text-gray-400 transition-colors hover:border-violet-500/30" x-text="'#' + (typeof label === 'string' ? label : (label.description || ''))"></span>
                     </template>
                 </div>
 

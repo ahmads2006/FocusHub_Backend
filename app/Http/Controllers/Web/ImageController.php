@@ -161,6 +161,9 @@ class ImageController extends Controller
             'privacy' => $validated['privacy'] ?? $image->privacy,
         ]);
 
+        // Invalidate Feed Cache so privacy changes show up instantly in their own gallery
+        app(\App\Services\AI\RecommendationEngine::class)->invalidateUserFeedCache(auth()->id());
+
         // Checkboxes: handle both checked (sent) and unchecked (not sent)
         $image->settings()->updateOrCreate(
             ['image_id' => $image->id],
@@ -321,6 +324,7 @@ class ImageController extends Controller
                 if (!empty($slicedIds)) {
                     $placeholders = implode(',', array_fill(0, count($slicedIds), '?'));
                     $models = Image::whereIn('id', $slicedIds)
+                        ->where('privacy', 'public') // Prevents stale cache from exposing newly-private images
                         ->with(['settings', 'user', 'labelData', 'aiMetadata'])
                         ->withCount('likes')
                         ->orderByRaw("FIELD(id, {$placeholders})", $slicedIds)
@@ -373,9 +377,11 @@ class ImageController extends Controller
         
         // Infinite Scroll AJAX Response
         if ($request->ajax()) {
+            /** @var \Illuminate\View\View $view */
+            $view = view('images.gallery', compact('images', 'likedImageIds', 'bookmarkedImageIds', 'categories', 'selectedTag', 'searchQuery'));
             return response()->json([
-                'grid_html' => view('images.gallery', compact('images', 'likedImageIds', 'bookmarkedImageIds', 'categories', 'selectedTag', 'searchQuery'))->fragment('grid-items'),
-                'list_html' => view('images.gallery', compact('images', 'likedImageIds', 'bookmarkedImageIds', 'categories', 'selectedTag', 'searchQuery'))->fragment('list-items'),
+                'grid_html' => $view->fragment('grid-items'),
+                'list_html' => $view->fragment('list-items'),
                 'has_more' => $images->hasMorePages(),
                 'next_page_url' => $images->nextPageUrl(),
             ]);

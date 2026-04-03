@@ -51,10 +51,12 @@ class SightengineAnalyzer implements MediaAnalyzerInterface
             
             if ($path && \Illuminate\Support\Facades\Storage::disk('public')->exists($path)) {
                 $content = \Illuminate\Support\Facades\Storage::disk('public')->get($path);
+            } elseif ($path && \Illuminate\Support\Facades\Storage::disk('s3')->exists($path)) {
+                $content = \Illuminate\Support\Facades\Storage::disk('s3')->get($path);
             } else {
                 // Priority 2: Full URL (Fallback for pre-upload or cloud-only assets)
                 $url = $media->getRawOriginal('url') ?? $media->url;
-                Log::warning("{$this->getName()} Analyzer: File not found at public path [{$path}]. Falling back to URL: {$url}");
+                Log::warning("{$this->getName()} Analyzer: File not found at local or S3 path [{$path}]. Falling back to URL: {$url}");
 
                 $content = @file_get_contents($url);
                 if ($content === false) {

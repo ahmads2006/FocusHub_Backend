@@ -152,6 +152,11 @@ class ImageService
                 'privacy'   => $data['privacy'] ?? 'public',
             ]);
 
+            // Bridge safety cache to let the asynchronous Tagging job know safety was already verified
+            if (($moderationResult['status'] ?? '') !== \App\Models\Image::STATUS_REJECTED) {
+                \Illuminate\Support\Facades\Redis::setex("opticvault:safety:{$image->id}", 3600, 'safe_verified');
+            }
+
             // 4b. Storage (paths & cloud)
             $image->storage()->updateOrCreate(['image_id' => $image->id], [
                 'path'                => $path,
@@ -253,13 +258,21 @@ class ImageService
             }
 
             // 2. Delete from S3 if exists
-            if (!empty($image->path) && Storage::disk('s3')->exists($image->path)) {
-                Storage::disk('s3')->delete($image->path);
+            try {
+                if (!empty($image->path) && Storage::disk('s3')->exists($image->path)) {
+                    Storage::disk('s3')->delete($image->path);
+                }
+            } catch (\Exception $e) {
+                Log::warning("S3 file deletion/check failed for {$image->path}: " . $e->getMessage());
             }
 
             // 3. Delete local fallback or thumbnails
-            if (!empty($image->path) && Storage::disk('public')->exists($image->path)) {
-                Storage::disk('public')->delete($image->path);
+            try {
+                if (!empty($image->path) && Storage::disk('public')->exists($image->path)) {
+                    Storage::disk('public')->delete($image->path);
+                }
+            } catch (\Exception $e) {
+                Log::warning("Local file deletion/check failed for {$image->path}: " . $e->getMessage());
             }
 
             // 4. Delete from database

@@ -143,21 +143,36 @@ class RecommendationEngine
 
             $discoveryIds = array_column($discoveryResults, 'id');
 
-            // ── BUCKET 3: Trending/Latest Fallback (Unliked) ──
+            // ── BUCKET 3: Fresh/Latest Content (Seed traffic for new uploads) ──
             $excludeIds = array_merge($hiddenIds, $directIds, $discoveryIds);
             $remainingFreshCount = max(0, $limit - count($directResults) - count($discoveryResults));
             
+            $freshAllocation = (int) ceil($remainingFreshCount * 0.4); // 40% of leftover strictly for newness
+
             $freshResults = Image::query()
+                ->tap($unlikedConstraints)
+                ->whereNotIn('id', $excludeIds)
+                ->latest() // Strictly newest first, no sorting by likes
+                ->take($freshAllocation)
+                ->get(['id', 'user_id', 'labels'])
+                ->toArray();
+
+            $freshIds = array_column($freshResults, 'id');
+            $excludeIds = array_merge($excludeIds, $freshIds);
+
+            // ── BUCKET 4: Trending Fallback (Unliked, sorted by likes) ──
+            $trendingAllocation = max(0, $remainingFreshCount - count($freshResults));
+            $trendingResults = Image::query()
                 ->tap($unlikedConstraints)
                 ->whereNotIn('id', $excludeIds)
                 ->withCount('likes')
                 ->orderBy('likes_count', 'desc')
                 ->latest()
-                ->take($remainingFreshCount)
+                ->take($trendingAllocation)
                 ->get(['id', 'user_id', 'labels'])
                 ->toArray();
 
-            // ── BUCKET 4: Historical Likes (Show last) ──
+            // ── BUCKET 5: Historical Likes (Show last) ──
             $likedResults = Image::query()
                 ->where('privacy', 'public')
                 ->whereHas('likes', fn($lq) => $lq->where('user_id', $user->id))
@@ -167,7 +182,7 @@ class RecommendationEngine
                 ->toArray();
 
             // Merge unliked models into a pool
-            $freshDiscoveryPool = array_merge($directResults, $discoveryResults, $freshResults);
+            $freshDiscoveryPool = array_merge($directResults, $discoveryResults, $freshResults, $trendingResults);
             
             // Uniquify based on ID
             $uniquePool = [];
@@ -206,6 +221,7 @@ class RecommendationEngine
 
         $placeholders = implode(',', array_fill(0, count($ids), '?'));
         return Image::whereIn('id', $ids)
+            ->where('privacy', 'public') // Prevents stale cache from exposing newly-private images
             ->with(['settings', 'user', 'labelData'])
             ->withCount('likes')
             ->orderByRaw("FIELD(id, {$placeholders})", $ids)

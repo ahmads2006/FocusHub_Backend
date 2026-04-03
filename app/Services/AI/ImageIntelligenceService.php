@@ -58,10 +58,13 @@ class ImageIntelligenceService
             'size' => $file->getSize(),
         ]);
 
-        // 3. Analyze and Tag
+        // 3. Bridge the cache gap: Store the safety result using the new image->id
+        // so analyzeAndTag (Stage 2) knows safety is verified and proceeds to Tagging-only drivers.
+        Redis::setex("opticvault:safety:{$image->id}", 3600, 'safe_verified');
+        // 4. Analyze and Tag
         $this->analyzeAndTag($image);
 
-        // 4. Return Optimized URL
+        // 5. Return Optimized URL
         return [
             'image_id' => $image->id,
             'cdn_url' => $this->imageKit->getOptimizedUrl($image->path),

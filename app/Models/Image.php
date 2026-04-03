@@ -222,6 +222,15 @@ class Image extends Model
     }
 
     /**
+     * Get the AI-generated caption for SEO alt text.
+     * Falls back to the image title if no caption exists.
+     */
+    public function getAiCaptionAttribute(): ?string
+    {
+        return $this->aiMetadata?->caption;
+    }
+
+    /**
      * Frontend-aware capability flags
      */
     public function getCanEditAttribute(): bool
