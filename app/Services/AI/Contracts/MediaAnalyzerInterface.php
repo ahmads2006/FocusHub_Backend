@@ -16,6 +16,16 @@ interface MediaAnalyzerInterface
      * @throws \App\Services\AI\Exceptions\AnalyzerException
      */
     public function analyze(Model $media, string $mediaType = 'image'): AnalysisResult;
+    
+    /**
+     * Specialized analysis method for extracting tags and metadata only.
+     * Often used when safety analysis is already cached or performed separately.
+     * 
+     * @param Model $media
+     * @param string $mediaType
+     * @return AnalysisResult
+     */
+    public function analyzeTags(Model $media, string $mediaType = 'image'): AnalysisResult;
 
     /**
      * Analyze a raw uploaded file (pre-upload validation).

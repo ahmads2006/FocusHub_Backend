@@ -45,6 +45,7 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
                 'watermark_text_color' => $user->getAttribute('watermark_text_color') ?? '#FFFFFF',
                 'watermark_neon_color' => $user->getAttribute('watermark_neon_color') ?? '#00FFFF',
                 'watermark_opacity' => $user->getAttribute('watermark_opacity') ?? 0.5,
+                'watermark_mode' => $user->getAttribute('watermark_mode') ?? 'text',
                 'auto_orient_default' => $user->getAttribute('auto_orient_default') ?? true,
                 'stay_logged_in' => $user->getAttribute('stay_logged_in') ?? false,
                 'is_public_profile' => $user->getAttribute('is_public_profile') ?? true,
@@ -110,8 +111,7 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
         'is_public_profile',
         'watermark_text',
         'watermark_logo',
-        'use_text_watermark',
-        'use_logo_watermark',
+        'watermark_mode',
     ];
 
     protected $with = ['userStatus', 'profile', 'settings', 'verification', 'oauth'];
@@ -196,11 +196,8 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
     public function getWatermarkLogoAttribute() { return $this->getRelatedAttribute('settings', 'watermark_logo'); }
     public function setWatermarkLogoAttribute($value) { $this->setRelatedAttribute('settings', 'watermark_logo', $value); }
 
-    public function getUseTextWatermarkAttribute() { return (bool) $this->getRelatedAttribute('settings', 'use_text_watermark', true); }
-    public function setUseTextWatermarkAttribute($value) { $this->setRelatedAttribute('settings', 'use_text_watermark', $value); }
-
-    public function getUseLogoWatermarkAttribute() { return (bool) $this->getRelatedAttribute('settings', 'use_logo_watermark', false); }
-    public function setUseLogoWatermarkAttribute($value) { $this->setRelatedAttribute('settings', 'use_logo_watermark', $value); }
+    public function getWatermarkModeAttribute() { return $this->getRelatedAttribute('settings', 'watermark_mode', 'text'); }
+    public function setWatermarkModeAttribute($value) { $this->setRelatedAttribute('settings', 'watermark_mode', $value); }
 
     public function getWatermarkNeonColorAttribute() { return $this->getRelatedAttribute('settings', 'watermark_neon_color'); }
     public function setWatermarkNeonColorAttribute($value) { $this->setRelatedAttribute('settings', 'watermark_neon_color', $value); }

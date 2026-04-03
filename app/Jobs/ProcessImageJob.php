@@ -6,9 +6,6 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Facades\Storage;
-use Intervention\Image\ImageManager;
-use Intervention\Image\Drivers\Gd\Driver as GdDriver;
-use Intervention\Image\Drivers\Imagick\Driver as ImagickDriver;
 use App\Models\Image;
 use Illuminate\Support\Str;
 use Exception;
@@ -54,11 +51,8 @@ class ProcessImageJob implements ShouldQueue
             $absolutePath = Storage::disk('local')->path($this->imagePath);
             $filename = basename($absolutePath);
             
-            $manager = new ImageManager(extension_loaded('imagick') ? new ImagickDriver() : new GdDriver());
-            $img = $manager->read($absolutePath);
-
-            // Watermark is NOT applied here — it's handled at CDN delivery time
-            // via ImageKit URL transformations (see ImageKitService::getWatermarkedUrl)
+            // Watermark and resizing is NOT applied here — it's handled at CDN delivery time
+            // via ImageKit URL transformations for zero backend CPU cost.
 
             // 1. Dual-Storage Strategy
             $cleanPath = null;
@@ -86,10 +80,8 @@ class ProcessImageJob implements ShouldQueue
                 // Save Public Preview (clean, watermark applied at CDN delivery time)
                 $publicPath = "photos/{$year}/{$month}/{$this->userId}/" . $uid . '_' . $filename;
                 
-                // Ensure directory exists
-                Storage::disk('public')->makeDirectory(dirname($publicPath));
-                
-                $img->save(Storage::disk('public')->path($publicPath), quality: 80);
+                // Pure Copy (0 CPU footprint compared to Intervention Re-encoding)
+                Storage::disk('public')->put($publicPath, file_get_contents($absolutePath));
                 $storagePath = $publicPath;
             }
 

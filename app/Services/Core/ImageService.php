@@ -69,7 +69,6 @@ class ImageService
             $isPublicAlbum = !$album || $album->privacy === 'public';
 
             // 3. Cloud & Storage Routing
-            $imagekitFileId = null;
             $imagekitFilePath = null;
             $path = '';
             $originalPath = null;
@@ -120,17 +119,10 @@ class ImageService
                     // 1. Store in S3 (The foundation / LocalStack)
                     $s3Path = $this->uploadToS3($cleanFile, $shortName, $dynamicPath);
                     $path = $s3Path;
-                    $imagekitFileId = null; 
-                    $imagekitFilePath = $s3Path; 
-
-                    // 2. Dual-Upload to ImageKit Media Library
-                    try {
-                        $cloudResponse = $this->uploadToCloud($cleanFile, $shortName, $dynamicPath);
-                        $imagekitFileId = $cloudResponse->fileId;
-                        $imagekitFilePath = $cloudResponse->filePath;
-                    } catch (\Exception $e) {
-                         Log::warning("OpticVault ImageKit Dual-Upload Failed: " . $e->getMessage() . ". Falling back to S3 Origin only.");
-                    }
+                    // ImageKit is used as an Origin Proxy (CDN) only.
+                    // No direct upload to ImageKit Media Library — saves 100% of storage quota.
+                    // ImageKit will pull the image from S3 on-demand, transform it, and cache it.
+                    $imagekitFilePath = $s3Path;
 
                 } catch (\Exception $e) {
                     Log::warning("OpticVault Cloud (S3) Failed: " . $e->getMessage() . ". Attempting secondary storages.");
@@ -164,7 +156,7 @@ class ImageService
             $image->storage()->updateOrCreate(['image_id' => $image->id], [
                 'path'                => $path,
                 'original_path'       => $originalPath,
-                'imagekit_file_id'    => $imagekitFileId,
+                'imagekit_file_id'    => null, // No longer uploading to ImageKit Media Library
                 'imagekit_file_path'  => $imagekitFilePath,
                 'md5_hash'            => $moderationResult['metadata']['hash'] ?? md5_file($file->getRealPath()),
             ]);

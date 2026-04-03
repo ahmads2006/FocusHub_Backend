@@ -46,17 +46,20 @@ class SightengineAnalyzer implements MediaAnalyzerInterface
         }
 
         try {
-            $path = $media->path;
+            // Priority 1: Storage Disk (resilient to missing relationships by checking raw storage relation)
+            $path = $media->storage->path ?? $media->path;
             
-            if (!$path || !\Illuminate\Support\Facades\Storage::disk('public')->exists($path)) {
-                // If it's a temp file path (pre-upload) or a full URL
+            if ($path && \Illuminate\Support\Facades\Storage::disk('public')->exists($path)) {
+                $content = \Illuminate\Support\Facades\Storage::disk('public')->get($path);
+            } else {
+                // Priority 2: Full URL (Fallback for pre-upload or cloud-only assets)
                 $url = $media->getRawOriginal('url') ?? $media->url;
+                Log::warning("{$this->getName()} Analyzer: File not found at public path [{$path}]. Falling back to URL: {$url}");
+
                 $content = @file_get_contents($url);
                 if ($content === false) {
                     throw new AnalyzerException("Failed to read media content from URL/Path: {$url}");
                 }
-            } else {
-                $content = \Illuminate\Support\Facades\Storage::disk('public')->get($path);
             }
 
             $response = Http::attach(
@@ -137,6 +140,9 @@ class SightengineAnalyzer implements MediaAnalyzerInterface
                 'media_id' => $media->id ?? 'new',
             ]);
 
+            // --- AI Caption ---
+            $caption = $this->generateCaption($data, $tags, $category);
+
             return new ImageAnalysisResult(
                 driverName: $this->getName(),
                 rawResults: $data,
@@ -144,6 +150,7 @@ class SightengineAnalyzer implements MediaAnalyzerInterface
                 isSensitive: $isSensitive,
                 qualityGrade: $qualityGrade,
                 category: $category,
+                caption: $caption,
             );
 
         } catch (QuotaExceededException $e) {
@@ -239,6 +246,9 @@ class SightengineAnalyzer implements MediaAnalyzerInterface
             $data['_sensitivity_reasons'] = $sensitivityReasons;
             $data['_gore_score'] = $goreScore;
 
+            // --- AI Caption ---
+            $caption = $this->generateCaption($data, $tags, $category);
+
             return new ImageAnalysisResult(
                 driverName: $this->getName(),
                 rawResults: $data,
@@ -246,6 +256,7 @@ class SightengineAnalyzer implements MediaAnalyzerInterface
                 isSensitive: $isSensitive,
                 qualityGrade: $qualityGrade,
                 category: $category,
+                caption: $caption,
             );
 
         } catch (QuotaExceededException $e) {
@@ -278,6 +289,8 @@ class SightengineAnalyzer implements MediaAnalyzerInterface
 
         return 'other';
     }
+
+
 
     /**
      * Unified, strict safety evaluation logic matching the modern Sightengine API structure.
@@ -391,5 +404,67 @@ class SightengineAnalyzer implements MediaAnalyzerInterface
             'goreScore' => $goreScore,
             'safetyVerdict' => $safetyVerdict,
         ];
+    }
+
+    public function analyzeTags(Model $media, string $mediaType = 'image'): AnalysisResult
+    {
+        return $this->analyze($media, $mediaType);
+    }
+
+    /**
+     * Generate a caption from Sightengine's context and color data.
+     * Builds a descriptive sentence from scene context, dominant colors, and tags.
+     */
+    protected function generateCaption(array $data, array $tags, ?string $category): ?string
+    {
+        $parts = [];
+
+        // Scene context (indoor/outdoor)
+        $context = $data['nudity']['context'] ?? [];
+        if (!empty($context)) {
+            $topContext = null;
+            $topScore = 0;
+            foreach ($context as $key => $score) {
+                if ($score > $topScore) {
+                    $topScore = $score;
+                    $topContext = $key;
+                }
+            }
+            if ($topContext && $topScore > 0.3) {
+                $contextMap = [
+                    'indoor_other' => 'Indoor scene',
+                    'outdoor_other' => 'Outdoor scene',
+                    'sea_lake_pool' => 'Waterfront scene',
+                ];
+                $parts[] = $contextMap[$topContext] ?? ucfirst(str_replace('_', ' ', $topContext));
+            }
+        }
+
+        // Category
+        if ($category && $category !== 'other') {
+            $categoryNames = [
+                'nature' => 'nature landscape',
+                'forest' => 'forest scenery',
+                'sea' => 'sea or ocean view',
+                'urban' => 'urban scenery',
+                'architecture' => 'architectural structure',
+                'portrait' => 'portrait photograph',
+                'food' => 'food imagery',
+                'abstract' => 'abstract composition',
+            ];
+            $parts[] = 'featuring ' . ($categoryNames[$category] ?? $category);
+        }
+
+        if (!empty($parts)) {
+            return implode(' ', $parts);
+        }
+
+        // Fallback: build from tags
+        if (!empty($tags)) {
+            $topTags = array_slice($tags, 0, 3);
+            return 'Image of ' . implode(', ', $topTags);
+        }
+
+        return null;
     }
 }

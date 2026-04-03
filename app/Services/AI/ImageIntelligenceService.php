@@ -77,6 +77,11 @@ class ImageIntelligenceService
         try {
             Log::info("ImageIntelligence: Starting analysis for image {$image->id}");
 
+            // Ensure storage relation is loaded for path resolution
+            if (!$image->relationLoaded('storage')) {
+                $image->load('storage');
+            }
+
             // Stage 3: Check Redis Pipeline Cache for existing safety result
             $safetyCacheKey = "opticvault:safety:{$image->id}";
             $cachedSafety = Redis::get($safetyCacheKey);
@@ -109,6 +114,7 @@ class ImageIntelligenceService
                     'extracted_tags' => $result->tags,
                     'quality_grade' => $result->qualityGrade,
                     'category' => $result->category,
+                    'caption' => $result->caption,
                 ]
             );
 

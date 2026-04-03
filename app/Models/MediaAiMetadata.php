@@ -18,6 +18,7 @@ class MediaAiMetadata extends Model
         'quality_grade',
         'category',
         'ocr_text',
+        'caption',
         'is_sensitive',
         'confidence_score',
     ];

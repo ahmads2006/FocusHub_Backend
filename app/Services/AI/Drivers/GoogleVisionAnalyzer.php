@@ -44,17 +44,20 @@ class GoogleVisionAnalyzer implements MediaAnalyzerInterface
         }
 
         try {
-            $path = $media->path;
+            // Priority 1: Storage Disk (resilient to missing relationships by checking raw storage relation)
+            $path = $media->storage->path ?? $media->path;
             
-            if (!$path || !\Illuminate\Support\Facades\Storage::disk('public')->exists($path)) {
-                // If it's a temp file path (pre-upload) or a full URL
+            if ($path && \Illuminate\Support\Facades\Storage::disk('public')->exists($path)) {
+                $content = \Illuminate\Support\Facades\Storage::disk('public')->get($path);
+            } else {
+                // Priority 2: Full URL (Fallback for pre-upload or cloud-only assets)
                 $url = $media->getRawOriginal('url') ?? $media->url;
+                Log::warning("{$this->getName()} Analyzer: File not found at public path [{$path}]. Falling back to URL: {$url}");
+
                 $content = @file_get_contents($url);
                 if ($content === false) {
                     throw new AnalyzerException("Failed to read media content from URL/Path: {$url}");
                 }
-            } else {
-                $content = \Illuminate\Support\Facades\Storage::disk('public')->get($path);
             }
 
             $base64Image = base64_encode($content);
@@ -69,6 +72,7 @@ class GoogleVisionAnalyzer implements MediaAnalyzerInterface
                             ['type' => 'TEXT_DETECTION'],
                             ['type' => 'IMAGE_PROPERTIES'],
                             ['type' => 'CROP_HINTS'],
+                            ['type' => 'WEB_DETECTION', 'maxResults' => 5],
                         ],
                     ],
                 ],
@@ -153,6 +157,9 @@ class GoogleVisionAnalyzer implements MediaAnalyzerInterface
             // --- Scene Category ---
             $category = $this->deriveCategory($tags);
 
+            // --- AI Caption ---
+            $caption = $this->generateCaption($res, $tags);
+
             // Inject standardized safety metrics into raw results
             $res['_safety_verdict'] = $safetyVerdict;
             $res['_sensitivity_reasons'] = $sensitivityReasons;
@@ -166,6 +173,7 @@ class GoogleVisionAnalyzer implements MediaAnalyzerInterface
                 isSensitive: $isSensitive,
                 qualityGrade: $qualityGrade,
                 category: $category,
+                caption: $caption,
             );
 
         } catch (QuotaExceededException $e) {
@@ -236,5 +244,48 @@ class GoogleVisionAnalyzer implements MediaAnalyzerInterface
         }
 
         return 'other';
+    }
+
+    public function analyzeTags(Model $media, string $mediaType = 'image'): AnalysisResult
+    {
+        return $this->analyze($media, $mediaType);
+    }
+
+    /**
+     * Generate a human-readable caption from Google Vision WEB_DETECTION results.
+     * Priority: bestGuessLabels → webEntities → top label tags.
+     */
+    protected function generateCaption(array $response, array $tags): ?string
+    {
+        $webDetection = $response['webDetection'] ?? [];
+
+        // Priority 1: Best guess labels (most descriptive)
+        if (!empty($webDetection['bestGuessLabels'])) {
+            $bestGuess = $webDetection['bestGuessLabels'][0]['label'] ?? null;
+            if ($bestGuess) {
+                return ucfirst($bestGuess);
+            }
+        }
+
+        // Priority 2: Build from web entities (top 3)
+        if (!empty($webDetection['webEntities'])) {
+            $entities = [];
+            foreach (array_slice($webDetection['webEntities'], 0, 3) as $entity) {
+                if (isset($entity['description']) && ($entity['score'] ?? 0) > 0.5) {
+                    $entities[] = $entity['description'];
+                }
+            }
+            if (!empty($entities)) {
+                return 'Image of ' . implode(', ', $entities);
+            }
+        }
+
+        // Priority 3: Fallback to top 3 label tags
+        if (!empty($tags)) {
+            $topTags = array_slice($tags, 0, 3);
+            return 'Image of ' . implode(', ', $topTags);
+        }
+
+        return null;
     }
 }

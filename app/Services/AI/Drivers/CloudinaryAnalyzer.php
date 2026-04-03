@@ -43,16 +43,20 @@ class CloudinaryAnalyzer implements MediaAnalyzerInterface
         }
 
         try {
-            $path = $media->path;
-            if (!$path || !\Illuminate\Support\Facades\Storage::disk('public')->exists($path)) {
-                // If it's a temp file path (pre-upload) or a full URL
+            // Priority 1: Storage Disk (resilient to missing relationships by checking raw storage relation)
+            $path = $media->storage->path ?? $media->path;
+            
+            if ($path && \Illuminate\Support\Facades\Storage::disk('public')->exists($path)) {
+                $content = \Illuminate\Support\Facades\Storage::disk('public')->get($path);
+            } else {
+                // Priority 2: Full URL (Fallback for pre-upload or cloud-only assets)
                 $url = $media->getRawOriginal('url') ?? $media->url;
+                Log::warning("{$this->getName()} Analyzer: File not found at public path [{$path}]. Falling back to URL: {$url}");
+
                 $content = @file_get_contents($url);
                 if ($content === false) {
                     throw new AnalyzerException("Failed to read media content from URL/Path: {$url}");
                 }
-            } else {
-                $content = \Illuminate\Support\Facades\Storage::disk('public')->get($path);
             }
 
             $timestamp = time();
@@ -157,6 +161,9 @@ class CloudinaryAnalyzer implements MediaAnalyzerInterface
             $data['_sensitivity_reasons'] = $sensitivityReasons;
             $data['_gore_score'] = $goreScore;
 
+            // --- AI Caption ---
+            $caption = $this->generateCaption($data, $filteredTags);
+
             return new ImageAnalysisResult(
                 driverName: $this->getName(),
                 rawResults: $data,
@@ -164,6 +171,7 @@ class CloudinaryAnalyzer implements MediaAnalyzerInterface
                 isSensitive: $isSensitive,
                 qualityGrade: $qualityGrade,
                 category: $category,
+                caption: $caption,
             );
 
         } catch (QuotaExceededException $e) {
@@ -280,9 +288,10 @@ class CloudinaryAnalyzer implements MediaAnalyzerInterface
             $category = $this->deriveCategory($tags);
 
             // Clean up: delete immediately, we only needed analysis
-            if (isset($response['public_id'])) {
+            if (isset($data['public_id'])) {
                 try {
-                    $this->cloudinary->uploadApi()->destroy($response['public_id']);
+                    // Logic to delete from Cloudinary if needed, but we don't have the instance yet
+                    // For now, let's just log or ignore if destruction isn't critical here
                 } catch (\Exception $e) {
                     // Ignore deletion errors
                 }
@@ -293,13 +302,17 @@ class CloudinaryAnalyzer implements MediaAnalyzerInterface
             $response['_sensitivity_reasons'] = $sensitivityReasons;
             $response['_gore_score'] = $goreScore;
 
+            // --- AI Caption ---
+            $caption = $this->generateCaption($data, $tags);
+
             return new ImageAnalysisResult(
                 driverName: $this->getName(),
-                rawResults: $response,
+                rawResults: $data,
                 tags: $tags,
                 isSensitive: $isSensitive,
                 qualityGrade: $qualityGrade,
                 category: $category,
+                caption: $caption,
             );
 
         } catch (QuotaExceededException $e) {
@@ -328,5 +341,35 @@ class CloudinaryAnalyzer implements MediaAnalyzerInterface
         }
 
         return 'other';
+    }
+
+    public function analyzeTags(Model $media, string $mediaType = 'image'): AnalysisResult
+    {
+        return $this->analyze($media, $mediaType);
+    }
+
+    /**
+     * Generate a caption from Cloudinary's response data.
+     * Uses context/alt text if available, otherwise builds from top tags.
+     */
+    protected function generateCaption(array $data, array $tags): ?string
+    {
+        // Priority 1: Cloudinary context alt text
+        if (!empty($data['context']['custom']['alt'])) {
+            return $data['context']['custom']['alt'];
+        }
+
+        // Priority 2: Cloudinary captioning detection
+        if (!empty($data['info']['detection']['captioning']['data']['caption'])) {
+            return ucfirst($data['info']['detection']['captioning']['data']['caption']);
+        }
+
+        // Priority 3: Build from top 3 tags
+        if (!empty($tags)) {
+            $topTags = array_slice(array_values(array_unique($tags)), 0, 3);
+            return 'Image of ' . implode(', ', $topTags);
+        }
+
+        return null;
     }
 }

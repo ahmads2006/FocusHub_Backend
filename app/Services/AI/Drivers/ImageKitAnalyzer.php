@@ -210,4 +210,9 @@ class ImageKitAnalyzer implements MediaAnalyzerInterface
 
         return 'other';
     }
+
+    public function analyzeTags(Model $media, string $mediaType = 'image'): AnalysisResult
+    {
+        return $this->analyze($media, $mediaType);
+    }
 }

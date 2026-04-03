@@ -122,34 +122,36 @@
                     textColor: '{{ auth()->user()->watermark_text_color ?? '#ffffff' }}',
                     neonColor: '{{ auth()->user()->watermark_neon_color ?? '#800080' }}',
                     opacity: {{ auth()->user()->watermark_opacity ?? 0.8 }},
-                    useText: {{ auth()->user()->use_text_watermark ? 'true' : 'false' }},
-                    useLogo: {{ auth()->user()->use_logo_watermark ? 'true' : 'false' }},
+                    watermarkMode: '{{ auth()->user()->watermark_mode ?? 'text' }}',
                     logoPreview: '{{ auth()->user()->watermark_logo ? asset('storage/' . auth()->user()->watermark_logo) : '' }}'
                 }" class="p-8 space-y-8">
 
                     <!-- Live Watermark Preview -->
                     <div class="relative h-48 rounded-[30px] overflow-hidden border border-white/10 bg-black/40 group">
                         <div class="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?q=80&w=800&auto=format&fit=crop')] bg-cover bg-center opacity-50"></div>
-                        <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
-                            <div class="p-4 rounded-xl border border-white/10 backdrop-blur-md flex flex-col items-center gap-3"
+                        <!-- Bottom-Right Positioned Watermark Preview -->
+                        <div class="absolute bottom-4 right-4 pointer-events-none">
+                            <div class="p-3 px-5 rounded-xl border border-white/10 backdrop-blur-md flex items-center gap-3"
                                  :style="`background: rgba(255,255,255,0.05); opacity: ${opacity}; border-left: 4px solid ${neonColor}`">
                                 
                                 <!-- Logo Preview -->
-                                <template x-if="useLogo && logoPreview">
-                                    <img :src="logoPreview" class="h-12 w-auto object-contain mb-1">
+                                <template x-if="watermarkMode === 'logo' && logoPreview">
+                                    <img :src="logoPreview" class="h-10 w-auto object-contain">
                                 </template>
-                                <template x-if="useLogo && !logoPreview">
-                                    <div class="w-12 h-12 rounded-lg bg-white/10 flex items-center justify-center text-xs text-gray-500 mb-1 border border-dashed border-white/20">LOGO</div>
+                                <template x-if="watermarkMode === 'logo' && !logoPreview">
+                                    <div class="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center text-xs text-gray-500 border border-dashed border-white/20">LOGO</div>
                                 </template>
 
                                 <!-- Text Preview -->
-                                <div x-show="useText" class="flex items-center gap-2">
-                                    <div class="w-6 h-6 rounded-md flex items-center justify-center font-black text-sm" :style="`color: ${neonColor}`">V</div>
-                                    <span class="font-bold tracking-tight text-lg" :style="`color: ${textColor}; text-shadow: 0 0 10px ${neonColor}44;`" x-text="watermarkText"></span>
-                                </div>
+                                <template x-if="watermarkMode === 'text'">
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-5 h-5 rounded-md flex items-center justify-center font-black text-sm" :style="`color: ${neonColor}`">V</div>
+                                        <span class="font-bold tracking-tight text-base" :style="`color: ${textColor}; text-shadow: 0 0 10px ${neonColor}44;`" x-text="'© ' + watermarkText"></span>
+                                    </div>
+                                </template>
                             </div>
                         </div>
-                        <div class="absolute bottom-4 left-4 bg-black/60 backdrop-blur-sm px-3 py-1 rounded-full text-[10px] text-gray-400 font-bold uppercase tracking-widest">معاينة العلامة المائية (Live Preview)</div>
+                        <div class="absolute top-4 left-4 bg-black/60 backdrop-blur-sm px-3 py-1 rounded-full text-[10px] text-gray-400 font-bold uppercase tracking-widest">معاينة العلامة المائية (Bottom-Right)</div>
                     </div>
 
                     <form method="post" action="{{ route('profile.photography.update') }}" enctype="multipart/form-data" class="space-y-8">
@@ -172,15 +174,23 @@
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6 border-t border-white/5">
                                 <!-- Mode Selection -->
                                 <div class="md:col-span-2 space-y-4 mb-2">
-                                    <label class="text-xs text-gray-400 font-bold uppercase tracking-wider block">نوع العلامة المائية (اختر واحدة على الأقل)</label>
+                                    <label class="text-xs text-gray-400 font-bold uppercase tracking-wider block">نوع العلامة المائية (اختر واحدة فقط)</label>
                                     <div class="flex gap-6">
-                                        <label class="flex items-center gap-3 cursor-pointer group">
-                                            <input type="checkbox" name="use_text_watermark" value="1" x-model="useText" class="w-5 h-5 accent-purple-500 rounded-md">
-                                            <span class="text-sm font-medium transition-colors" :class="useText ? 'text-white' : 'text-gray-500'">نص (الاسم)</span>
+                                        <label class="flex items-center gap-3 cursor-pointer group p-3 rounded-xl border transition-all"
+                                               :class="watermarkMode === 'text' ? 'border-purple-500/50 bg-purple-500/10' : 'border-white/5 bg-white/5 hover:border-white/20'">
+                                            <input type="radio" name="watermark_mode" value="text" x-model="watermarkMode" class="w-5 h-5 accent-purple-500">
+                                            <div>
+                                                <span class="text-sm font-bold transition-colors" :class="watermarkMode === 'text' ? 'text-purple-400' : 'text-gray-500'">✍️ نص (الاسم)</span>
+                                                <p class="text-[10px] text-gray-600">يظهر اسمك وتاريخ الصورة</p>
+                                            </div>
                                         </label>
-                                        <label class="flex items-center gap-3 cursor-pointer group">
-                                            <input type="checkbox" name="use_logo_watermark" value="1" x-model="useLogo" class="w-5 h-5 accent-purple-500 rounded-md">
-                                            <span class="text-sm font-medium transition-colors" :class="useLogo ? 'text-white' : 'text-gray-500'">شعار (لوجو)</span>
+                                        <label class="flex items-center gap-3 cursor-pointer group p-3 rounded-xl border transition-all"
+                                               :class="watermarkMode === 'logo' ? 'border-purple-500/50 bg-purple-500/10' : 'border-white/5 bg-white/5 hover:border-white/20'">
+                                            <input type="radio" name="watermark_mode" value="logo" x-model="watermarkMode" class="w-5 h-5 accent-purple-500">
+                                            <div>
+                                                <span class="text-sm font-bold transition-colors" :class="watermarkMode === 'logo' ? 'text-purple-400' : 'text-gray-500'">🎨 شعار (لوجو)</span>
+                                                <p class="text-[10px] text-gray-600">يظهر شعارك الخاص</p>
+                                            </div>
                                         </label>
                                     </div>
                                     @error('watermark_mode')
@@ -188,14 +198,14 @@
                                     @enderror
                                 </div>
 
-                                <div class="space-y-2" x-show="useText">
+                                <div class="space-y-2" x-show="watermarkMode === 'text'">
                                     <label class="text-xs text-gray-400 font-bold uppercase tracking-wider">نص العلامة المائية</label>
                                     <input type="text" name="watermark_text" x-model="watermarkText"
                                            class="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-purple-500/50" 
                                            placeholder="مثلاً: FocusHub / اسمك">
                                 </div>
 
-                                <div class="space-y-2" x-show="useLogo">
+                                <div class="space-y-2" x-show="watermarkMode === 'logo'">
                                     <label class="text-xs text-gray-400 font-bold uppercase tracking-wider">شعار العلامة المائية (Logo)</label>
                                     <div class="flex items-center gap-4">
                                         <div class="w-12 h-12 rounded-xl bg-white/5 border border-white/10 overflow-hidden flex items-center justify-center p-1">
@@ -214,10 +224,6 @@
                                 </div>
 
                                 <div class="space-y-2">
-                                    <label class="text-xs text-gray-400 font-bold uppercase tracking-wider">درجة الشفافية (<span x-text="opacity"></span>)</label>
-                                    <input type="range" name="watermark_opacity" min="0" max="1" step="0.1" x-model="opacity"
-                                           class="w-full accent-purple-500">
-                                </div>      <div class="space-y-2">
                                     <label class="text-xs text-gray-400 font-bold uppercase tracking-wider">درجة الشفافية (<span x-text="opacity"></span>)</label>
                                     <input type="range" name="watermark_opacity" min="0" max="1" step="0.1" x-model="opacity"
                                            class="w-full accent-purple-500">

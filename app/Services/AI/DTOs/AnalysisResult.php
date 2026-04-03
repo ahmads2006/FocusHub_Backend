@@ -8,6 +8,11 @@ abstract class AnalysisResult
         public string $driverName,
         public array $rawResults,
         public float $confidenceScore = 1.0,
+        public bool $isSensitive = false,
+        public array $tags = [],
+        public string $qualityGrade = 'high_quality',
+        public ?string $category = null,
+        public ?string $caption = null,
     ) {
     }
 

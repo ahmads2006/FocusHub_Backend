@@ -74,8 +74,9 @@ class ImageKitService
                     'overlayTextFontSize' => '30',
                     'overlayTextColor' => 'FFFFFF',
                     'overlayAlpha' => '50',
-                    'overlayX' => '10',
-                    'overlayY' => '10',
+                    'overlayFocus' => 'bottom_right',
+                    'overlayX' => '20',
+                    'overlayY' => '20',
                 ]
             ],
         ]);

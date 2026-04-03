@@ -52,42 +52,9 @@ class ContentSafetyService
             return array_merge($cachedResult, ['metadata' => array_merge($metadata, ['cached_redis' => true])]);
         }
 
-        // LAYER 1: Local Heuristics (ai_filter.py)
-        $aiFilterPath = base_path('scripts/ai_filter.py');
-        if (file_exists($aiFilterPath)) {
-            Log::info("AI Safety: Running Layer 1 (ai_filter.py) on {$fileHash}");
-            try {
-                $process = new \Symfony\Component\Process\Process(['python3', $aiFilterPath, $filePath]);
-                $process->setTimeout(10);
-                $process->run();
-                
-                if ($process->isSuccessful()) {
-                    $l1Result = trim($process->getOutput());
-                    Log::info("AI Safety: Layer 1 returned [{$l1Result}]");
-                    
-                    if ($l1Result === 'UNSAFE') {
-                        Log::channel('datadog')->error("Image Rejected (Local Heuristic)", ['hash' => $fileHash]);
-                        $this->banHash($fileHash, 'AI Rejected: Local Heuristic', ['layer1' => 'UNSAFE']);
-                        return [
-                            'status' => 'rejected',
-                            'is_visible' => false,
-                            'reason' => 'AI Flagged (Critical)',
-                            'driver' => 'ai_filter_local',
-                            'metadata' => array_merge($metadata, ['layer1_result' => 'UNSAFE'])
-                        ];
-                    } elseif ($l1Result === 'SUSPICIOUS') {
-                        // Skip to Layer 2 but remember it's suspicious
-                        $metadata['layer1_result'] = 'SUSPICIOUS';
-                    } else {
-                        $metadata['layer1_result'] = 'SAFE';
-                    }
-                } else {
-                    Log::warning("AI Safety: Layer 1 failed with error: " . $process->getErrorOutput());
-                }
-            } catch (\Exception $e) {
-                Log::warning("AI Safety: Layer 1 execution error: " . $e->getMessage());
-            }
-        }
+        // LAYER 1 (Python Local Heuristics) REMOVED.
+        // We rely completely on the robust Image AI Engine (Sightengine) in Layer 2
+        // to avoid false positives and unnecesary command line execution overhead.
 
         // LAYER 2: Failover AI File Analysis (Sightengine -> Cloudinary)
         try {
@@ -115,12 +82,6 @@ class ContentSafetyService
                 $reason = $analysisResult->isSensitive ? 'AI Flagged (Sensitive)' : 'Safe';
             }
             
-            // If layer 1 was suspicious, elevate caution
-            if (($metadata['layer1_result'] ?? '') === 'SUSPICIOUS' && $status === 'approved') {
-                $status = 'pending_review';
-                $reason = 'Suspicious Local Heuristics';
-            }
-
             if ($status === 'pending_review') {
                 Log::channel('datadog')->warning("Image Flagged (Sensitive Contents)", [
                     'hash' => $fileHash,
