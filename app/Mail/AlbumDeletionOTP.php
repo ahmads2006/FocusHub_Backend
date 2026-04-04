@@ -9,7 +9,7 @@ use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
 
-class AlbumDeletionOTP extends Mailable
+class AlbumDeletionOTP extends Mailable implements ShouldQueue
 {
     use Queueable, SerializesModels;
 

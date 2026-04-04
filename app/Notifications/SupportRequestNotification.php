@@ -26,13 +26,7 @@ class SupportRequestNotification extends Notification implements ShouldQueue, Sh
         return ['database', 'broadcast'];
     }
 
-    /**
-     * The channels the notification should broadcast on.
-     */
-    public function broadcastOn()
-    {
-        return [new PrivateChannel('App.Models.User.' . $this->requester->id)];
-    }
+
 
     public function broadcastType()
     {

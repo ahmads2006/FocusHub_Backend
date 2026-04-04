@@ -12,7 +12,7 @@ class EnsureUserNotBanned
     {
         $user = $request->user();
 
-        if ($user && $user->hasRole('super-admin')) {
+        if ($user && $user->hasRole('super_admin')) {
             return $next($request);
         }
 
