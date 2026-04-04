@@ -32,13 +32,6 @@ class ImageSocialNotification extends Notification implements ShouldQueue, Shoul
         return ['database', 'broadcast'];
     }
 
-    /**
-     * The channels the notification should broadcast on.
-     */
-    public function broadcastOn()
-    {
-        return [new PrivateChannel('App.Models.User.' . $this->actor->id)];
-    }
 
     public function broadcastType()
     {

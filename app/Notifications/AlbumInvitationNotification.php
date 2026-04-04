@@ -30,13 +30,6 @@ class AlbumInvitationNotification extends Notification implements ShouldQueue, S
         return ['database', 'broadcast'];
     }
 
-    /**
-     * The channels the notification should broadcast on.
-     */
-    public function broadcastOn()
-    {
-        return [new PrivateChannel('App.Models.User.' . $this->inviter->id)];
-    }
 
     /**
      * The event name for broadcasting.

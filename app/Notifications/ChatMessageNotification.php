@@ -29,13 +29,6 @@ class ChatMessageNotification extends Notification implements ShouldQueue, Shoul
         return ['database', 'broadcast'];
     }
 
-    /**
-     * The channels the notification should broadcast on.
-     */
-    public function broadcastOn()
-    {
-        return [new PrivateChannel('App.Models.User.' . $this->sender->id)];
-    }
 
     public function broadcastType()
     {
