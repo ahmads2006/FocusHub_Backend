@@ -19,6 +19,16 @@ class ImageModerationObserver
      */
     public function updated(ImageModeration $moderation): void
     {
+        // ── v22.0 Performance: Sync denormalized columns to images table ──
+        if ($moderation->isDirty('status') || $moderation->isDirty('is_visible')) {
+            \Illuminate\Support\Facades\DB::table('images')
+                ->where('id', $moderation->image_id)
+                ->update([
+                    'is_visible' => $moderation->is_visible,
+                    'moderation_status' => $moderation->status,
+                ]);
+        }
+
         if ($moderation->isDirty('status')) {
             // Bypass global scope 'visible' which might hide the image if status is rejected
             $image = $moderation->image()->withoutGlobalScopes()->first();

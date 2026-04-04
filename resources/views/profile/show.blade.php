@@ -147,7 +147,7 @@
                             },
                             status: '{{ $image->status }}',
                             is_sensitive: {{ $image->is_sensitive ? 'true' : 'false' }},
-                            labels: @json($image->labels ? $image->labels->labels : []),
+                            labels: @json($image->labelData ? $image->labelData->labels : ($image->labels ?? [])),
                             likes_count: {{ $image->likes_count ?? 0 }},
                             allow_download: {{ $image->allow_download ? 'true' : 'false' }},
                             download_url: '{{ $image->allow_download ? route('images.download', $image) : '#' }}'

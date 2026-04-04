@@ -30,9 +30,9 @@ class Image extends Model
     {
         static::addGlobalScope(new ShadowPrivacyScope);
 
-        // Filter by moderation visibility via the related table
+        // Filter by moderation visibility via denormalized column (v22.0 Performance)
         static::addGlobalScope('visible', function (\Illuminate\Database\Eloquent\Builder $builder) {
-            $builder->whereHas('moderation', fn($q) => $q->where('is_visible', true));
+            $builder->where('images.is_visible', true);
         });
 
         // Auto-create related rows on creation
@@ -66,10 +66,13 @@ class Image extends Model
         'size',
         'privacy',
         'labels',
+        'is_visible',
+        'moderation_status',
     ];
 
     protected $casts = [
         'labels' => 'array',
+        'is_visible' => 'boolean',
     ];
 
     protected $appends = ['can_edit', 'can_delete', 'can_download'];
