@@ -222,7 +222,7 @@ class RecommendationEngine
         $placeholders = implode(',', array_fill(0, count($ids), '?'));
         return Image::whereIn('id', $ids)
             ->where('privacy', 'public') // Prevents stale cache from exposing newly-private images
-            ->with(['settings', 'user', 'labelData'])
+            ->with(['settings', 'user', 'labelData', 'storage'])
             ->withCount('likes')
             ->orderByRaw("FIELD(id, {$placeholders})", $ids)
             ->get();
@@ -234,6 +234,7 @@ class RecommendationEngine
     protected function getTrendingFeed(int $limit = 20, bool $includeOwnImages = false)
     {
         $query = Image::where('privacy', 'public')
+            ->with(['storage', 'settings', 'user'])
             ->withCount('likes');
 
         // Optional: Include owner images in Gallery context

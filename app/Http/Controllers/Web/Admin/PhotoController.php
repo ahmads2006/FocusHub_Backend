@@ -15,7 +15,7 @@ class PhotoController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Image::query()->with('user');
+        $query = Image::query()->with(['user', 'storage', 'settings']);
 
         if ($request->filled('search')) {
             $query->where('title', 'like', '%' . $request->search . '%')

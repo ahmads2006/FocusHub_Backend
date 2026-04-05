@@ -119,7 +119,7 @@ class ChatController extends Controller
             ->update(['is_read' => true]);
 
         $messages = Message::conversation($userId, $partner->id)
-            ->with(['image'])
+            ->with(['image.storage', 'image.settings'])
             ->orderBy('created_at', 'asc')
             ->take(50)
             ->get()
@@ -197,7 +197,7 @@ class ChatController extends Controller
 
         $newMessages = Message::conversation($userId, $partner->id)
             ->where('id', '>', $afterId)
-            ->with(['image'])
+            ->with(['image.storage', 'image.settings'])
             ->orderBy('created_at', 'asc')
             ->get()
             ->map(function ($msg) use ($userId) {
@@ -223,6 +223,7 @@ class ChatController extends Controller
     public function myImages(): JsonResponse
     {
         $images = Auth::user()->images()
+            ->with(['storage', 'settings'])
             ->latest()
             ->paginate(12)
             ->through(fn($img) => [

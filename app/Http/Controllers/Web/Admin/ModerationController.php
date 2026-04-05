@@ -17,11 +17,11 @@ class ModerationController extends Controller
             ->whereHas('moderation', function ($query) {
                 $query->whereIn('status', [Image::STATUS_PENDING_REVIEW, Image::STATUS_UNDER_REVIEW]);
             })
-            ->with(['user', 'moderation'])
+            ->with(['user', 'moderation', 'storage'])
             ->latest()
             ->paginate(20);
 
-        $reports = ImageReport::with(['user', 'image'])
+        $reports = ImageReport::with(['user', 'image.storage', 'image.settings'])
             ->where('status', 'open')
             ->latest()
             ->paginate(20);

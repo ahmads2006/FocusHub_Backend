@@ -76,6 +76,19 @@ class AssetDeliveryService
             case 'source':
                 return $this->generateSecureOriginalUrl($image);
 
+            case 'gallery_watermarked':
+                $transformations = [['width' => 800]];
+                // إذا لم يكن المستخدم هو المالك، أضف علامة مائية
+                if (!Auth::check() || Auth::id() !== $image->user_id) {
+                    $transformations[] = [
+                        'overlayImage' => 'logo.png', // المسار في ImageKit
+                        'overlayFocus' => 'bottom_right',
+                        'overlayAlpha' => '40', // شفافية العلامة المائية
+                        'overlayWidth' => '150',
+                    ];
+                }
+                return $isInCloud ? $imageKit->getEnhancedUrl($path, $transformations) : $image->getThumbnailUrl('medium');
+
             default:
                 return $isInCloud ? $imageKit->getOptimizedUrl($path) : $image->getThumbnailUrl('medium');
         }

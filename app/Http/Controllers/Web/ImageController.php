@@ -32,7 +32,7 @@ class ImageController extends Controller
     public function manage()
     {
         $user = Auth::user();
-        $images = $user->images()->with('settings')->withoutGlobalScope('visible')->latest()->get();
+        $images = $user->images()->with(['settings', 'storage'])->withoutGlobalScope('visible')->latest()->get();
         $ownedAlbums = $user->ownedAlbums()->latest()->get();
         $sharedAlbums = $user->collaborativeAlbums()->wherePivot('status', 'accepted')->latest()->get();
 
@@ -273,7 +273,7 @@ class ImageController extends Controller
         
         // Setup base query for filtering or guest users
         $query = Image::where('privacy', 'public')
-            ->with(['settings', 'user', 'labelData', 'aiMetadata'])
+            ->with(['settings', 'user', 'labelData', 'aiMetadata', 'storage'])
             ->withCount('likes');
 
         // --- AI-Powered Smart Search ---
@@ -325,7 +325,7 @@ class ImageController extends Controller
                     $placeholders = implode(',', array_fill(0, count($slicedIds), '?'));
                     $models = Image::whereIn('id', $slicedIds)
                         ->where('privacy', 'public') // Prevents stale cache from exposing newly-private images
-                        ->with(['settings', 'user', 'labelData', 'aiMetadata'])
+                        ->with(['settings', 'user', 'labelData', 'aiMetadata', 'storage'])
                         ->withCount('likes')
                         ->orderByRaw("FIELD(id, {$placeholders})", $slicedIds)
                         ->get();

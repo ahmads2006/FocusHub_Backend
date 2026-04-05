@@ -205,7 +205,7 @@ class ProfileController extends Controller
                     ->whereHas('moderation', function ($q) {
                         $q->where('status', \App\Models\Image::STATUS_APPROVED);
                     })
-                    ->with(['likes', 'labelData'])
+                    ->with(['likes', 'labelData', 'storage', 'settings'])
                     ->latest()
                     ->paginate(24);
             } elseif ($activeTab === 'saved' && $isOwner) {
@@ -214,7 +214,7 @@ class ProfileController extends Controller
                     ->whereHas('moderation', function ($q) {
                         $q->where('status', \App\Models\Image::STATUS_APPROVED);
                     })
-                    ->with(['likes', 'labelData'])
+                    ->with(['likes', 'labelData', 'storage', 'settings'])
                     ->latest('bookmarks.created_at')
                     ->paginate(24);
             } elseif ($activeTab === 'liked' && $isOwner) {
@@ -225,7 +225,7 @@ class ProfileController extends Controller
                     ->whereHas('moderation', function ($q) {
                         $q->where('status', \App\Models\Image::STATUS_APPROVED);
                     })
-                    ->with(['likes', 'labelData'])
+                    ->with(['likes', 'labelData', 'storage', 'settings'])
                     ->latest() // ideally sort by like created_at but this is fine
                     ->paginate(24);
             } else {
@@ -235,7 +235,7 @@ class ProfileController extends Controller
                     ->whereHas('moderation', function ($q) {
                         $q->where('status', \App\Models\Image::STATUS_APPROVED);
                     })
-                    ->with(['likes', 'labelData'])
+                    ->with(['likes', 'labelData', 'storage', 'settings'])
                     ->latest()
                     ->paginate(24);
             }

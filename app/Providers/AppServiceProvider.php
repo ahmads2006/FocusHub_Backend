@@ -17,7 +17,12 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        if (class_exists(\Sentry\ClientBuilder::class) && ! app()->runningInConsole()) {
+            $this->app->extend(\Sentry\ClientBuilder::class, function (\Sentry\ClientBuilder $builder) {
+                $builder->setTransport(new \App\Sentry\LaravelQueueTransport());
+                return $builder;
+            });
+        }
     }
 
     /**
