@@ -46,38 +46,54 @@ class SightengineAnalyzer implements MediaAnalyzerInterface
         }
 
         try {
-            // Priority 1: Storage Disk (resilient to missing relationships by checking raw storage relation)
-            $path = $media->storage->path ?? $media->path;
-            
-            if ($path && \Illuminate\Support\Facades\Storage::disk('public')->exists($path)) {
-                $content = \Illuminate\Support\Facades\Storage::disk('public')->get($path);
-            } elseif ($path && \Illuminate\Support\Facades\Storage::disk('s3')->exists($path)) {
-                $content = \Illuminate\Support\Facades\Storage::disk('s3')->get($path);
+            $url = $media->getRawOriginal('url') ?? $media->url;
+            $isPubliclyAccessible = $url && (str_starts_with($url, 'https://') || (str_starts_with($url, 'http://') && !str_contains($url, 'localhost') && !str_contains($url, '127.0.0.1')));
+
+            $timeout = 15;
+
+            if ($isPubliclyAccessible) {
+                // URL-based analysis (Fast & low RAM)
+                Log::info("{$this->getName()} Analyzer: Using URL-based analysis for {$url}");
+                $timeout = 20; // Safe default for URLs
+                $response = Http::connectTimeout(10)->timeout($timeout)->post('https://api.sightengine.com/1.0/check.json', [
+                    'api_user' => $apiUser,
+                    'api_secret' => $apiSecret,
+                    'models' => 'nudity-2.1,weapon,offensive-2.0,gore-2.0,text-content,properties,quality',
+                    'url' => $url,
+                ]);
             } else {
-                // Priority 2: Full URL (Fallback for pre-upload or cloud-only assets)
-                $url = $media->getRawOriginal('url') ?? $media->url;
-                Log::warning("{$this->getName()} Analyzer: File not found at local or S3 path [{$path}]. Falling back to URL: {$url}");
-
-                $content = @file_get_contents($url);
-                if ($content === false) {
-                    throw new AnalyzerException("Failed to read media content from URL/Path: {$url}");
+                // Fallback to local file attachment
+                $path = $media->storage->path ?? $media->path;
+                
+                if ($path && \Illuminate\Support\Facades\Storage::disk('public')->exists($path)) {
+                    $content = \Illuminate\Support\Facades\Storage::disk('public')->get($path);
+                } elseif ($path && \Illuminate\Support\Facades\Storage::disk('s3')->exists($path)) {
+                    $content = \Illuminate\Support\Facades\Storage::disk('s3')->get($path);
+                } else {
+                    Log::warning("{$this->getName()} Analyzer: File not found locally. Falling back to fetch: {$url}");
+                    $content = @file_get_contents($url);
+                    if ($content === false) {
+                        throw new AnalyzerException("Failed to read media content from URL/Path: {$url}");
+                    }
                 }
-            }
 
-            $response = Http::attach(
-                'media', 
-                $content, 
-                $media->filename ?? 'image.jpg'
-            )->post('https://api.sightengine.com/1.0/check.json', [
-                'api_user' => $apiUser,
-                'api_secret' => $apiSecret,
-                'models' => 'nudity-2.1,weapon,offensive-2.0,gore-2.0,text-content,properties,quality',
-            ]);
+                $timeout = (strlen($content) > 3 * 1024 * 1024) ? 30 : 15;
+
+                $response = Http::connectTimeout(10)->timeout($timeout)->attach(
+                    'media', 
+                    $content, 
+                    $media->filename ?? 'image.jpg'
+                )->post('https://api.sightengine.com/1.0/check.json', [
+                    'api_user' => $apiUser,
+                    'api_secret' => $apiSecret,
+                    'models' => 'nudity-2.1,weapon,offensive-2.0,gore-2.0,text-content,properties,quality',
+                ]);
+            }
 
             if ($response->failed()) {
                 if ($response->status() === 429) {
                     Log::channel('datadog')->error("Sightengine Quota Exceeded", ['driver' => $this->getName()]);
-                    throw new QuotaExceededException("Sightengine Quota Exceeded.");
+                    throw new QuotaExceededException("Sightengine Quota Exceeded.", driverName: 'sightengine');
                 }
                 Log::channel('datadog')->error("Sightengine API Error", ['driver' => $this->getName(), 'status' => $response->status()]);
                 throw new AnalyzerException("Sightengine API Error: " . $response->body());
@@ -163,7 +179,7 @@ class SightengineAnalyzer implements MediaAnalyzerInterface
                 'message' => $e->getMessage(),
             ]);
             Log::error("Sightengine Analysis Failed: " . $e->getMessage());
-            throw new AnalyzerException($e->getMessage(), $e->getCode(), $e);
+            throw new AnalyzerException(message: $e->getMessage(), driverName: 'sightengine', code: (int)$e->getCode(), previous: $e);
         }
     }
 
@@ -186,7 +202,9 @@ class SightengineAnalyzer implements MediaAnalyzerInterface
                 throw new AnalyzerException("Failed to read uploaded file content.");
             }
 
-            $response = Http::attach(
+            $timeout = (strlen($content) > 3 * 1024 * 1024) ? 30 : 15;
+
+            $response = Http::connectTimeout(10)->timeout($timeout)->attach(
                 'media', 
                 $content, 
                 $file->getClientOriginalName()
@@ -198,7 +216,7 @@ class SightengineAnalyzer implements MediaAnalyzerInterface
 
             if ($response->failed()) {
                 if ($response->status() === 429) {
-                    throw new QuotaExceededException("Sightengine Quota Exceeded.");
+                    throw new QuotaExceededException("Sightengine Quota Exceeded.", driverName: 'sightengine');
                 }
                 throw new AnalyzerException("Sightengine API Error: " . $response->body());
             }
@@ -265,7 +283,7 @@ class SightengineAnalyzer implements MediaAnalyzerInterface
             throw $e;
         } catch (\Exception $e) {
             Log::error("Sightengine Analysis Exception (File): " . $e->getMessage());
-            throw new AnalyzerException($e->getMessage(), $e->getCode(), $e);
+            throw new AnalyzerException(message: $e->getMessage(), driverName: 'sightengine', code: (int)$e->getCode(), previous: $e);
         }
     }
 

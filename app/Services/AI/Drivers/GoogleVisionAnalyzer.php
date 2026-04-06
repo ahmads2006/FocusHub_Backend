@@ -44,30 +44,42 @@ class GoogleVisionAnalyzer implements MediaAnalyzerInterface
         }
 
         try {
-            // Priority 1: Storage Disk (resilient to missing relationships by checking raw storage relation)
-            $path = $media->storage->path ?? $media->path;
-            
-            if ($path && \Illuminate\Support\Facades\Storage::disk('public')->exists($path)) {
-                $content = \Illuminate\Support\Facades\Storage::disk('public')->get($path);
-            } elseif ($path && \Illuminate\Support\Facades\Storage::disk('s3')->exists($path)) {
-                $content = \Illuminate\Support\Facades\Storage::disk('s3')->get($path);
-            } else {
-                // Priority 2: Full URL (Fallback for pre-upload or cloud-only assets)
-                $url = $media->getRawOriginal('url') ?? $media->url;
-                Log::warning("{$this->getName()} Analyzer: File not found at local or S3 path [{$path}]. Falling back to URL: {$url}");
+            $url = $media->getRawOriginal('url') ?? $media->url;
+            $isPubliclyAccessible = $url && (str_starts_with($url, 'https://') || (str_starts_with($url, 'http://') && !str_contains($url, 'localhost') && !str_contains($url, '127.0.0.1')));
 
-                $content = @file_get_contents($url);
-                if ($content === false) {
-                    throw new AnalyzerException("Failed to read media content from URL/Path: {$url}");
+            $imageSource = [];
+            $timeout = 15;
+
+            if ($isPubliclyAccessible) {
+                // URL-based analysis (Fast & low RAM)
+                Log::info("{$this->getName()} Analyzer: Using URL-based analysis for {$url}");
+                $imageSource = ['source' => ['imageUri' => $url]];
+                $timeout = 20; // Safe default for URLs
+            } else {
+                // Fallback to local file / base64
+                $path = $media->storage->path ?? $media->path;
+                
+                if ($path && \Illuminate\Support\Facades\Storage::disk('public')->exists($path)) {
+                    $content = \Illuminate\Support\Facades\Storage::disk('public')->get($path);
+                } elseif ($path && \Illuminate\Support\Facades\Storage::disk('s3')->exists($path)) {
+                    $content = \Illuminate\Support\Facades\Storage::disk('s3')->get($path);
+                } else {
+                    Log::warning("{$this->getName()} Analyzer: File not found locally. Falling back to fetch: {$url}");
+                    $content = @file_get_contents($url);
+                    if ($content === false) {
+                        throw new AnalyzerException("Failed to read media content from URL/Path: {$url}");
+                    }
                 }
+
+                $base64Image = base64_encode($content);
+                $imageSource = ['content' => $base64Image];
+                $timeout = (strlen($content) > 3 * 1024 * 1024) ? 30 : 15;
             }
 
-            $base64Image = base64_encode($content);
-
-            $response = Http::post("https://vision.googleapis.com/v1/images:annotate?key={$apiKey}", [
+            $response = Http::connectTimeout(10)->timeout($timeout)->post("https://vision.googleapis.com/v1/images:annotate?key={$apiKey}", [
                 'requests' => [
                     [
-                        'image' => ['content' => $base64Image],
+                        'image' => $imageSource,
                         'features' => [
                             ['type' => 'LABEL_DETECTION', 'maxResults' => 15],
                             ['type' => 'SAFE_SEARCH_DETECTION'],
@@ -82,7 +94,7 @@ class GoogleVisionAnalyzer implements MediaAnalyzerInterface
 
             if ($response->failed()) {
                 if ($response->status() === 429) {
-                    throw new QuotaExceededException("Google Vision Quota Exceeded.");
+                    throw new QuotaExceededException("Google Vision Quota Exceeded.", driverName: 'google_vision');
                 }
                 throw new AnalyzerException("Google Vision API Error: " . $response->body());
             }
@@ -182,7 +194,7 @@ class GoogleVisionAnalyzer implements MediaAnalyzerInterface
             throw $e;
         } catch (\Exception $e) {
             Log::error("Google Vision Analysis Failed: " . $e->getMessage());
-            throw new AnalyzerException($e->getMessage(), 0, $e);
+            throw new AnalyzerException(message: $e->getMessage(), driverName: 'google_vision', code: 0, previous: $e);
         }
     }
 

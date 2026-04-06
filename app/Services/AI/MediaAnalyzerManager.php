@@ -67,23 +67,25 @@ class MediaAnalyzerManager extends Manager implements MediaAnalyzerInterface
 
             } catch (QuotaExceededException $e) {
                 Log::error("AI Failover: {$driverName} Quota Exceeded. Marking as depleted.");
-                Cache::put("ai_quota_depleted:{$driverName}", true, now()->addHour());
-                $errors[$driverName] = $e->getMessage();
+                $ttl = $e->retryAfterSeconds ? now()->addSeconds($e->retryAfterSeconds) : now()->addHour();
+                Cache::put("ai_quota_depleted:{$driverName}", true, $ttl);
+                $errors[$driverName] = $e;
                 $lastFailedDriver = $driverName;
             } catch (AnalyzerException $e) {
                 Log::error("AI Failover: {$driverName} Failed: " . $e->getMessage());
-                $errors[$driverName] = $e->getMessage();
+                $errors[$driverName] = $e;
                 $lastFailedDriver = $driverName;
             } catch (\Exception $e) {
                 Log::error("AI Failover: Unexpected error in {$driverName}: " . $e->getMessage());
-                $errors[$driverName] = $e->getMessage();
+                $errors[$driverName] = $e;
                 $lastFailedDriver = $driverName;
             }
         }
 
         // If we reach here, all drivers failed
         throw new AllAnalyzersFailedException(
-            "All AI Analyzers failed. Errors: " . json_encode($errors)
+            'All AI Analyzers failed for media analysis.',
+            driverErrors: $errors
         );
     }
 
@@ -123,22 +125,24 @@ class MediaAnalyzerManager extends Manager implements MediaAnalyzerInterface
 
             } catch (QuotaExceededException $e) {
                 Log::error("AI Failover (File): {$driverName} Quota Exceeded. Marking as depleted.");
-                Cache::put("ai_quota_depleted:{$driverName}", true, now()->addHour());
-                $errors[$driverName] = $e->getMessage();
+                $ttl = $e->retryAfterSeconds ? now()->addSeconds($e->retryAfterSeconds) : now()->addHour();
+                Cache::put("ai_quota_depleted:{$driverName}", true, $ttl);
+                $errors[$driverName] = $e;
                 $lastFailedDriver = $driverName;
             } catch (AnalyzerException $e) {
                 Log::error("AI Failover (File): {$driverName} Failed: " . $e->getMessage());
-                $errors[$driverName] = $e->getMessage();
+                $errors[$driverName] = $e;
                 $lastFailedDriver = $driverName;
             } catch (\Exception $e) {
                 Log::error("AI Failover (File): Unexpected error in {$driverName}: " . $e->getMessage());
-                $errors[$driverName] = $e->getMessage();
+                $errors[$driverName] = $e;
                 $lastFailedDriver = $driverName;
             }
         }
 
         throw new AllAnalyzersFailedException(
-            "All AI File Analyzers failed for pre-upload. Errors: " . json_encode($errors)
+            'All AI File Analyzers failed for pre-upload validation.',
+            driverErrors: $errors
         );
     }
 
@@ -180,22 +184,24 @@ class MediaAnalyzerManager extends Manager implements MediaAnalyzerInterface
 
             } catch (QuotaExceededException $e) {
                 Log::error("AI Pipeline (Tags): {$driverName} Quota Exceeded. Marking as depleted.");
-                Cache::put("ai_quota_depleted:{$driverName}", true, now()->addHour());
-                $errors[$driverName] = $e->getMessage();
+                $ttl = $e->retryAfterSeconds ? now()->addSeconds($e->retryAfterSeconds) : now()->addHour();
+                Cache::put("ai_quota_depleted:{$driverName}", true, $ttl);
+                $errors[$driverName] = $e;
                 $lastFailedDriver = $driverName;
             } catch (AnalyzerException $e) {
                 Log::error("AI Pipeline (Tags): {$driverName} Failed: " . $e->getMessage());
-                $errors[$driverName] = $e->getMessage();
+                $errors[$driverName] = $e;
                 $lastFailedDriver = $driverName;
             } catch (\Exception $e) {
                 Log::error("AI Pipeline (Tags): Unexpected error in {$driverName}: " . $e->getMessage());
-                $errors[$driverName] = $e->getMessage();
+                $errors[$driverName] = $e;
                 $lastFailedDriver = $driverName;
             }
         }
 
         throw new AllAnalyzersFailedException(
-            "All AI Tagging Analyzers failed. Errors: " . json_encode($errors)
+            'All AI Tagging Analyzers failed.',
+            driverErrors: $errors
         );
     }
 

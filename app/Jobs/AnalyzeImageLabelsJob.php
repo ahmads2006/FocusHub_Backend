@@ -60,6 +60,10 @@ class AnalyzeImageLabelsJob implements ShouldQueue
      */
     public function failed(\Throwable $exception): void
     {
-        Log::error("AnalyzeImageLabelsJob: All AI analyzers failed for image {$this->imageId}: " . $exception->getMessage());
+        $message = $exception instanceof \App\Services\AI\Exceptions\AllAnalyzersFailedException
+            ? $exception->getErrorSummary()
+            : $exception->getMessage();
+            
+        Log::error("AnalyzeImageLabelsJob: All AI analyzers failed for image {$this->imageId}:\n" . $message);
     }
 }

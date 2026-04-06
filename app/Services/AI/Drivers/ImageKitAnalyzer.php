@@ -60,7 +60,7 @@ class ImageKitAnalyzer implements MediaAnalyzerInterface
 
             if ($response->err) {
                 if ($response->err->raw['status'] == 429) {
-                    throw new QuotaExceededException("ImageKit Quota Exceeded.");
+                    throw new QuotaExceededException("ImageKit Quota Exceeded.", driverName: 'imagekit');
                 }
                 throw new AnalyzerException("ImageKit API Error: " . json_encode($response->err));
             }
@@ -147,7 +147,7 @@ class ImageKitAnalyzer implements MediaAnalyzerInterface
             throw $e;
         } catch (\Exception $e) {
             Log::error("ImageKit Analysis Failed: " . $e->getMessage());
-            throw new AnalyzerException($e->getMessage(), $e->getCode(), $e);
+            throw new AnalyzerException(message: $e->getMessage(), driverName: 'imagekit', code: (int)$e->getCode(), previous: $e);
         }
     }
 

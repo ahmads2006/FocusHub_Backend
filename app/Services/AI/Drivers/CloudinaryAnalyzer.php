@@ -89,7 +89,7 @@ class CloudinaryAnalyzer implements MediaAnalyzerInterface
 
             if ($response->failed()) {
                 if ($response->status() === 429) {
-                    throw new QuotaExceededException("Cloudinary Quota Exceeded.");
+                    throw new QuotaExceededException("Cloudinary Quota Exceeded.", driverName: 'cloudinary');
                 }
                 throw new AnalyzerException("Cloudinary API Error: " . $response->body());
             }
@@ -180,7 +180,7 @@ class CloudinaryAnalyzer implements MediaAnalyzerInterface
             throw $e;
         } catch (\Exception $e) {
             Log::error("Cloudinary Analysis Failed: " . $e->getMessage());
-            throw new AnalyzerException($e->getMessage(), $e->getCode(), $e);
+            throw new AnalyzerException(message: $e->getMessage(), driverName: 'cloudinary', code: (int)$e->getCode(), previous: $e);
         }
     }
 
@@ -321,7 +321,7 @@ class CloudinaryAnalyzer implements MediaAnalyzerInterface
             throw $e;
         } catch (\Exception $e) {
             Log::error("Cloudinary Analysis Exception (File): " . $e->getMessage());
-            throw new AnalyzerException($e->getMessage(), $e->getCode(), $e);
+            throw new AnalyzerException(message: $e->getMessage(), driverName: 'cloudinary', code: (int)$e->getCode(), previous: $e);
         }
     }
 
