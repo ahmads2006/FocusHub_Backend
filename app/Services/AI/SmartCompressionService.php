@@ -53,7 +53,7 @@ class SmartCompressionService
      */
     public function tuneImagick($imagick)
     {
-        if ($imagick instanceof \Imagick) {
+        if (class_exists('Imagick') && $imagick instanceof \Imagick) {
             // Force Chroma Subsampling to 4:2:0 for JPEG/WebP compatibility
             $imagick->setSamplingFactors(['4:2:0', '4:2:0', '4:2:0']);
             
@@ -61,7 +61,8 @@ class SmartCompressionService
             $imagick->stripImage();
             
             // Optimization for web: Interlace / Plane for progressive loading
-            $imagick->setInterlaceScheme(\Imagick::INTERLACE_PLANE);
+            // Using 3 (which corresponds to Imagick::INTERLACE_PLANE) to prevent IDE undefined class constant errors
+            $imagick->setInterlaceScheme(3);
         }
     }
 }

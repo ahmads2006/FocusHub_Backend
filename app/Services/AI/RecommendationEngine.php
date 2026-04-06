@@ -70,10 +70,10 @@ class RecommendationEngine
     public function getForYouFeedIds(User $user, int $limit = 500, bool $includeOwnImages = false)
     {
         $startTime = microtime(true);
-        $cacheKey = "feed:for_you_ids:{$user->id}:" . ($includeOwnImages ? 'all' : 'others') . ":v9"; // Version bump for ID logic
+        $cacheKey = "feed:for_you_ids:{$user->id}:" . ($includeOwnImages ? 'all' : 'others') . ":v10"; // Version bump
 
-        // Use Redis Cache Tags tied to the user ID.
-        $feedIds = Cache::tags(["user:{$user->id}", 'feeds'])->remember($cacheKey, 300, function () use ($user, $limit, $includeOwnImages) {
+        // Cache tied to user ID. Reduced to 30 seconds so pulling-to-refresh quickly yields a new Pinterest-style feed.
+        $feedIds = Cache::tags(["user:{$user->id}", 'feeds'])->remember($cacheKey, 30, function () use ($user, $limit, $includeOwnImages) {
             $prefs = UserPreference::where('user_id', $user->id)->first();
 
             // --- Hidden images (not interested) from Redis ---
@@ -114,14 +114,15 @@ class RecommendationEngine
             if (!empty($topTags) || !empty($topCreators)) {
                 $q = Image::query()->tap($unlikedConstraints);
                 if (!empty($topTags)) {
-                    $json = json_encode($topTags);
-                    $q->whereRaw("JSON_OVERLAPS(JSON_EXTRACT(labels, '$[*].description'), ?) OR JSON_OVERLAPS(labels, ?)", [$json, $json]);
+                    // Global Architecture Upgrade: Using Spatie's Many-to-Many Pivot Table instead of Slow JSON!
+                    $q->withAnyTags($topTags);
                 }
                 if (!empty($topCreators)) {
                     $placeholders = implode(',', array_fill(0, count($topCreators), '?'));
                     $q->orderByRaw("FIELD(user_id, {$placeholders}) DESC", $topCreators);
                 }
-                $directResults = $q->latest()->take($directCount)->get(['id', 'user_id', 'labels'])->toArray();
+                // Fetch a larger pool and shuffle for Pinterest-like randomization, then crop to needed count
+                $directResults = $q->latest()->take($directCount * 4)->get(['id', 'user_id', 'labels'])->shuffle()->take($directCount)->values()->toArray();
             }
 
             $directIds = array_column($directResults, 'id');
@@ -129,15 +130,17 @@ class RecommendationEngine
             // ── BUCKET 2: Discovery Match (Unliked) ──
             $discoveryResults = [];
             if (!empty($secondaryTags)) {
-                $json = json_encode($secondaryTags);
                 $excludeIds = array_merge($hiddenIds, $directIds);
                 $discoveryResults = Image::query()
                     ->tap($unlikedConstraints)
                     ->whereNotIn('id', $excludeIds)
-                    ->whereRaw("JSON_OVERLAPS(JSON_EXTRACT(labels, '$[*].description'), ?) OR JSON_OVERLAPS(labels, ?)", [$json, $json])
+                    ->withAnyTags($secondaryTags) // Uses Pivot Tables instead of JSON
                     ->latest()
-                    ->take($discoveryCount)
+                    ->take($discoveryCount * 4)
                     ->get(['id', 'user_id', 'labels'])
+                    ->shuffle()
+                    ->take($discoveryCount)
+                    ->values()
                     ->toArray();
             }
 
@@ -153,8 +156,11 @@ class RecommendationEngine
                 ->tap($unlikedConstraints)
                 ->whereNotIn('id', $excludeIds)
                 ->latest() // Strictly newest first, no sorting by likes
-                ->take($freshAllocation)
+                ->take((int)($freshAllocation * 4))
                 ->get(['id', 'user_id', 'labels'])
+                ->shuffle()
+                ->take($freshAllocation)
+                ->values()
                 ->toArray();
 
             $freshIds = array_column($freshResults, 'id');
@@ -168,8 +174,11 @@ class RecommendationEngine
                 ->withCount('likes')
                 ->orderBy('likes_count', 'desc')
                 ->latest()
-                ->take($trendingAllocation)
+                ->take((int)($trendingAllocation * 4))
                 ->get(['id', 'user_id', 'labels'])
+                ->shuffle()
+                ->take($trendingAllocation)
+                ->values()
                 ->toArray();
 
             // ── BUCKET 5: Historical Likes (Show last) ──

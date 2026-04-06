@@ -67,7 +67,7 @@ class MediaAnalyzerManager extends Manager implements MediaAnalyzerInterface
 
             } catch (QuotaExceededException $e) {
                 Log::error("AI Failover: {$driverName} Quota Exceeded. Marking as depleted.");
-                $ttl = $e->retryAfterSeconds ? now()->addSeconds($e->retryAfterSeconds) : now()->addHour();
+                $ttl = $e->retryAfterSeconds ? now()->addSeconds($e->retryAfterSeconds) : now()->addHours(5);
                 Cache::put("ai_quota_depleted:{$driverName}", true, $ttl);
                 $errors[$driverName] = $e;
                 $lastFailedDriver = $driverName;
@@ -125,7 +125,7 @@ class MediaAnalyzerManager extends Manager implements MediaAnalyzerInterface
 
             } catch (QuotaExceededException $e) {
                 Log::error("AI Failover (File): {$driverName} Quota Exceeded. Marking as depleted.");
-                $ttl = $e->retryAfterSeconds ? now()->addSeconds($e->retryAfterSeconds) : now()->addHour();
+                $ttl = $e->retryAfterSeconds ? now()->addSeconds($e->retryAfterSeconds) : now()->addHours(5);
                 Cache::put("ai_quota_depleted:{$driverName}", true, $ttl);
                 $errors[$driverName] = $e;
                 $lastFailedDriver = $driverName;
@@ -184,7 +184,7 @@ class MediaAnalyzerManager extends Manager implements MediaAnalyzerInterface
 
             } catch (QuotaExceededException $e) {
                 Log::error("AI Pipeline (Tags): {$driverName} Quota Exceeded. Marking as depleted.");
-                $ttl = $e->retryAfterSeconds ? now()->addSeconds($e->retryAfterSeconds) : now()->addHour();
+                $ttl = $e->retryAfterSeconds ? now()->addSeconds($e->retryAfterSeconds) : now()->addHours(5);
                 Cache::put("ai_quota_depleted:{$driverName}", true, $ttl);
                 $errors[$driverName] = $e;
                 $lastFailedDriver = $driverName;
