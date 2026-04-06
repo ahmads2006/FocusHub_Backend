@@ -173,15 +173,12 @@ class RecommendationEngine
                 ->toArray();
 
             // ── BUCKET 5: Historical Likes (Show last) ──
-            $likedResults = Image::query()
-                ->where('privacy', 'public')
-                ->whereHas('likes', fn($lq) => $lq->where('user_id', $user->id))
-                ->latest()
-                ->take(100) 
-                ->pluck('id')
-                ->toArray();
+            // ADVICE: In modern apps (like TikTok), we DO NOT show liked content in the main feed 
+            // to keep it focused on discovery. Users should go to their profile to see 'Liked' items.
+            // Leaving it empty to improve algorithmic engagement.
+            $likedResults = [];
 
-            // Merge unliked models into a pool
+            // Merge unliked models into a pool (Keeps priority: Direct -> Discovery -> Fresh -> Trending)
             $freshDiscoveryPool = array_merge($directResults, $discoveryResults, $freshResults, $trendingResults);
             
             // Uniquify based on ID
@@ -194,10 +191,10 @@ class RecommendationEngine
                 }
             }
 
-            // Apply Smart Spacing
+            // Apply Smart Spacing (Anti-Clustering)
             $spacedIds = $this->smartSpaceItems($uniquePool);
 
-            // Append Liked content at the end and return as simple array of IDs
+            // Return as simple array of IDs
             return array_values(array_unique(array_merge($spacedIds, $likedResults)));
         });
 
@@ -289,8 +286,9 @@ class RecommendationEngine
         $lastCreatorId = null;
         $lastPrimaryTag = null;
         
-        // Ensure random initial distribution before intelligent sorting
-        $itemsCollection = collect($items)->shuffle()->all();
+        // We DO NOT shuffle here to preserve the Priority Buckets (Direct > Discovery > Fresh)
+        // Shuffling would destroy the 50/20/30 distribution weighting.
+        $itemsCollection = $items; 
 
         while (!empty($itemsCollection) || !empty($penaltyBox)) {
             $placed = false;
@@ -309,7 +307,7 @@ class RecommendationEngine
                 $creatorConflict = ($item['user_id'] === $lastCreatorId);
                 $tagConflict = ($primaryTag !== null && $primaryTag === $lastPrimaryTag);
 
-                if (!$creatorConflict && !$tagConflict) {
+                if (!$creatorConflict && (!$tagConflict || empty($primaryTag))) {
                     $buffer[] = $item['id'];
                     $lastCreatorId = $item['user_id'];
                     $lastPrimaryTag = $primaryTag;
@@ -333,7 +331,7 @@ class RecommendationEngine
                     $creatorConflict = ($item['user_id'] === $lastCreatorId);
                     $tagConflict = ($primaryTag !== null && $primaryTag === $lastPrimaryTag);
 
-                    if (!$creatorConflict && !$tagConflict) {
+                    if (!$creatorConflict && (!$tagConflict || empty($primaryTag))) {
                         $buffer[] = $item['id'];
                         $lastCreatorId = $item['user_id'];
                         $lastPrimaryTag = $primaryTag;
@@ -348,8 +346,8 @@ class RecommendationEngine
             // If we are absolutely stuck, force insert to keep moving
             if (!$placed) {
                 if (!empty($itemsCollection)) {
+                    // Pull item and force it into the feed buffer (FIX: Removed duplicate insertion into penaltyBox)
                     $item = array_shift($itemsCollection);
-                    $penaltyBox[] = $item; // Wait, actually just force into buffer
                     $buffer[] = $item['id'];
                     $lastCreatorId = $item['user_id'];
                     
