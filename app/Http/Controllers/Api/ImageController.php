@@ -50,10 +50,20 @@ class ImageController extends Controller
             'is_comparison' => 'boolean'
         ]);
 
+        $user = Auth::user();
+        $file = $request->file('image');
+
+        // ── Storage Quota Check (10GB Drive System) ──
+        if (!$user->hasEnoughStorage($file->getSize())) {
+            return response()->json([
+                'message' => 'لقد تجاوزت الحد الأقصى للمساحة المسموحة (10 جيجابايت). يُرجى تفريغ بعض المساحة لتتمكن من الرفع.'
+            ], 403);
+        }
+
         $image = $this->imageService->processAndUpload(
-            $request->file('image'), 
+            $file, 
             $request->all(), 
-            Auth::id()
+            $user->id
         );
 
         return response()->json([

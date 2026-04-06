@@ -38,6 +38,15 @@ class AlbumUploadController extends Controller
         ]);
 
         $user = $request->user() ?: \App\Models\User::first(); // Fallback for dev if needed
+        $file = $request->file('archive');
+
+        // ── Storage Quota Check (10GB Drive System) ──
+        if (!$user->hasEnoughStorage($file->getSize())) {
+            return response()->json([
+                'message' => 'لقد تجاوزت الحد الأقصى للمساحة المسموحة (10 جيجابايت). يُرجى تفريغ بعض المساحة لتتمكن من رفع هذا الأرشيف.'
+            ], 403);
+        }
+
         $albumId = $request->album_id;
 
         // If no album_id, create one using album_name or default
@@ -139,9 +148,18 @@ class AlbumUploadController extends Controller
             $albumId = $album->id;
         }
 
-        $jobId = Str::uuid()->toString();
         $files = $request->file('images');
         $totalFiles = count($files);
+
+        // ── Storage Quota Check (10GB Drive System) ──
+        $totalBatchSize = array_reduce($files, fn($carry, $f) => $carry + $f->getSize(), 0);
+        if (!$user->hasEnoughStorage($totalBatchSize)) {
+            return response()->json([
+                'message' => 'عذراً، مساحة التخزين الخاصة بك غير كافية لرفع هذه المجموعة من الصور. الحد الأقصى للمستخدم هو 10 جيجابايت.'
+            ], 403);
+        }
+
+        $jobId = Str::uuid()->toString();
 
         // Initialize Redis progress tracker
         $redisKey = 'opticvault:upload_progress:' . $jobId;

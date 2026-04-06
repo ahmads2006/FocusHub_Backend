@@ -35,12 +35,23 @@ class Image extends Model
             $builder->where('images.is_visible', true);
         });
 
-        // Auto-create related rows on creation
         static::created(function (Image $image) {
             ImageStorage::create(['image_id' => $image->id]);
             ImageMeta::create(['image_id' => $image->id]);
             ImageModeration::create(['image_id' => $image->id, 'status' => self::STATUS_APPROVED]);
             ImageSettings::create(['image_id' => $image->id]);
+
+            // Update user storage quota (v23.0 Drive System)
+            if ($image->user_id && $image->size > 0) {
+                $image->user()->increment('storage_used_bytes', $image->size);
+            }
+        });
+
+        // Update user storage quota on deletion
+        static::deleted(function (Image $image) {
+            if ($image->user_id && $image->size > 0) {
+                $image->user()->decrement('storage_used_bytes', $image->size);
+            }
         });
     }
 

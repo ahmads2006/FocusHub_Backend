@@ -112,8 +112,10 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
         'watermark_text',
         'watermark_logo',
         'watermark_mode',
-    ];
-
+        'storage_limit_bytes',
+        'storage_used_bytes',
+    ];  
+    
     protected $with = ['userStatus', 'profile', 'settings', 'verification', 'oauth'];
     protected $appends = ['role_names', 'permission_names', 'can_edit'];
 
@@ -129,6 +131,8 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'role' => 'string',
+            'storage_limit_bytes' => 'integer',
+            'storage_used_bytes' => 'integer',
         ];
     }
 
@@ -410,4 +414,47 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
         return 'https://ui-avatars.com/api/?name=' . urlencode($this->name) . '&color=7F9CF5&background=EBF4FF&size=150';
     }
 
+    /**
+     * حساب إجمالي المساحة المستخدمة (10GB Limit System)
+     */
+    public function getStorageUsedPercentageAttribute(): float
+    {
+        if (!$this->storage_limit_bytes || $this->storage_limit_bytes === 0) {
+            return 0;
+        }
+
+        return round(($this->storage_used_bytes / $this->storage_limit_bytes) * 100, 2);
+    }
+
+    public function getStorageRemainingBytesAttribute(): int
+    {
+        if (!$this->storage_limit_bytes) {
+            return 999999999999; // Infinite for Super Admin
+        }
+
+        return max(0, $this->storage_limit_bytes - $this->storage_used_bytes);
+    }
+
+    /**
+     * التأكد من وجود مساحة كافية قبل الرفع.
+     */
+    public function hasEnoughStorage(int $bytesToAdd): bool
+    {
+        // Super Admins have infinite space
+        if ($this->hasRole('super-admin') || $this->hasRole('super_admin') || !$this->storage_limit_bytes) {
+            return true;
+        }
+
+        return ($this->storage_used_bytes + $bytesToAdd) <= $this->storage_limit_bytes;
+    }
+
+    /**
+     * تحديث المساحة المستخدمة يدوياً (للطوارئ أو إعادة الحساب)
+     */
+    public function recalculateStorageUsed(): int
+    {
+        $total = (int) $this->images()->sum('size');
+        $this->update(['storage_used_bytes' => $total]);
+        return $total;
+    }
 }

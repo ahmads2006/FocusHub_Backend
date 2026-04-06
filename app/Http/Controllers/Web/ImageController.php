@@ -68,9 +68,14 @@ class ImageController extends Controller
             }
         }
 
+        // ── Storage Quota Check (10GB Drive System) ──
+        $file = $request->file('image');
+        if (!Auth::user()->hasEnoughStorage($file->getSize())) {
+            return back()->with('error', 'لقد تجاوزت الحد الأقصى للمساحة المسموحة (10 جيجابايت). يُرجى حذف بعض الصور لتتمكن من الرفع.');
+        }
+
         // The Full-Stack Cloud Pipeline (v7.0)
-        // Handles: Local Extract -> Sanitization -> Cloud Upload -> Local Cleanup -> Database Save
-        $image = $this->imageService->processAndUpload($request->file('image'), $request->all(), Auth::id());
+        $image = $this->imageService->processAndUpload($file, $request->all(), Auth::id());
 
         if ($request->filled('tags')) {
             $tags = array_map('trim', explode(',', $request->tags));
