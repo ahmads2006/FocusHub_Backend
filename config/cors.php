@@ -19,9 +19,11 @@ return [
     'allowed_methods' => ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
 
     'allowed_origins' => [
-        'http://localhost:3000',        // React dev (CRA / Next.js)
-        'http://localhost:5173',        // Vite + React dev
-        'https://opticvault.com',       // Production
+        'http://localhost:3000',
+        'http://localhost:5173',
+        'https://opalshot.studio',
+        'https://www.opalshot.studio',
+        ...explode(',', env('CORS_ALLOWED_ORIGINS', '')),
     ],
 
     'allowed_origins_patterns' => [],
