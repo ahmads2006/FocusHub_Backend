@@ -438,7 +438,7 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
     }
 
     /**
-     * حساب إجمالي المساحة المستخدمة (10GB Limit System)
+     * حساب إجمالي المساحة المستخدمة (5GB Limit System)
      */
     public function getStorageUsedPercentageAttribute(): float
     {

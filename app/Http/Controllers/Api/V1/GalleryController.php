@@ -1,0 +1,114 @@
+<?php
+
+namespace App\Http\Controllers\Api\V1;
+
+use App\Http\Controllers\Controller;
+use App\Models\Image;
+use App\Services\AI\RecommendationEngine;
+use App\Services\Core\AssetDeliveryService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+
+class GalleryController extends Controller
+{
+    protected AssetDeliveryService $deliveryService;
+
+    public function __construct(AssetDeliveryService $deliveryService)
+    {
+        $this->deliveryService = $deliveryService;
+    }
+
+    /**
+     * Public gallery with smart search, tag filtering, and personalized feed.
+     */
+    public function index(Request $request): JsonResponse
+    {
+        $selectedTag = $request->query('tag');
+        $searchQuery = $request->query('q');
+        $perPage     = min($request->query('per_page', 20), 50);
+
+        $query = Image::where('privacy', 'public')
+            ->with(['settings', 'user', 'labelData', 'aiMetadata', 'storage'])
+            ->withCount('likes');
+
+        // ── AI-Powered Smart Search ──
+        if ($searchQuery) {
+            $search = trim($searchQuery);
+            $query->where(function ($q) use ($search) {
+                $q->where('title', 'LIKE', "%{$search}%")
+                    ->orWhere('description', 'LIKE', "%{$search}%")
+                    ->orWhereRaw("JSON_SEARCH(labels, 'one', ?, NULL, '$[*]') IS NOT NULL", ["%{$search}%"])
+                    ->orWhereHas('aiMetadata', function ($ai) use ($search) {
+                        $ai->where('category', 'LIKE', "%{$search}%")
+                            ->orWhere('caption', 'LIKE', "%{$search}%")
+                            ->orWhereRaw("JSON_SEARCH(extracted_tags, 'one', ?, NULL, '$[*]') IS NOT NULL", ["%{$search}%"]);
+                    })
+                    ->orWhereHas('tags', function ($t) use ($search) {
+                        $t->where('name->en', 'LIKE', "%{$search}%")
+                            ->orWhere('name->ar', 'LIKE', "%{$search}%")
+                            ->orWhere('name', 'LIKE', "%{$search}%");
+                    });
+            });
+
+            $images = $query->latest()->paginate($perPage);
+        } elseif ($selectedTag) {
+            $query->whereRaw('JSON_CONTAINS(labels, ?)', [json_encode($selectedTag)]);
+            $images = $query->latest()->paginate($perPage);
+        } else {
+            // Personalized For You for authenticated users
+            $user = Auth::user();
+            if ($user) {
+                $recommendationEngine = app(RecommendationEngine::class);
+                $feedIds = $recommendationEngine->getForYouFeedIds($user, 500, true);
+
+                $page       = \Illuminate\Pagination\Paginator::resolveCurrentPage() ?: 1;
+                $totalCount = count($feedIds);
+                $slicedIds  = array_slice($feedIds, ($page - 1) * $perPage, $perPage);
+
+                if (!empty($slicedIds)) {
+                    $placeholders = implode(',', array_fill(0, count($slicedIds), '?'));
+                    $models = Image::whereIn('id', $slicedIds)
+                        ->where('privacy', 'public')
+                        ->with(['settings', 'user', 'labelData', 'aiMetadata', 'storage'])
+                        ->withCount('likes')
+                        ->orderByRaw("FIELD(id, {$placeholders})", $slicedIds)
+                        ->get();
+                } else {
+                    $models = collect();
+                }
+
+                $images = new \Illuminate\Pagination\LengthAwarePaginator(
+                    $models, $totalCount, $perPage, $page,
+                    ['path' => \Illuminate\Pagination\Paginator::resolveCurrentPath(), 'query' => $request->query()]
+                );
+            } else {
+                $images = $query->latest()->paginate($perPage);
+            }
+        }
+
+        // Interaction state for current user
+        $likedImageIds     = [];
+        $bookmarkedImageIds = [];
+        if (Auth::check()) {
+            $imageIds          = $images->pluck('id');
+            $likedImageIds     = \App\Models\Like::where('user_id', Auth::id())
+                ->whereIn('image_id', $imageIds)->pluck('image_id')->toArray();
+            $bookmarkedImageIds = \App\Models\Bookmark::where('user_id', Auth::id())
+                ->whereIn('image_id', $imageIds)->pluck('image_id')->toArray();
+        }
+
+        return response()->json([
+            'success' => true,
+            'data'    => [
+                'images'               => $images,
+                'liked_image_ids'      => $likedImageIds,
+                'bookmarked_image_ids' => $bookmarkedImageIds,
+                'filters'              => [
+                    'tag'    => $selectedTag,
+                    'search' => $searchQuery,
+                ],
+            ],
+        ]);
+    }
+}

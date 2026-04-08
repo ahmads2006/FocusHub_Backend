@@ -68,10 +68,10 @@ class ImageController extends Controller
             }
         }
 
-        // ── Storage Quota Check (10GB Drive System) ──
+        // ── Storage Quota Check (5GB Drive System) ──
         $file = $request->file('image');
         if (!Auth::user()->hasEnoughStorage($file->getSize())) {
-            return back()->with('error', 'لقد تجاوزت الحد الأقصى للمساحة المسموحة (10 جيجابايت). يُرجى حذف بعض الصور لتتمكن من الرفع.');
+            return back()->with('error', 'لقد تجاوزت الحد الأقصى للمساحة المسموحة (5 جيجابايت). يُرجى حذف بعض الصور لتتمكن من الرفع.');
         }
 
         // The Full-Stack Cloud Pipeline (v7.0)

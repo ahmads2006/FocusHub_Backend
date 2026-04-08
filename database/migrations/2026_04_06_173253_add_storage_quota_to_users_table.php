@@ -12,8 +12,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('users', function (Blueprint $table) {
-            // Default: 10GB = 10 * 1024 * 1024 * 1024 bytes
-            $table->unsignedBigInteger('storage_limit_bytes')->nullable()->default(10737418240)->after('email');
+            // Default: 5GB = 5 * 1024 * 1024 * 1024 bytes
+            $table->unsignedBigInteger('storage_limit_bytes')->nullable()->default(5368709120)->after('email');
             $table->unsignedBigInteger('storage_used_bytes')->default(0)->after('storage_limit_bytes');
         });
     }

@@ -40,10 +40,10 @@ class AlbumUploadController extends Controller
         $user = $request->user() ?: \App\Models\User::first(); // Fallback for dev if needed
         $file = $request->file('archive');
 
-        // ── Storage Quota Check (10GB Drive System) ──
+        // ── Storage Quota Check (5GB Drive System) ──
         if (!$user->hasEnoughStorage($file->getSize())) {
             return response()->json([
-                'message' => 'لقد تجاوزت الحد الأقصى للمساحة المسموحة (10 جيجابايت). يُرجى تفريغ بعض المساحة لتتمكن من رفع هذا الأرشيف.'
+                'message' => 'لقد تجاوزت الحد الأقصى للمساحة المسموحة (5 جيجابايت). يُرجى تفريغ بعض المساحة لتتمكن من رفع هذا الأرشيف.'
             ], 403);
         }
 
@@ -151,11 +151,11 @@ class AlbumUploadController extends Controller
         $files = $request->file('images');
         $totalFiles = count($files);
 
-        // ── Storage Quota Check (10GB Drive System) ──
+        // ── Storage Quota Check (5GB Drive System) ──
         $totalBatchSize = array_reduce($files, fn($carry, $f) => $carry + $f->getSize(), 0);
         if (!$user->hasEnoughStorage($totalBatchSize)) {
             return response()->json([
-                'message' => 'عذراً، مساحة التخزين الخاصة بك غير كافية لرفع هذه المجموعة من الصور. الحد الأقصى للمستخدم هو 10 جيجابايت.'
+                'message' => 'عذراً، مساحة التخزين الخاصة بك غير كافية لرفع هذه المجموعة من الصور. الحد الأقصى للمستخدم هو 5 جيجابايت.'
             ], 403);
         }
 

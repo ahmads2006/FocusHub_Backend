@@ -17,7 +17,7 @@ class InstagramAuthController extends Controller
     public function redirectToInstagram()
     {
         $url = Socialite::driver('instagram')->stateless()->redirect()->getTargetUrl();
-        
+
         return response()->json([
             'status' => 'success',
             'redirect_url' => $url
@@ -33,8 +33,8 @@ class InstagramAuthController extends Controller
             $instagramUser = Socialite::driver('instagram')->stateless()->user();
 
             $user = User::where('instagram_id', $instagramUser->getId())
-                        ->orWhere('email', $instagramUser->getEmail() ?? $instagramUser->getId() . '@instagram.local')
-                        ->first();
+                ->orWhere('email', $instagramUser->getEmail() ?? $instagramUser->getId() . '@instagram.local')
+                ->first();
 
             if (!$user) {
                 $user = User::create([
@@ -49,12 +49,12 @@ class InstagramAuthController extends Controller
             $token = $user->createToken('instagram_login_token')->plainTextToken;
 
             // Redirect back to frontend
-            $frontendUrl = env('FRONTEND_URL', 'https://opticvault.me') . '/auth/callback?token=' . $token;
+            $frontendUrl = env('FRONTEND_URL', 'https://opalshot.studio') . '/auth/callback?token=' . $token;
             return redirect()->away($frontendUrl);
 
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error("Instagram Social Login Failed: " . $e->getMessage());
-            $errorUrl = env('FRONTEND_URL', 'https://opticvault.me') . '/login?error=instagram_auth_failed';
+            $errorUrl = env('FRONTEND_URL', 'https://opalshot.studio') . '/login?error=instagram_auth_failed';
             return redirect()->away($errorUrl);
         }
     }

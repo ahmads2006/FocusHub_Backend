@@ -53,10 +53,10 @@ class ImageController extends Controller
         $user = Auth::user();
         $file = $request->file('image');
 
-        // ── Storage Quota Check (10GB Drive System) ──
+        // ── Storage Quota Check (5GB Drive System) ──
         if (!$user->hasEnoughStorage($file->getSize())) {
             return response()->json([
-                'message' => 'لقد تجاوزت الحد الأقصى للمساحة المسموحة (10 جيجابايت). يُرجى تفريغ بعض المساحة لتتمكن من الرفع.'
+                'message' => 'لقد تجاوزت الحد الأقصى للمساحة المسموحة (5 جيجابايت). يُرجى تفريغ بعض المساحة لتتمكن من الرفع.'
             ], 403);
         }
 
