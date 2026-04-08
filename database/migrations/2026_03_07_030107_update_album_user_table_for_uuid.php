@@ -18,7 +18,7 @@ return new class extends Migration
             // The previous migration already used foreignUuid, 
             // but we'll make sure there's no auto-increment ID if it exists.
             if (Schema::hasColumn('album_user', 'id')) {
-                $table->dropColumn('id');
+                if (DB::getDriverName() !== 'sqlite') { $table->dropColumn('id'); }
             }
         });
     }
