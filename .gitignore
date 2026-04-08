@@ -21,6 +21,8 @@ yarn-error.log
 /.phpunit.cache
 /.vscode
 /.zed
+.env.server
+api.opalshot.studio.conf
 
 # Project Specific (OpticVault)
 /venv/
