@@ -269,14 +269,20 @@ class Image extends Model
     public function isPendingReview(): bool { return $this->status === self::STATUS_PENDING_REVIEW; }
     public function isRejected(): bool { return $this->status === self::STATUS_REJECTED; }
 
-    // ───────────────────────── URL Helpers ─────────────────────────
+    /**
+     * Get the URL for a specific context/variant.
+     */
+    public function getUrl(string $context = 'gallery'): string
+    {
+        return app(\App\Services\Core\AssetDeliveryService::class)->getUrl($this, $context);
+    }
 
     /**
      * Accessor for the image display URL.
      */
     public function getUrlAttribute(): string
     {
-        return app(\App\Services\Core\AssetDeliveryService::class)->getUrl($this, 'gallery');
+        return $this->getUrl('gallery');
     }
 
     /**
@@ -284,7 +290,7 @@ class Image extends Model
      */
     public function getOriginalUrl(): string
     {
-        return app(\App\Services\Core\AssetDeliveryService::class)->getUrl($this, 'original');
+        return $this->getUrl('original');
     }
 
     /**

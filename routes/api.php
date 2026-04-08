@@ -11,6 +11,7 @@ Route::middleware(['auth:sanctum', 'check.banned', 'throttle:api'])->group(funct
     });
 
     Route::apiResource('images', App\Http\Controllers\Api\ImageController::class)->names('api.images');
+    Route::get('/user/drive-stats', [App\Http\Controllers\Api\StatsController::class, 'driveStats'])->name('api.user.drive-stats');
 });
 
 // ─── Admin API (super-admin only) ──────────────────────────────
@@ -29,11 +30,12 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'role:super-admin'])->group(
     Route::delete('/images/{image}', [AdminController::class, 'deleteImage']);
 });
 
-// ─── Internal Scanner API (Python background scanner only) ─────
-Route::prefix('internal/scanner')->group(function () {
-    Route::get('/images', [ScannerController::class, 'publicImages']);
-    Route::post('/report', [ScannerController::class, 'report']);
-});
+// ─── [LEGACY] Internal Scanner API (Python background scanner only) ─────
+// Deactivated: Migrated to Cloud-native AI Moderation for v23.0+
+// Route::prefix('internal/scanner')->group(function () {
+//     Route::get('/images', [ScannerController::class, 'publicImages']);
+//     Route::post('/report', [ScannerController::class, 'report']);
+// });
 
 // ─── Webhooks ──────────────────────────────────────────────
 Route::post('/webhooks/imagekit', [\App\Http\Controllers\Api\ImageKitWebhookController::class, 'handle'])

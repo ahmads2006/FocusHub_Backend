@@ -8,14 +8,23 @@ use App\Models\ImageReport;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
+/**
+ * @deprecated v23.0
+ * 
+ * [LEGACY CODE]
+ * This controller was part of the Phase 1 Local Python Scanner architecture.
+ * It has been deactivated in favor of the unified Cloud-native AI Moderation Pipeline (Sightengine/Google Vision).
+ * The logic is preserved for academic transition documentation only.
+ */
 class ScannerController extends Controller
 {
     /**
      * Receive a violation report from the Python background scanner.
-     * Protected by SCANNER_API_KEY.
+     * [DEACTIVATED]
      */
     public function report(Request $request)
     {
+        /*
         // Validate the secret key
         $expectedKey = config('services.scanner.api_key');
         if (!$expectedKey || $request->header('X-Scanner-Key') !== $expectedKey) {
@@ -66,14 +75,18 @@ class ScannerController extends Controller
         }
 
         return response()->json(['message' => 'Report submitted successfully.'], 201);
+        */
+
+        return response()->json(['message' => 'This service has been migrated to Cloud AI.'], 410);
     }
 
     /**
      * Return a list of public gallery images for the scanner to inspect.
-     * Protected by SCANNER_API_KEY.
+     * [DEACTIVATED]
      */
     public function publicImages(Request $request)
     {
+        /*
         $expectedKey = config('services.scanner.api_key');
         if (!$expectedKey || $request->header('X-Scanner-Key') !== $expectedKey) {
             return response()->json(['error' => 'Unauthorized'], 401);
@@ -93,5 +106,9 @@ class ScannerController extends Controller
             ]);
 
         return response()->json($images);
+        */
+
+        return response()->json(['message' => 'Service Gone'], 410);
     }
 }
+

@@ -99,10 +99,23 @@ class ImageIntelligenceService
                 $result = $this->analyzer->analyze($image, 'image');
             }
 
-            // 1. Update Tags (Spatie Tags)
+            // 1. Hierarchical Tagging: Prepend category to tags for "Nature -> Sea" structure
+            if (!empty($result->category) && $result->category !== 'other') {
+                // Ensure category is translated or handled as a primary tag
+                array_unshift($result->tags, $result->category);
+                $result->tags = array_values(array_unique($result->tags));
+            }
+
+            // 1a. Update Tags (Spatie Tags)
             $this->updateImageTags($image, $result->tags);
 
-            // 2. Store Labels in images.labels (new column)
+            // 2. Automated AI Description: Populate description if empty
+            if (empty($image->description) && !empty($result->caption)) {
+                $image->update(['description' => $result->caption]);
+                Log::info("ImageIntelligence: Auto-populated description for {$image->id}");
+            }
+
+            // 2a. Store Labels in images.labels (new column)
             $image->update(['labels' => $result->tags]);
 
             // 3. Store in separate table (legacy support)

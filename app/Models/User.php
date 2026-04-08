@@ -23,43 +23,53 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasFactory, Notifiable, HasUuids, HasRoles, InteractsWithMedia, LogsActivity, HasTags;
+    
+    /**
+     * Temporary storage for attributes that belong to related models.
+     * This avoids SQL errors during the creation of the User model.
+     */
+    protected array $relationData = [];
 
     protected static function booted(): void
     {
         static::created(function (User $user) {
             $user->userStatus()->create([]);
             
-            $displayName = $user->getAttribute('name');
-            $handle = \App\Helpers\RestrictedNameHelper::generateUniqueHandle($displayName ?: 'User');
+            // Extract deferred data for the profile
+            $profileData = $user->getRelationData('profile');
+            $displayName = $profileData['name'] ?? 'User';
+            $handle = \App\Helpers\RestrictedNameHelper::generateUniqueHandle($displayName);
 
-            $user->profile()->create([
+            $user->profile()->create(array_merge([
                 'name' => $displayName,
                 'username' => $handle,
                 'username_last_changed_at' => now(),
-                'bio' => $user->getAttribute('bio'),
-                'profile_picture' => $user->getAttribute('profile_picture'),
-                'avatar' => $user->getAttribute('avatar'),
-            ]);
-            $user->settings()->create([
-                'dynamic_watermark' => $user->getAttribute('dynamic_watermark') ?? false,
-                'watermark_text_color' => $user->getAttribute('watermark_text_color') ?? '#FFFFFF',
-                'watermark_neon_color' => $user->getAttribute('watermark_neon_color') ?? '#00FFFF',
-                'watermark_opacity' => $user->getAttribute('watermark_opacity') ?? 0.5,
-                'watermark_mode' => $user->getAttribute('watermark_mode') ?? 'text',
-                'auto_orient_default' => $user->getAttribute('auto_orient_default') ?? true,
-                'stay_logged_in' => $user->getAttribute('stay_logged_in') ?? false,
-                'is_public_profile' => $user->getAttribute('is_public_profile') ?? true,
-            ]);
-            $user->verification()->create([
-                'verification_code' => $user->getAttribute('verification_code'),
-                'is_verified' => $user->getAttribute('is_verified') ?? false,
-            ]);
-            if ($user->getAttribute('google_id') || $user->getAttribute('adobe_id')) {
-                $user->oauth()->create([
-                    'google_id' => $user->getAttribute('google_id'),
-                    'adobe_id' => $user->getAttribute('adobe_id'),
-                    'provider_token' => $user->getAttribute('provider_token'),
-                ]);
+            ], $profileData));
+
+            // Extract deferred data for settings
+            $settingsData = $user->getRelationData('settings');
+            $user->settings()->create(array_merge([
+                'dynamic_watermark' => false,
+                'watermark_text_color' => '#FFFFFF',
+                'watermark_neon_color' => '#00FFFF',
+                'watermark_opacity' => 0.5,
+                'watermark_mode' => 'text',
+                'auto_orient_default' => true,
+                'stay_logged_in' => false,
+                'is_public_profile' => true,
+            ], $settingsData));
+
+            // Extract deferred data for verification
+            $verificationData = $user->getRelationData('verification');
+            $user->verification()->create(array_merge([
+                'verification_code' => null,
+                'is_verified' => false,
+            ], $verificationData));
+
+            // Extract deferred data for oauth
+            $oauthData = $user->getRelationData('oauth');
+            if (!empty($oauthData)) {
+                $user->oauth()->create($oauthData);
             }
         });
     }
@@ -153,7 +163,10 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
         if ($this->relationLoaded($relation)) {
             return $this->{$relation}->{$column} ?? $default;
         }
-        return $this->attributes[$column] ?? ($this->{$relation}->{$column} ?? $default);
+
+        return $this->relationData[$relation][$column] 
+            ?? $this->attributes[$column] 
+            ?? ($this->{$relation}->{$column} ?? $default);
     }
 
     protected function setRelatedAttribute($relation, $column, $value)
@@ -166,7 +179,18 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
                 return;
             }
         }
-        $this->attributes[$column] = $value;
+        
+        // During creation, store in relationData instead of main attributes
+        // to avoid SQL Unknown Column errors.
+        $this->relationData[$relation][$column] = $value;
+    }
+
+    /**
+     * Helper to extract temporary relation data.
+     */
+    public function getRelationData($relation): array
+    {
+        return $this->relationData[$relation] ?? [];
     }
 
     // Accessors & Mutators for Backward Compatibility
@@ -276,8 +300,7 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
     public function getIsBadgeVerifiedAttribute(): bool
     {
         // الأدمن يحصل على العلامة دائماً
-        if ($this->hasRole('admin') || $this->hasRole('super-admin') || $this->hasRole('super_admin')
-            || in_array($this->role, ['admin', 'super_admin' , 'support'])) {
+        if ($this->isAnyAdmin() || in_array($this->role, ['support'])) {
             return true;
         }
 
@@ -456,5 +479,17 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
         $total = (int) $this->images()->sum('size');
         $this->update(['storage_used_bytes' => $total]);
         return $total;
+    }
+
+    /**
+     * Check if the user has any administrative role.
+     */
+    public function isAnyAdmin(): bool
+    {
+        $adminRoles = ['admin', 'super_admin', 'super-admin'];
+        
+        return in_array($this->role, $adminRoles) || 
+               $this->hasAnyRole($adminRoles) || 
+               $this->can('access-admin-panel');
     }
 }

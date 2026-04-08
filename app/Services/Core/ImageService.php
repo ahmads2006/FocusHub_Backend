@@ -145,7 +145,7 @@ class ImageService
             $image = Image::create([
                 'user_id'   => $userId,
                 'album_id'  => $data['album_id'] ?? null,
-                'title'     => $data['title'] ?? 'OpticVault',
+                'title'     => $data['title'] ?? config('app.name'),
                 'filename'  => $file->getClientOriginalName(),
                 'file_type' => $file->getClientOriginalExtension(),
                 'size'      => $file->getSize(),

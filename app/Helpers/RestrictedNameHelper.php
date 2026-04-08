@@ -25,7 +25,7 @@ class RestrictedNameHelper
             'جنس', 'نيك', 'شرموطة', 'قحبة', 'سكس', 'زب', 'كس', 'دعارة', 'طيز', 'ممحون', 'قتل', 'إرهاب', 'داعش'
         ];
     }
-
+    
     /**
      * Check if a name contains any restricted words.
      * Returns true if the name is RESTRICTED (bad).

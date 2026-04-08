@@ -98,6 +98,45 @@ services:
         networks:
             - opticvault_network
 
+    # 6. معالج المهام الخلفية (Queue Worker)
+    # [PROFESSIONAL SETUP] Handles Image AI analysis and S3 uploads asynchronously.
+    php-worker:
+        build:
+            context: ./vendor/laravel/sail/runtimes/8.3
+            dockerfile: Dockerfile
+            args:
+                WWWGROUP: '${WWWGROUP:-1000}'
+        image: sail-8.3/app
+        # Use entrypoint to override the base start-container script
+        entrypoint: [ "php", "artisan", "queue:work", "redis", "--queue=default", "--sleep=3", "--tries=3" ]
+        volumes:
+            - '.:/var/www/html'
+        networks:
+            - opticvault_network
+        depends_on:
+            - redis
+            - mysql
+            - localstack
+
+    # 7. المجدول (Task Scheduler)
+    # [PROFESSIONAL SETUP] Handles periodic cleanup, notifications, and auto-closing chats.
+    php-scheduler:
+        build:
+            context: ./vendor/laravel/sail/runtimes/8.3
+            dockerfile: Dockerfile
+            args:
+                WWWGROUP: '${WWWGROUP:-1000}'
+        image: sail-8.3/app
+        # Use entrypoint to override the base start-container script
+        entrypoint: [ "php", "artisan", "schedule:work" ]
+        volumes:
+            - '.:/var/www/html'
+        networks:
+            - opticvault_network
+        depends_on:
+            - redis
+            - mysql
+
 networks:
     opticvault_network:
         driver: bridge

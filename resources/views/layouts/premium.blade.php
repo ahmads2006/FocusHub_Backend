@@ -108,7 +108,7 @@
                 <span class="font-medium">Settings</span>
             </a>
 
-            @if(auth()->user()->role === 'super_admin')
+            @if(auth()->user()->isAnyAdmin())
             <div class="pt-4 mt-4 border-t border-white/5">
                 <p class="px-4 mb-2 text-[10px] font-bold text-gray-500 uppercase tracking-[0.2em]">Management</p>
                 <a href="{{ route('admin.dashboard') }}" class="flex items-center gap-4 p-3 px-4 rounded-xl text-purple-400 hover:bg-purple-500/10 hover:text-purple-300 transition-all {{ request()->routeIs('admin.dashboard') ? 'nav-item-active' : '' }}">
@@ -128,7 +128,7 @@
                 <img src="{{ auth()->user()->avatar ?? 'https://ui-avatars.com/api/?name=User' }}" class="w-10 h-10 rounded-full border border-purple-500/50">
                 <div class="flex-1 min-w-0">
                     <p class="text-sm font-semibold truncate">{{ auth()->user()->name }}</p>
-                    <p class="text-[10px] text-gray-500 truncate uppercase">Premium Client</p>
+                    <p class="text-[10px] text-gray-500 truncate uppercase">{{ str_replace(['_', '-'], ' ', auth()->user()->role ?: 'Premium Client') }}</p>
                 </div>
                 <a href="{{ route('logout') }}" class="text-gray-500 hover:text-red-500 transition-colors">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
