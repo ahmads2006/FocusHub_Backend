@@ -12,6 +12,9 @@ RUN apt-get update && apt-get install -y \
     supervisor \
     sqlite3 \
     libsqlite3-dev \
+    fonts-dejavu-core \
+    fonts-liberation \
+    libmagickwand-dev \
     && pecl install redis \
     && docker-php-ext-enable redis \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
@@ -39,6 +42,11 @@ RUN composer install --no-dev --optimize-autoloader --no-interaction
 
 # إعطاء الصلاحيات المناسبة لمجلدات التخزين
 RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
+
+# نسخ خطوط النظام إلى مجلد التطبيق لضمان عمل SecureShield Watermarking
+RUN mkdir -p /var/www/html/storage/app/fonts && \
+    cp /usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf /var/www/html/storage/app/fonts/ 2>/dev/null || true && \
+    cp /usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf /var/www/html/storage/app/fonts/ 2>/dev/null || true
 
 # تشغيل خادم Apache (منفذ 80) بشكل افتراضي
 CMD ["apache2-foreground"]

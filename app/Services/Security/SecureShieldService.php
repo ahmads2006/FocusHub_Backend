@@ -224,8 +224,10 @@ class SecureShieldService
      */
     private function drawHighEndNeonText(ImageInterface $img, string $text, int $x, int $y, int $fontSize, float $glow, string $mainColor = '#ffffff', string $neonColor = '#800080'): void
     {
-        // Path discovery for v3.1 Robustness
+        // Path discovery for v3.2 Robustness — App-bundled fonts first, then OS fallbacks
         $fontPaths = [
+            storage_path('app/fonts/DejaVuSans-Bold.ttf'),         // App-bundled (Docker-safe)
+            storage_path('app/fonts/LiberationSans-Bold.ttf'),     // App-bundled fallback
             '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
             '/usr/share/fonts/truetype/ubuntu/Ubuntu-M.ttf',
             '/usr/share/fonts/truetype/freefont/FreeSansBold.ttf',
