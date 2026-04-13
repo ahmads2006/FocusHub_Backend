@@ -48,7 +48,7 @@ class SystemHealthController extends Controller
     private function checkQueue()
     {
         try {
-            $failedJobs = DB::table('failed_jobs')->latest()->limit(5)->get()->map(function($job) {
+            $failedJobs = DB::table('failed_jobs')->latest('failed_at')->limit(5)->get()->map(function($job) {
                 return [
                     'id' => $job->id,
                     'connection' => $job->connection,
