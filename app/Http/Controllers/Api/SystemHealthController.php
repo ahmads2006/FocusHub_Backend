@@ -75,9 +75,9 @@ class SystemHealthController extends Controller
             return 'Log file not found.';
         }
 
-        // Get last 50 lines
-        $file = file($logPath);
-        $lines = array_slice($file, -50);
+        // Get last 50 lines efficiently to prevent memory exhaustion on large log files
+        $lines = [];
+        exec('tail -n 50 ' . escapeshellarg($logPath), $lines);
         
         return array_map('trim', $lines);
     }
