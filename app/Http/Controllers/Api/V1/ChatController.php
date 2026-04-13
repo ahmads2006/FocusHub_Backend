@@ -24,6 +24,7 @@ class ChatController extends Controller
     {
         $userId = Auth::id();
 
+        // ── 1. Direct (1-to-1) conversations ──────────────────
         $latestMessages = DB::table('messages')
             ->select(DB::raw('
                 CASE
@@ -34,6 +35,7 @@ class ChatController extends Controller
             ->where(function ($q) use ($userId) {
                 $q->where('sender_id', $userId)->orWhere('receiver_id', $userId);
             })
+            ->whereNull('conversation_id') // Only direct messages
             ->groupBy('partner_id')
             ->setBindings([$userId])
             ->get();
@@ -48,10 +50,12 @@ class ChatController extends Controller
 
             $unreadCount = Message::where('sender_id', $row->partner_id)
                 ->where('receiver_id', $userId)
+                ->whereNull('conversation_id')
                 ->where('is_read', false)
                 ->count();
 
             $conversations[] = [
+                'type'    => 'direct',
                 'partner' => [
                     'id'     => $partner->id,
                     'name'   => $partner->name,
@@ -62,14 +66,51 @@ class ChatController extends Controller
                     'created_at' => $message->created_at->diffForHumans(),
                     'is_mine'    => $message->sender_id === $userId,
                 ],
+                'last_message_at' => $message->created_at->toISOString(),
                 'unread_count' => $unreadCount,
                 'is_online'    => (bool) Redis::exists('user:online:' . $row->partner_id),
             ];
         }
 
+        // ── 2. Group conversations ────────────────────────────
+        $groupConversations = \App\Models\Conversation::where('type', 'group')
+            ->whereHas('participants', fn($q) => $q->where('users.id', $userId))
+            ->with(['participants' => fn($q) => $q->select('users.id', 'users.name')])
+            ->orderByDesc('last_message_at')
+            ->get()
+            ->map(function (\App\Models\Conversation $conv) use ($userId) {
+                $lastMessage = $conv->messages()->latest()->first();
+
+                return [
+                    'type'         => 'group',
+                    'id'           => $conv->id,
+                    'name'         => $conv->name,
+                    'album_id'     => $conv->album_id,
+                    'participants' => $conv->participants->map(fn($p) => [
+                        'id'     => $p->id,
+                        'name'   => $p->name,
+                        'avatar' => $p->avatar,
+                    ]),
+                    'last_message' => $lastMessage ? [
+                        'body'       => $lastMessage->image_id ? '📷 Shared an image' : $lastMessage->body,
+                        'created_at' => $lastMessage->created_at->diffForHumans(),
+                        'sender'     => $lastMessage->sender?->name,
+                        'is_mine'    => $lastMessage->sender_id === $userId,
+                    ] : null,
+                    'last_message_at' => $lastMessage?->created_at?->toISOString() ?? $conv->created_at->toISOString(),
+                    'unread_count' => $conv->unreadCountFor($userId),
+                ];
+            })->toArray();
+
+        // ── 3. Merge & sort by last_message_at ────────────────
+        $unified = collect(array_merge($conversations, $groupConversations))
+            ->sortByDesc('last_message_at')
+            ->values()
+            ->all();
+
         return response()->json([
             'success' => true,
-            'data'    => $conversations,
+            'data'    => $unified,
         ]);
     }
 

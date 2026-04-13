@@ -43,6 +43,9 @@ class AppServiceProvider extends ServiceProvider
             );
         }
 
+        // ── Album Observer (sync group chat name with album title) ──
+        \App\Models\Album::observe(\App\Observers\AlbumObserver::class);
+
 
         // ────────────────────────────────────────────────
         // Tunnel Configuration (ngrok)

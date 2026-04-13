@@ -271,6 +271,9 @@ class AlbumController extends Controller
 
         $album->collaborators()->updateExistingPivot($userId, ['status' => 'accepted']);
 
+        // Auto-create or update group conversation when 3+ members
+        $this->syncGroupConversation($album);
+
         return response()->json([
             'success' => true,
             'message' => 'تم قبول الدعوة بنجاح.',
@@ -296,4 +299,77 @@ class AlbumController extends Controller
             'message' => 'تم رفض الدعوة.',
         ]);
     }
+
+    // ── Private Helpers ──────────────────────────────────────
+
+    /**
+     * Auto-create a group conversation when a collaborative album reaches 3+ accepted members.
+     * If the group already exists, add the new member to it.
+     */
+    private function syncGroupConversation(Album $album): void
+    {
+        // Count: owner + accepted collaborators
+        $acceptedCollaborators = $album->collaborators()->wherePivot('status', 'accepted')->get();
+        $totalMembers = 1 + $acceptedCollaborators->count(); // 1 = owner
+
+        if ($totalMembers < 3) {
+            return; // Not enough members yet
+        }
+
+        $conversation = $album->groupConversation;
+
+        if (!$conversation) {
+            // Create the group conversation
+            $conversation = \App\Models\Conversation::create([
+                'type'            => 'group',
+                'name'            => '📁 ' . $album->title,
+                'is_name_custom'  => false,
+                'album_id'        => $album->id,
+                'created_by'      => $album->user_id,
+                'last_message_at' => now(),
+            ]);
+
+            // Add owner as group owner
+            $conversation->participants()->attach($album->user_id, [
+                'role'      => 'owner',
+                'joined_at' => now(),
+            ]);
+
+            // Add all accepted collaborators
+            foreach ($acceptedCollaborators as $collaborator) {
+                $conversation->participants()->attach($collaborator->id, [
+                    'role'      => 'member',
+                    'joined_at' => now(),
+                ]);
+            }
+
+            // System message
+            Message::create([
+                'sender_id'       => $album->user_id,
+                'receiver_id'     => $album->user_id,
+                'conversation_id' => $conversation->id,
+                'body'            => "📣 تم إنشاء مجموعة الدردشة تلقائيًا للألبوم التعاوني: {$album->title}",
+            ]);
+        } else {
+            // Group exists — just add any missing accepted collaborators
+            foreach ($acceptedCollaborators as $collaborator) {
+                if (!$conversation->hasParticipant($collaborator->id)) {
+                    $conversation->participants()->attach($collaborator->id, [
+                        'role'      => 'member',
+                        'joined_at' => now(),
+                    ]);
+
+                    Message::create([
+                        'sender_id'       => $album->user_id,
+                        'receiver_id'     => $album->user_id,
+                        'conversation_id' => $conversation->id,
+                        'body'            => "📥 انضم {$collaborator->name} للمجموعة.",
+                    ]);
+
+                    $conversation->update(['last_message_at' => now()]);
+                }
+            }
+        }
+    }
 }
+

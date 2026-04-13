@@ -198,6 +198,18 @@ Route::prefix('v1')->group(function () {
             Route::get('/unread-count', [App\Http\Controllers\Api\V1\ChatController::class, 'unreadCount']);
             Route::get('/my-images', [App\Http\Controllers\Api\V1\ChatController::class, 'myImages']);
             Route::get('/connections', [App\Http\Controllers\Api\V1\ChatController::class, 'connections']);
+
+            // ─── 👥 Group Chat ──────────────────────
+            Route::prefix('groups')->group(function () {
+                Route::get('/', [App\Http\Controllers\Api\V1\GroupChatController::class, 'index']);
+                Route::post('/', [App\Http\Controllers\Api\V1\GroupChatController::class, 'store']);
+                Route::get('/{conversation}', [App\Http\Controllers\Api\V1\GroupChatController::class, 'show']);
+                Route::post('/{conversation}/send', [App\Http\Controllers\Api\V1\GroupChatController::class, 'sendMessage']);
+                Route::get('/{conversation}/poll', [App\Http\Controllers\Api\V1\GroupChatController::class, 'poll']);
+                Route::post('/{conversation}/participants', [App\Http\Controllers\Api\V1\GroupChatController::class, 'addParticipant']);
+                Route::delete('/{conversation}/participants/{user}', [App\Http\Controllers\Api\V1\GroupChatController::class, 'removeParticipant']);
+                Route::patch('/{conversation}/rename', [App\Http\Controllers\Api\V1\GroupChatController::class, 'rename']);
+            });
         });
 
         // ─── 🎧 Support ────────────────────────

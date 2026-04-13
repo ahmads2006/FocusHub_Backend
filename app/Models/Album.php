@@ -170,6 +170,11 @@ class Album extends Model implements HasMedia
         return $this->morphMany(SharedLink::class, 'shareable');
     }
 
+    public function groupConversation(): HasOne
+    {
+        return $this->hasOne(Conversation::class, 'album_id');
+    }
+
     public function images(): HasMany
     {
         return $this->hasMany(Image::class);

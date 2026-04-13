@@ -5,12 +5,14 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Builder;
+use App\Models\Conversation;
 
 class Message extends Model
 {
     protected $fillable = [
         'sender_id',
         'receiver_id',
+        'conversation_id',
         'image_id',
         'album_id',
         'body',
@@ -26,6 +28,11 @@ class Message extends Model
     public function album(): BelongsTo
     {
         return $this->belongsTo(Album::class, 'album_id');
+    }
+
+    public function conversation(): BelongsTo
+    {
+        return $this->belongsTo(Conversation::class, 'conversation_id');
     }
 
     public function sender(): BelongsTo
