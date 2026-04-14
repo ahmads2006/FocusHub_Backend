@@ -26,7 +26,7 @@ services:
         depends_on:
             - mysql
             - redis
-            - localstack
+            # - localstack
 
     # 2. قاعدة البيانات MySQL 8.4
     mysql:
@@ -42,7 +42,7 @@ services:
             MYSQL_ALLOW_EMPTY_PASSWORD: 1
         volumes:
             - 'sail-mysql:/var/lib/mysql'
-            - './vendor/laravel/sail/database/mysql/create-testing-database.sh:/docker-entrypoint-initdb.d/10-create-testing-database.sh'
+            # - './vendor/laravel/sail/database/mysql/create-testing-database.sh:/docker-entrypoint-initdb.d/10-create-testing-database.sh'
         networks:
             - opticvault_network
         healthcheck:
@@ -72,22 +72,22 @@ services:
             timeout: 5s
 
     # 4. محاكي السحابة LocalStack Pro (لـ S3 و SQS)
-    localstack:
-        container_name: opticvault_localstack
-        image: 'localstack/localstack-pro:latest'
-        ports:
-            - '127.0.0.1:4566:4566'            # منفذ خدمات AWS الموحد
-            - '127.0.0.1:4510-4559:4510-4559'  # منافذ الخدمات الإضافية
-        environment:
-            - LOCALSTACK_AUTH_TOKEN=${LOCALSTACK_AUTH_TOKEN} # مسحوب من .env
-            - SERVICES=s3,sqs
-            - DEBUG=1
-            - DATA_DIR=/var/lib/localstack
-        volumes:
-            - 'sail-localstack:/var/lib/localstack'
-            - '/var/run/docker.sock:/var/run/docker.sock'
-        networks:
-            - opticvault_network
+    # localstack:
+    #     container_name: opticvault_localstack
+    #     image: 'localstack/localstack-pro:latest'
+    #     ports:
+    #         - '127.0.0.1:4566:4566' # منفذ خدمات AWS الموحد
+    #         - '127.0.0.1:4510-4559:4510-4559' # منافذ الخدمات الإضافية
+    #     environment:
+    #         - LOCALSTACK_AUTH_TOKEN=${LOCALSTACK_AUTH_TOKEN} # مسحوب من .env
+    #         - SERVICES=s3,sqs
+    #         - DEBUG=1
+    #         - DATA_DIR=/var/lib/localstack
+    #     volumes:
+    #         - 'sail-localstack:/var/lib/localstack'
+    #         - '/var/run/docker.sock:/var/run/docker.sock'
+    #     networks:
+    #         - opticvault_network
 
     # 5. اختبار الإيميلات Mailpit
     mailpit:
@@ -109,14 +109,16 @@ services:
         image: sail-8.3/app
         # Use entrypoint to override the base start-container script
         entrypoint: [ "php", "artisan", "queue:work", "redis", "--queue=default", "--sleep=3", "--tries=3" ]
+        working_dir: /var/www/html
         volumes:
             - '.:/var/www/html'
         networks:
+            # - opalshot_network
             - opticvault_network
         depends_on:
             - redis
             - mysql
-            - localstack
+            # - localstack
 
     # 7. المجدول (Task Scheduler)
     # [PROFESSIONAL SETUP] Handles periodic cleanup, notifications, and auto-closing chats.
@@ -129,10 +131,12 @@ services:
         image: sail-8.3/app
         # Use entrypoint to override the base start-container script
         entrypoint: [ "php", "artisan", "schedule:work" ]
+        working_dir: /var/www/html
         volumes:
             - '.:/var/www/html'
         networks:
             - opticvault_network
+            # - opalshot_network
         depends_on:
             - redis
             - mysql
@@ -146,5 +150,5 @@ volumes:
         driver: local
     sail-redis:
         driver: local
-    sail-localstack:
-        driver: local
+    # sail-localstack:
+    #     driver: local
