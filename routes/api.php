@@ -167,6 +167,15 @@ Route::prefix('v1')->group(function () {
         // ─── 🎨 Gallery ─────────────────────────
         Route::get('/gallery', [App\Http\Controllers\Api\V1\GalleryController::class, 'index']);
 
+        // ─── 🛠️ Utilities & Helpers ─────────────────
+        Route::prefix('utils')->group(function () {
+            Route::get('/format-bytes', [App\Http\Controllers\Api\V1\UtilityController::class, 'formatBytes']);
+            Route::get('/format-number', [App\Http\Controllers\Api\V1\UtilityController::class, 'formatNumber']);
+            Route::get('/mask-email', [App\Http\Controllers\Api\V1\UtilityController::class, 'maskEmail']);
+            Route::get('/image-orientation', [App\Http\Controllers\Api\V1\UtilityController::class, 'imageOrientation']);
+            Route::get('/test-response', [App\Http\Controllers\Api\V1\UtilityController::class, 'testResponseHelper']);
+        });
+
         // ─── 🎯 Feed (For You Algorithm) ────────
         Route::get('/feed/for-you', [App\Http\Controllers\Api\V1\FeedController::class, 'forYou']);
 
