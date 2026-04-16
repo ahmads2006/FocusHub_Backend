@@ -26,8 +26,19 @@ Route::middleware(['signed'])->get('/assets/preview/{image}', [\App\Http\Control
 // Fallback for all other stray Web Routes
 // ────────────────────────────────────────────────
 if (app()->environment('local', 'development')) {
-    Route::get('/preview/mail', function () {
+    Route::get('/preview/mail/{locale?}', function ($locale = 'ar') {
+        app()->setLocale($locale);
         return new \App\Mail\VerificationCodeMail('123456', 'Ahmad Test');
+    });
+
+    Route::get('/preview/mail/welcome/{locale?}', function ($locale = 'ar') {
+        app()->setLocale($locale);
+        return new \App\Mail\WelcomeMail('Ahmad User');
+    });
+
+    Route::get('/preview/mail/register-verify/{locale?}', function ($locale = 'ar') {
+        app()->setLocale($locale);
+        return new \App\Mail\RegisterVerificationMail('888999', 'Sara New');
     });
 }
 
