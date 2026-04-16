@@ -89,6 +89,8 @@ OpticVault/
 | **Redis Caching** | تخزين مؤقت ذكي للتغذية والتوصيات والإحصائيات |
 | **Background Processing** | معالجة الصور والتحليل عبر Queue Workers |
 | **Anti-Clustering** | خوارزمية فريدة لتوزيع المحتوى في الفيد دون تكرار |
+| **Transactional Integrity** | حماية بـ `DB::transaction` مع حذف تلقائي من S3 عند فشل الداتابيز |
+| **Advanced Rate Limiting** | قيود صارمة (50 صورة/ساعة للشخص، 100 صورة للدفعة) لحماية الموارد |
 
 ---
 
@@ -110,6 +112,8 @@ OpticVault/
 | **AWS S3** | - | التخزين السحابي |
 | **Docker** | - | الحاويات والنشر |
 | **Laravel Reverb** | - | WebSocket Broadcasting |
+| **OPcache & JIT** | - | تحسين أداء PHP بنسبة 30% |
+| **Helper System** | Custom | ApiResponse, Format, Media, Security Helpers |
 
 ---
 
@@ -211,6 +215,14 @@ POST   /api/v1/share/image/{id}       # مشاركة صورة
 POST   /api/v1/share/album/{id}       # مشاركة ألبوم
 GET    /api/v1/chat/conversations     # المحادثات
 POST   /api/v1/chat/{id}/send         # إرسال رسالة
+```
+
+### أدوات المساعدين (Utility Helpers)
+```
+GET    /api/v1/utils/format-bytes     # تنسيق أحجام الملفات
+GET    /api/v1/utils/format-number    # تنسيق الأرقام الكبيرة (K/M)
+GET    /api/v1/utils/mask-email       # تشفير الإيميلات للخصوصية
+GET    /api/v1/utils/image-orientation # حساب أبعاد الصورة
 ```
 
 ---
