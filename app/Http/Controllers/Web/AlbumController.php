@@ -131,7 +131,7 @@ class AlbumController extends Controller
     {
         $this->authorize('delete', $album);
 
-        $code = rand(100000, 999999);
+        $code = random_int(100000, 999999);
         
         // Store in Redis Cache with 10 min TTL
         \Illuminate\Support\Facades\Cache::put("album_delete_otp_{$album->id}", $code, now()->addMinutes(10));

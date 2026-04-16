@@ -17,7 +17,7 @@ class AlbumUploadController extends Controller
     {
         $user = $request->user();
         if (!$user) {
-            $user = \App\Models\User::first(); // Fallback for dev environment
+            return response()->json(['message' => 'Unauthenticated.'], 401);
         }
         
         $ownedAlbums = \App\Models\Album::where('user_id', $user->id)->get();
@@ -37,7 +37,10 @@ class AlbumUploadController extends Controller
             'archive' => 'required|file|mimes:zip,rar,7z|max:512000',
         ]);
 
-        $user = $request->user() ?: \App\Models\User::first(); // Fallback for dev if needed
+        $user = $request->user();
+        if (!$user) {
+            return response()->json(['message' => 'Unauthenticated.'], 401);
+        }
         
         // ── Rate Limiting: Max 20 Albums Uploads Per Hour ──
         if (!$user->hasRole('super_admin') && !$user->hasRole('super-admin')) {
@@ -152,7 +155,10 @@ class AlbumUploadController extends Controller
             'images.*'   => 'required|image|mimes:jpeg,png,jpg,webp,gif,heic,heif,tiff,tif,bmp,svg|max:10240', // 10MB each
         ]);
 
-        $user = $request->user() ?: \App\Models\User::first();
+        $user = $request->user();
+        if (!$user) {
+            return response()->json(['message' => 'Unauthenticated.'], 401);
+        }
 
         // ── Rate Limiting: Max 20 Albums Uploads Per Hour ──
         if (!$user->hasRole('super_admin') && !$user->hasRole('super-admin')) {

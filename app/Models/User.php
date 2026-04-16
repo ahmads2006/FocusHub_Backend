@@ -335,7 +335,7 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
      */
     public function sendVerificationEmail(): void
     {
-        $code = (string) rand(100000, 999999);
+        $code = (string) random_int(100000, 999999);
 
         // This triggers the mutator which updates UserVerification
         $this->update(['verification_code' => $code]);

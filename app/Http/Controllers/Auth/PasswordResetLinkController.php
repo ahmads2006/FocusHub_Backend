@@ -43,7 +43,7 @@ class PasswordResetLinkController extends Controller
         }
 
         // Generate a 6-digit code
-        $resetCode = (string) rand(100000, 999999);
+        $resetCode = (string) random_int(100000, 999999);
 
         // تخزين الرمز في قاعدة البيانات (في جدول password_reset_tokens) لترتبط الميزة بالداتابيز
         DB::table('password_reset_tokens')->updateOrInsert(

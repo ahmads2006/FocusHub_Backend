@@ -270,6 +270,6 @@ graph TD
 ---
 
 <p align="center">
-  <b>صُنع بـ ❤️ بواسطة فريق OpticVault</b><br>
+  <b>صُنع بـ ❤️ بواسطة فريق opalshot</b><br>
   <sub>مشروع تخرج — 2026</sub>
 </p>

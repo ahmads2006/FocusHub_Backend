@@ -46,7 +46,8 @@ Route::post('/webhooks/imagekit', [\App\Http\Controllers\Api\ImageKitWebhookCont
     ->name('api.webhooks.imagekit');
 
 // ─── Diagnostic API ──────────────────────────────────────────
-Route::get('/health', [App\Http\Controllers\Api\SystemHealthController::class, 'index']);
+Route::get('/health', [App\Http\Controllers\Api\SystemHealthController::class, 'index'])
+    ->middleware(['auth:sanctum', 'role:super-admin']);
 
 // ─── Instagram Authentication (Unified) ──────────────────────────
 Route::prefix('auth/{provider}')->group(function () {

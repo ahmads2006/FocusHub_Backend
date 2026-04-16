@@ -226,27 +226,31 @@ class AuthController extends Controller
     public function forgotPassword(Request $request): JsonResponse
     {
         $request->validate([
-            'email' => 'required|email|exists:users,email',
+            'email' => 'required|email',
         ]);
 
         $user = User::where('email', $request->email)->first();
-        $code = rand(100000, 999999);
 
-        DB::table('password_reset_tokens')->updateOrInsert(
-            ['email' => $request->email],
-            ['token' => $code, 'created_at' => now()]
-        );
+        // Always return success to prevent user enumeration attacks
+        if ($user) {
+            $code = random_int(100000, 999999);
 
-        try {
-            \Illuminate\Support\Facades\Mail::to($request->email)
-                ->queue(new \App\Mail\ResetPasswordCode($code));
-        } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::error('Failed to send reset code: ' . $e->getMessage());
+            DB::table('password_reset_tokens')->updateOrInsert(
+                ['email' => $request->email],
+                ['token' => $code, 'created_at' => now()]
+            );
+
+            try {
+                \Illuminate\Support\Facades\Mail::to($request->email)
+                    ->queue(new \App\Mail\ResetPasswordCode($code));
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::error('Failed to send reset code: ' . $e->getMessage());
+            }
         }
 
         return response()->json([
             'success' => true,
-            'message' => 'تم إرسال رمز إعادة التعيين إلى بريدك الإلكتروني.',
+            'message' => 'إذا كان البريد الإلكتروني مسجلاً لدينا، سيصلك رمز إعادة التعيين خلال لحظات.',
         ]);
     }
 
@@ -269,6 +273,15 @@ class AuthController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'الرمز غير صحيح أو منتهي الصلاحية.',
+            ], 422);
+        }
+
+        // Fix #6: Enforce 10-minute TTL on reset tokens
+        if (\Carbon\Carbon::parse($resetData->created_at)->addMinutes(10)->isPast()) {
+            DB::table('password_reset_tokens')->where('email', $request->email)->delete();
+            return response()->json([
+                'success' => false,
+                'message' => 'انتهت صلاحية رمز إعادة التعيين (10 دقائق). يرجى طلب رمز جديد.',
             ], 422);
         }
 

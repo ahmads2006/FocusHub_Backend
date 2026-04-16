@@ -117,7 +117,7 @@ class AlbumController extends Controller
     {
         $this->authorize('delete', $album);
 
-        $code = rand(100000, 999999);
+        $code = random_int(100000, 999999);
         Cache::put("album_delete_otp_{$album->id}", $code, now()->addMinutes(10));
 
         try {
@@ -149,7 +149,7 @@ class AlbumController extends Controller
 
         $otpCode = Cache::get("album_delete_otp_{$album->id}");
 
-        if (!$otpCode || $otpCode != $request->otp) {
+        if (!$otpCode || !hash_equals((string) $otpCode, (string) $request->otp)) {
             return response()->json([
                 'success' => false,
                 'message' => 'رمز التحقق غير صحيح أو منتهي الصلاحية.',

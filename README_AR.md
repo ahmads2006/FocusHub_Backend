@@ -69,5 +69,5 @@ docker exec opticvault-app-1 php artisan optimize
 ---
 
 <p align="center">
-  <b>تم التطوير بواسطة فريق OpticVault ❤️ - مشروع تخرج 2026</b>
+  <b>تم التطوير بواسطة فريق opalshot ❤️ - مشروع تخرج 2026</b>
 </p>
