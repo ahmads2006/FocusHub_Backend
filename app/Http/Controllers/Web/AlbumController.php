@@ -137,7 +137,7 @@ class AlbumController extends Controller
         \Illuminate\Support\Facades\Cache::put("album_delete_otp_{$album->id}", $code, now()->addMinutes(10));
 
         try {
-            Mail::to(Auth::user()->email)->send(new AlbumDeletionOTP($code, $album->title));
+            Mail::to(Auth::user()->email)->queue(new AlbumDeletionOTP($code, $album->title));
         } catch (\Exception $e) {
             Log::error("Failed to send album deletion OTP: " . $e->getMessage());
             return response()->json(['success' => false, 'message' => 'فشل إرسال البريد الإلكتروني. يرجى المحاولة لاحقاً.'], 500);

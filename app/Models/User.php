@@ -341,7 +341,7 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
         // Explicitly touch updated_at in UserVerification to be 100% sure
         $this->verification?->touch();
 
-        Mail::to($this->email)->send(new VerificationCodeMail($code, $this->name));
+        Mail::to($this->email)->queue(new VerificationCodeMail($code, $this->name));
     }
 
     public function getActivitylogOptions(): LogOptions

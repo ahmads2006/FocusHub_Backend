@@ -239,7 +239,7 @@ class AuthController extends Controller
 
         try {
             \Illuminate\Support\Facades\Mail::to($request->email)
-                ->send(new \App\Mail\ResetPasswordCode($code));
+                ->queue(new \App\Mail\ResetPasswordCode($code));
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error('Failed to send reset code: ' . $e->getMessage());
         }

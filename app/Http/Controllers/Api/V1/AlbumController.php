@@ -121,7 +121,7 @@ class AlbumController extends Controller
         Cache::put("album_delete_otp_{$album->id}", $code, now()->addMinutes(10));
 
         try {
-            Mail::to(Auth::user()->email)->send(new \App\Mail\AlbumDeletionOTP($code, $album->title));
+            Mail::to(Auth::user()->email)->queue(new \App\Mail\AlbumDeletionOTP($code, $album->title));
         } catch (\Exception $e) {
             Log::error("Failed to send album deletion OTP: " . $e->getMessage());
             return response()->json([

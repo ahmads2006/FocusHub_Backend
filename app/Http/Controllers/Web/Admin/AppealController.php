@@ -42,7 +42,7 @@ class AppealController extends Controller
         }
 
         if ($appeal->contact_email) {
-            Mail::to($appeal->contact_email)->send(new AppealApprovedMail($appeal));
+            Mail::to($appeal->contact_email)->queue(new AppealApprovedMail($appeal));
         }
 
         return back()->with('success', 'تم قبول طلب المراجعة وإلغاء حظر الصورة بنجاح و إرسال رسالة بريدية لـ' . $appeal->contact_name);
@@ -64,7 +64,7 @@ class AppealController extends Controller
         // Image remains rejected
 
         if ($appeal->contact_email) {
-            Mail::to($appeal->contact_email)->send(new AppealRejectedMail($appeal));
+            Mail::to($appeal->contact_email)->queue(new AppealRejectedMail($appeal));
         }
 
         return back()->with('success', 'تم رفض طلب المراجعة وبقاء حظر الصورة وإرسال بريد إلكتروني لـ' . $appeal->contact_name);

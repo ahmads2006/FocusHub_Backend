@@ -61,7 +61,7 @@ class PasswordResetLinkController extends Controller
 
         // إرسال الرمز عبر HTML email باستخدام VerificationCodeMail
         try {
-            Mail::to($user->email)->send(new VerificationCodeMail($resetCode, $user->name));
+            Mail::to($user->email)->queue(new VerificationCodeMail($resetCode, $user->name));
             Log::info("Password Reset Code sent to: {$user->email}");
         } catch (\Exception $e) {
             Log::error("Password Reset Email Error: " . $e->getMessage());
