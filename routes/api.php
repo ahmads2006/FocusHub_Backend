@@ -201,13 +201,13 @@ Route::prefix('v1')->group(function () {
 
         // ─── 💬 Chat ────────────────────────────
         Route::prefix('chat')->group(function () {
-            Route::get('/conversations', [App\Http\Controllers\Api\V1\ChatController::class, 'conversations']);
-            Route::get('/messages/{partner}', [App\Http\Controllers\Api\V1\ChatController::class, 'messages']);
-            Route::post('/send', [App\Http\Controllers\Api\V1\ChatController::class, 'store']);
-            Route::get('/poll/{partner}', [App\Http\Controllers\Api\V1\ChatController::class, 'poll']);
-            Route::get('/unread-count', [App\Http\Controllers\Api\V1\ChatController::class, 'unreadCount']);
-            Route::get('/my-images', [App\Http\Controllers\Api\V1\ChatController::class, 'myImages']);
-            Route::get('/connections', [App\Http\Controllers\Api\V1\ChatController::class, 'connections']);
+            Route::get('/conversations', [App\Http\Controllers\Api\V1\MongoChatController::class, 'conversations']);
+            Route::get('/messages/{partner}', [App\Http\Controllers\Api\V1\MongoChatController::class, 'messages']);
+            Route::post('/send', [App\Http\Controllers\Api\V1\MongoChatController::class, 'store']);
+            Route::get('/poll/{partner}', [App\Http\Controllers\Api\V1\MongoChatController::class, 'poll']);
+            Route::get('/unread-count', [App\Http\Controllers\Api\V1\MongoChatController::class, 'unreadCount']);
+            Route::get('/my-images', [App\Http\Controllers\Api\V1\MongoChatController::class, 'myImages']);
+            Route::get('/connections', [App\Http\Controllers\Api\V1\MongoChatController::class, 'connections']);
 
             // ─── 👥 Group Chat ──────────────────────
             Route::prefix('groups')->group(function () {

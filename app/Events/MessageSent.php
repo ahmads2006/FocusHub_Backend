@@ -14,9 +14,9 @@ class MessageSent implements ShouldBroadcast
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
-    public Message $message;
+    public Message|\App\Models\Mongo\ChatMessage $message;
 
-    public function __construct(Message $message)
+    public function __construct(Message|\App\Models\Mongo\ChatMessage $message)
     {
         $this->message = $message;
     }
@@ -37,14 +37,19 @@ class MessageSent implements ShouldBroadcast
      */
     public function broadcastWith(): array
     {
+        // For MongoMessage, sender is actually loaded manually or we send only sender_id and let auth/frontend resolve,
+        // but here we just manually pass sender details if loaded.
+        $senderName = $this->message->sender->name ?? 'User';
+        $senderAvatar = $this->message->sender->avatar ?? null;
+
         return [
             'id'         => $this->message->id,
             'sender_id'  => $this->message->sender_id,
             'body'       => $this->message->body,
-            'created_at' => $this->message->created_at->toISOString(),
+            'created_at' => is_string($this->message->created_at) ? $this->message->created_at : $this->message->created_at->toISOString(),
             'sender'     => [
-                'name'   => $this->message->sender->name,
-                'avatar' => $this->message->sender->avatar,
+                'name'   => $senderName,
+                'avatar' => $senderAvatar,
             ],
         ];
     }

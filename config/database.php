@@ -63,6 +63,15 @@ return [
             ]) : [],
         ],
 
+        'mongodb' => [
+            'driver' => 'mongodb',
+            'dsn' => env('MONGO_DB_DSN'),
+            'database' => env('MONGO_DB_DATABASE', 'opalshot_nosql'),
+            'options' => [
+                'tls' => env('MONGO_DB_TLS', false),
+            ],
+        ],
+
         'mariadb' => [
             'driver' => 'mariadb',
             'url' => env('DB_URL'),
