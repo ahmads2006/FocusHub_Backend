@@ -15,8 +15,9 @@ RUN apt-get update && apt-get install -y \
     fonts-dejavu-core \
     fonts-liberation \
     libmagickwand-dev \
-    && pecl install redis \
-    && docker-php-ext-enable redis \
+    libssl-dev \
+    && pecl install redis mongodb \
+    && docker-php-ext-enable redis mongodb \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install pdo pdo_mysql pdo_sqlite gd bcmath zip pcntl exif
 
