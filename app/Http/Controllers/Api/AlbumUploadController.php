@@ -237,35 +237,47 @@ class AlbumUploadController extends Controller
             $album = \App\Models\Album::find($albumId);
             $inheritedPrivacy = $album ? $album->privacy : 'private';
 
-            $image = \App\Models\Image::create([
-                'album_id'   => $albumId,
-                'user_id'    => $user->id,
-                'title'      => pathinfo($filename, PATHINFO_FILENAME),
-                'filename'   => $filename,
-                'file_type'  => $extension,
-                'size'       => $file->getSize(),
-                'privacy'    => $inheritedPrivacy,
-            ]);
+            try {
+                $image = \Illuminate\Support\Facades\DB::transaction(function () use ($albumId, $user, $filename, $extension, $file, $inheritedPrivacy, $s3Path, $jobId) {
+                    $image = \App\Models\Image::create([
+                        'album_id'   => $albumId,
+                        'user_id'    => $user->id,
+                        'title'      => pathinfo($filename, PATHINFO_FILENAME),
+                        'filename'   => $filename,
+                        'file_type'  => $extension,
+                        'size'       => $file->getSize(),
+                        'privacy'    => $inheritedPrivacy,
+                    ]);
 
-            $image->storage()->updateOrCreate(['image_id' => $image->id], [
-                'original_path' => $s3Path,
-                'path'          => $s3Path,
-                'md5_hash'      => md5_file($file->getRealPath()),
-            ]);
+                    $image->storage()->updateOrCreate(['image_id' => $image->id], [
+                        'original_path' => $s3Path,
+                        'path'          => $s3Path,
+                        'md5_hash'      => md5_file($file->getRealPath()),
+                    ]);
 
-            $image->moderation()->updateOrCreate(['image_id' => $image->id], [
-                'status'      => 'pending',
-                'is_sensitive' => false,
-                'is_visible'   => true,
-            ]);
+                    $image->moderation()->updateOrCreate(['image_id' => $image->id], [
+                        'status'      => 'pending',
+                        'is_sensitive' => false,
+                        'is_visible'   => true,
+                    ]);
 
-            // ── Dispatch background moderation job to Redis queue ──
-            \App\Jobs\ProcessImageModeration::dispatch($image->id, $jobId, $s3Path);
+                    return $image;
+                });
 
-            $uploadedImages[] = [
-                'id'       => $image->id,
-                'filename' => $filename,
-            ];
+                // ── Dispatch background moderation job to Redis queue ──
+                \App\Jobs\ProcessImageModeration::dispatch($image->id, $jobId, $s3Path);
+
+                $uploadedImages[] = [
+                    'id'       => $image->id,
+                    'filename' => $filename,
+                ];
+            } catch (\Exception $e) {
+                // If DB fails, securely delete the orphaned S3 file
+                \Illuminate\Support\Facades\Storage::disk('s3')->delete($s3Path);
+                \Illuminate\Support\Facades\Log::error("Batch upload failed inside DB, wiped S3 file: " . $e->getMessage());
+                // Skip adding to uploadedImages, continue with the next image in the batch
+                continue;
+            }
         }
 
         // Update status to "processing" (files are uploaded, moderation is running)
