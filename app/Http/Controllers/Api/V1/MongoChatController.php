@@ -143,12 +143,13 @@ class MongoChatController extends Controller
         $messages = MongoMessage::whereIn('sender_id', [$userId, $partner->id])
             ->whereIn('receiver_id', [$userId, $partner->id])
             ->whereNull('conversation_id')
-            // Load relations if defined on Mongo, otherwise we fetch images manually since MongoDB doesn't do SQL joins natively the same way
-            // ->with(['image.storage', 'image.settings']) 
             ->orderBy('created_at', 'asc')
             ->take(50)
             ->get()
-            ->map(fn($msg) => $this->formatMessage($msg, $userId));
+            ->map(function($msg) use ($userId) {
+                // Ensure $msg is treated as ChatMessage model for the linter and formatMessage
+                return $this->formatMessage($msg, $userId);
+            });
 
         return response()->json([
             'success' => true,
@@ -251,7 +252,9 @@ class MongoChatController extends Controller
 
         $newMessages = $query->orderBy('created_at', 'asc')
             ->get()
-            ->map(fn($msg) => $this->formatMessage($msg, $userId));
+            ->map(function($msg) use ($userId) {
+                return $this->formatMessage($msg, $userId);
+            });
 
         if ($newMessages->isNotEmpty()) {
             MongoMessage::where('sender_id', $partner->id)
@@ -318,8 +321,18 @@ class MongoChatController extends Controller
 
     // ── Helpers ──
 
-    private function formatMessage(MongoMessage $msg, string $userId): array
+    private function formatMessage($msg, string $userId): array
     {
+        // Safety check if $msg is somehow an array or stdClass (linter defense)
+        if (is_array($msg)) {
+            $msg = (object) $msg;
+        }
+
+        $createdAt = $msg->created_at;
+        if (is_string($createdAt)) {
+            $createdAt = \Carbon\Carbon::parse($createdAt);
+        }
+
         return [
             'id'         => $msg->id,
             'body'       => $msg->body,
@@ -327,10 +340,10 @@ class MongoChatController extends Controller
             'album_id'   => $msg->album_id,
             'image_url'  => $msg->image_id ? $msg->image?->url : null,
             'thumb_url'  => $msg->image_id ? app(AssetDeliveryService::class)->getUrl($msg->image, 'thumbnail') : null,
-            'is_mine'    => $msg->sender_id === $userId,
-            'is_read'    => $msg->is_read,
-            'created_at' => $msg->created_at->format('H:i'),
-            'date'       => $msg->created_at->format('Y-m-d'),
+            'is_mine'    => $msg->sender_id == $userId,
+            'is_read'    => (bool) $msg->is_read,
+            'created_at' => $createdAt->format('H:i'),
+            'date'       => $createdAt->format('Y-m-d'),
         ];
     }
 

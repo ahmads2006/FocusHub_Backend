@@ -32,4 +32,28 @@ class ChatMessage extends MongoDBModel
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
+
+    /**
+     * Relationship to the MySQL Image model.
+     */
+    public function image()
+    {
+        return $this->belongsTo(\App\Models\Image::class, 'image_id');
+    }
+
+    /**
+     * Relationship to the MySQL User model (Sender).
+     */
+    public function sender()
+    {
+        return $this->belongsTo(\App\Models\User::class, 'sender_id');
+    }
+
+    /**
+     * Relationship to the MySQL User model (Receiver).
+     */
+    public function receiver()
+    {
+        return $this->belongsTo(\App\Models\User::class, 'receiver_id');
+    }
 }
