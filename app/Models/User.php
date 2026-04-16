@@ -127,8 +127,10 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
         'storage_used_bytes',
     ];  
     
-    protected $with = ['userStatus', 'profile', 'settings', 'verification', 'oauth'];
-    protected $appends = ['role_names', 'permission_names', 'can_edit'];
+    protected $with = ['userStatus', 'profile' ];
+
+    
+    protected $appends = ['can_edit'];
 
     protected $hidden = [
         'password',

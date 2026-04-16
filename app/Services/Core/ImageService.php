@@ -140,71 +140,74 @@ class ImageService
 
 
             // 4. Save to Database — normalized over 5 tables
+            $image = \Illuminate\Support\Facades\DB::transaction(function () use ($userId, $data, $file, $path, $originalPath, $imagekitFilePath, $specs, $moderationResult) {
+                // 4a. Core image record
+                $image = Image::create([
+                    'user_id'   => $userId,
+                    'album_id'  => $data['album_id'] ?? null,
+                    'title'     => $data['title'] ?? config('app.name'),
+                    'filename'  => $file->getClientOriginalName(),
+                    'file_type' => $file->getClientOriginalExtension(),
+                    'size'      => $file->getSize(),
+                    'privacy'   => $data['privacy'] ?? 'public',
+                ]);
 
-            // 4a. Core image record
-            $image = Image::create([
-                'user_id'   => $userId,
-                'album_id'  => $data['album_id'] ?? null,
-                'title'     => $data['title'] ?? config('app.name'),
-                'filename'  => $file->getClientOriginalName(),
-                'file_type' => $file->getClientOriginalExtension(),
-                'size'      => $file->getSize(),
-                'privacy'   => $data['privacy'] ?? 'public',
-            ]);
+                // Bridge safety cache to let the asynchronous Tagging job know safety was already verified
+                if (($moderationResult['status'] ?? '') !== \App\Models\Image::STATUS_REJECTED) {
+                    \Illuminate\Support\Facades\Redis::setex("opticvault:safety:{$image->id}", 3600, 'safe_verified');
+                }
 
-            // Bridge safety cache to let the asynchronous Tagging job know safety was already verified
-            if (($moderationResult['status'] ?? '') !== \App\Models\Image::STATUS_REJECTED) {
-                \Illuminate\Support\Facades\Redis::setex("opticvault:safety:{$image->id}", 3600, 'safe_verified');
-            }
+                // 4b. Storage (paths & cloud)
+                $image->storage()->updateOrCreate(['image_id' => $image->id], [
+                    'path'                => $path,
+                    'original_path'       => $originalPath,
+                    'imagekit_file_id'    => null, // No longer uploading to ImageKit Media Library
+                    'imagekit_file_path'  => $imagekitFilePath,
+                    'md5_hash'            => $moderationResult['metadata']['hash'] ?? md5_file($file->getRealPath()),
+                ]);
 
-            // 4b. Storage (paths & cloud)
-            $image->storage()->updateOrCreate(['image_id' => $image->id], [
-                'path'                => $path,
-                'original_path'       => $originalPath,
-                'imagekit_file_id'    => null, // No longer uploading to ImageKit Media Library
-                'imagekit_file_path'  => $imagekitFilePath,
-                'md5_hash'            => $moderationResult['metadata']['hash'] ?? md5_file($file->getRealPath()),
-            ]);
+                // 4c. Technical EXIF/specs
+                $image->meta()->updateOrCreate(['image_id' => $image->id], [
+                    'technical_specs' => $specs,
+                ]);
 
-            // 4c. Technical EXIF/specs
-            $image->meta()->updateOrCreate(['image_id' => $image->id], [
-                'technical_specs' => $specs,
-            ]);
+                // 4d. Moderation status
+                $image->moderation()->updateOrCreate(['image_id' => $image->id], [
+                    'status'             => $moderationResult['status'],
+                    'is_sensitive'       => $moderationResult['is_sensitive'] ?? false,
+                    'is_visible'         => $moderationResult['is_visible'] ?? true,
+                    'sensitivity_reason' => $moderationResult['reason'] ?? null,
+                    'ai_metadata'        => $moderationResult['metadata'] ?? [],
+                ]);
 
-            // 4d. Moderation status
-            $image->moderation()->updateOrCreate(['image_id' => $image->id], [
-                'status'             => $moderationResult['status'],
-                'is_sensitive'       => $moderationResult['is_sensitive'] ?? false,
-                'is_visible'         => $moderationResult['is_visible'] ?? true,
-                'sensitivity_reason' => $moderationResult['reason'] ?? null,
-                'ai_metadata'        => $moderationResult['metadata'] ?? [],
-            ]);
+                // 4e. Intelligence: Auto-Tagging & Categorization (v14.1)
+                $aiData = $moderationResult['metadata'] ?? [];
+                $tags = $aiData['tags'] ?? [];
+                
+                if (!empty($tags)) {
+                    $image->syncTags($tags);
+                    $image->update(['labels' => $tags]);
+                }
 
-            // 4e. Intelligence: Auto-Tagging & Categorization (v14.1)
-            $aiData = $moderationResult['metadata'] ?? [];
-            $tags = $aiData['tags'] ?? [];
-            
-            if (!empty($tags)) {
-                $image->syncTags($tags);
-                $image->update(['labels' => $tags]);
-            }
+                // Save to polymorphic MediaAiMetadata table for UI & Advanced Filtering
+                $image->aiMetadata()->updateOrCreate(['media_id' => $image->id, 'media_type' => Image::class], [
+                    'driver_name'      => $moderationResult['driver'] ?? 'unknown',
+                    'raw_results'      => $aiData['raw_results'] ?? $aiData,
+                    'extracted_tags'   => $tags,
+                    'quality_grade'    => $aiData['quality_grade'] ?? 'high_quality',
+                    'category'         => $aiData['category'] ?? 'other',
+                    'is_sensitive'     => $moderationResult['is_sensitive'] ?? false,
+                    'confidence_score' => $aiData['confidence_score'] ?? 1.0,
+                ]);
 
-            // Save to polymorphic MediaAiMetadata table for UI & Advanced Filtering
-            $image->aiMetadata()->updateOrCreate(['media_id' => $image->id, 'media_type' => Image::class], [
-                'driver_name'      => $moderationResult['driver'] ?? 'unknown',
-                'raw_results'      => $aiData['raw_results'] ?? $aiData,
-                'extracted_tags'   => $tags,
-                'quality_grade'    => $aiData['quality_grade'] ?? 'high_quality',
-                'category'         => $aiData['category'] ?? 'other',
-                'is_sensitive'     => $moderationResult['is_sensitive'] ?? false,
-                'confidence_score' => $aiData['confidence_score'] ?? 1.0,
-            ]);
+                // 4f. Settings/permissions
+                $image->settings()->updateOrCreate(['image_id' => $image->id], [
+                    'allow_download'        => isset($data['allow_download']),
+                    'watermark_on_download' => isset($data['watermark_on_download']),
+                ]);
 
-            // 4f. Settings/permissions
-            $image->settings()->updateOrCreate(['image_id' => $image->id], [
-                'allow_download'        => isset($data['allow_download']),
-                'watermark_on_download' => isset($data['watermark_on_download']),
-            ]);
+                return $image;
+            });
 
             // Refresh so proxy accessors work correctly
             $image->load(['storage', 'meta', 'moderation', 'settings', 'tags', 'aiMetadata']);
@@ -237,7 +240,19 @@ class ImageService
             return $image;
 
         } catch (\Exception $e) {
-            Log::error("OpticVault Upload Failed: " . $e->getMessage());
+            // Rollback Storage if DB transaction failed
+            if (isset($path) && !empty($path)) {
+                if (Storage::disk('s3')->exists($path)) {
+                    Storage::disk('s3')->delete($path);
+                } elseif (Storage::disk('public')->exists($path)) {
+                    Storage::disk('public')->delete($path);
+                }
+            }
+            if (isset($originalPath) && !empty($originalPath) && Storage::disk('local')->exists($originalPath)) {
+                Storage::disk('local')->delete($originalPath);
+            }
+
+            Log::error("OpticVault Upload Failed (Rolled back files): " . $e->getMessage());
             throw $e;
         }
     }
@@ -452,7 +467,7 @@ class ImageService
 
         if (!$executed) {
             throw ValidationException::withMessages([
-                'image' => __('لقد تجاوزت الحد الأقصى للرفع (10 صور في الساعة). يرجى المحاولة لاحقاً.'),
+                'image' => __('لقد تجاوزت الحد الأقصى للرفع (50 صورة في الساعة). يرجى المحاولة لاحقاً.'),
             ]);
         }
     }

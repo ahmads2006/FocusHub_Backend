@@ -32,9 +32,23 @@ class FeedController extends Controller
 
         $feed = $this->engine->getForYouFeed($user, $limit);
 
+        $likedImageIds = [];
+        $bookmarkedImageIds = [];
+        if ($user) {
+            $imageIds = $feed->pluck('id');
+            $likedImageIds = \App\Models\Like::where('user_id', $user->id)
+                ->whereIn('image_id', $imageIds)->pluck('image_id')->toArray();
+            $bookmarkedImageIds = \App\Models\Bookmark::where('user_id', $user->id)
+                ->whereIn('image_id', $imageIds)->pluck('image_id')->toArray();
+        }
+
         return response()->json([
             'success' => true,
-            'data'    => $feed,
+            'data'    => [
+                'images'               => $feed,
+                'liked_image_ids'      => $likedImageIds,
+                'bookmarked_image_ids' => $bookmarkedImageIds,
+            ],
         ]);
     }
 

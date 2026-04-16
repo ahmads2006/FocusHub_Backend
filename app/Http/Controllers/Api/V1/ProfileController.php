@@ -226,13 +226,13 @@ class ProfileController extends Controller
             } elseif ($tab === 'saved' && $isOwner) {
                 $images = $user->bookmarkedImages()
                     ->whereHas('moderation', fn($q) => $q->where('status', \App\Models\Image::STATUS_APPROVED))
-                    ->with(['likes', 'labelData', 'storage', 'settings'])
+                    ->with(['user', 'likes', 'labelData', 'storage', 'settings', 'aiMetadata'])
                     ->latest('bookmarks.created_at')
                     ->paginate(24);
             } elseif ($tab === 'liked' && $isOwner) {
                 $images = \App\Models\Image::whereHas('likes', fn($q) => $q->where('user_id', $user->id))
                     ->whereHas('moderation', fn($q) => $q->where('status', \App\Models\Image::STATUS_APPROVED))
-                    ->with(['likes', 'labelData', 'storage', 'settings'])
+                    ->with(['user', 'likes', 'labelData', 'storage', 'settings', 'aiMetadata'])
                     ->latest()
                     ->paginate(24);
             } else {

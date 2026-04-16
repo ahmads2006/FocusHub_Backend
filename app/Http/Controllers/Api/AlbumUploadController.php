@@ -38,6 +38,23 @@ class AlbumUploadController extends Controller
         ]);
 
         $user = $request->user() ?: \App\Models\User::first(); // Fallback for dev if needed
+        
+        // ── Rate Limiting: Max 20 Albums Uploads Per Hour ──
+        if (!$user->hasRole('super_admin') && !$user->hasRole('super-admin')) {
+            $executed = \Illuminate\Support\Facades\RateLimiter::attempt(
+                'album-upload-limit:' . $user->id,
+                20,
+                function () {},
+                3600
+            );
+
+            if (!$executed) {
+                return response()->json([
+                    'message' => 'لقد تجاوزت الحد الأقصى للرفع (20 ألبوم في الساعة). يرجى المحاولة لاحقاً.'
+                ], 429);
+            }
+        }
+
         $file = $request->file('archive');
 
         // ── Storage Quota Check (5GB Drive System) ──
@@ -136,6 +153,23 @@ class AlbumUploadController extends Controller
         ]);
 
         $user = $request->user() ?: \App\Models\User::first();
+
+        // ── Rate Limiting: Max 20 Albums Uploads Per Hour ──
+        if (!$user->hasRole('super_admin') && !$user->hasRole('super-admin')) {
+            $executed = \Illuminate\Support\Facades\RateLimiter::attempt(
+                'album-upload-limit:' . $user->id,
+                20,
+                function () {},
+                3600
+            );
+
+            if (!$executed) {
+                return response()->json([
+                    'message' => 'لقد تجاوزت الحد الأقصى للرفع (20 دفعة صور في الساعة). يرجى المحاولة لاحقاً.'
+                ], 429);
+            }
+        }
+
         $albumId = $request->album_id;
 
         // Create album if needed
