@@ -49,6 +49,14 @@ Route::post('/webhooks/imagekit', [\App\Http\Controllers\Api\ImageKitWebhookCont
 Route::get('/health', [App\Http\Controllers\Api\SystemHealthController::class, 'index'])
     ->middleware(['auth:sanctum', 'role:super-admin']);
 
+Route::get('/ping', function () {
+    return response()->json([
+        'status' => 'UP',
+        'message' => 'OpalShot API is operational',
+        'timestamp' => now()->toIso8601String()
+    ]);
+});
+
 // ─── Instagram Authentication (Unified) ──────────────────────────
 Route::prefix('auth/{provider}')->group(function () {
     Route::get('/redirect', [\App\Http\Controllers\Api\Auth\SocialAuthController::class, 'redirectToProvider']);
@@ -76,7 +84,7 @@ Route::prefix('v1')->group(function () {
         Route::post('/forgot-password', [App\Http\Controllers\Api\V1\AuthController::class, 'forgotPassword'])
             ->middleware('throttle:sensitive');
 
-        Route::post('/verify-reset-code', [App\Http\Controllers\Api\V1\AuthController::class, 'verifyResetCode']);
+
 
         Route::post('/reset-password', [App\Http\Controllers\Api\V1\AuthController::class, 'resetPassword']);
 
@@ -297,3 +305,4 @@ Route::prefix('v1')->group(function () {
         Route::get('/share/{token}/download', [App\Http\Controllers\Api\V1\SharedLinkController::class, 'downloadAlbum']);
     });
 });
+

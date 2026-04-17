@@ -14,15 +14,15 @@ class ResetPasswordCode extends Mailable implements ShouldQueue
 {
     use Queueable, SerializesModels;
 
-    public $code;
+    public $url;
     public $userName;
 
     /**
      * Create a new message instance.
      */
-    public function __construct($code, $userName = 'User')
+    public function __construct($url, $userName = 'User')
     {
-        $this->code = $code;
+        $this->url = $url;
         $this->userName = $userName;
     }
 
@@ -32,7 +32,7 @@ class ResetPasswordCode extends Mailable implements ShouldQueue
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'رمز إعادة تعيين كلمة المرور - OpalShot',
+            subject: 'إعادة تعيين كلمة المرور - OpalShot',
         );
     }
 
@@ -42,7 +42,7 @@ class ResetPasswordCode extends Mailable implements ShouldQueue
     public function content(): Content
     {
         return new Content(
-            view: 'emails.verification',
+            view: 'emails.reset_password',
         );
     }
 

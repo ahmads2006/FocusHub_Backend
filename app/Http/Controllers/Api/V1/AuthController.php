@@ -22,15 +22,15 @@ class AuthController extends Controller
     public function register(Request $request): JsonResponse
     {
         $request->validate([
-            'name'     => ['required', 'string', 'max:255', new \App\Rules\RestrictedName()],
-            'email'    => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:' . User::class],
+            'name' => ['required', 'string', 'max:255', new \App\Rules\RestrictedName()],
+            'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:' . User::class],
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
         ]);
 
         $user = User::create([
-            'name'        => $request->name,
-            'email'       => $request->email,
-            'password'    => Hash::make($request->password),
+            'name' => $request->name,
+            'email' => $request->email,
+            'password' => Hash::make($request->password),
             'is_verified' => false,
         ]);
 
@@ -49,9 +49,10 @@ class AuthController extends Controller
 
         return response()->json([
             'success' => true,
+            'requires_verification' => true,
             'message' => 'تم إنشاء الحساب بنجاح. يرجى التحقق من بريدك الإلكتروني.',
-            'data'    => [
-                'user'  => $this->formatUser($user),
+            'data' => [
+                'user' => $this->formatUser($user),
                 'token' => $token,
             ],
         ], 201);
@@ -63,7 +64,7 @@ class AuthController extends Controller
     public function login(Request $request): JsonResponse
     {
         $request->validate([
-            'email'    => 'required|email',
+            'email' => 'required|email',
             'password' => 'required|string',
         ]);
 
@@ -91,7 +92,8 @@ class AuthController extends Controller
             $hashedCookie = hash('sha256', $cookieToken);
             $verification = $user->verification;
 
-            if ($verification
+            if (
+                $verification
                 && $verification->device_token === $hashedCookie
                 && $verification->device_trusted_until
                 && $verification->device_trusted_until->isFuture()
@@ -107,11 +109,11 @@ class AuthController extends Controller
             $token = $user->createToken('api-token')->plainTextToken;
 
             return response()->json([
-                'success'            => true,
+                'success' => true,
                 'requires_verification' => true,
-                'message'            => 'يجب تأكيد بريدك الإلكتروني أولاً.',
-                'data'               => [
-                    'user'  => $this->formatUser($user),
+                'message' => 'يجب تأكيد بريدك الإلكتروني أولاً.',
+                'data' => [
+                    'user' => $this->formatUser($user),
                     'token' => $token,
                 ],
             ]);
@@ -122,8 +124,8 @@ class AuthController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'تم تسجيل الدخول بنجاح.',
-            'data'    => [
-                'user'  => $this->formatUser($user),
+            'data' => [
+                'user' => $this->formatUser($user),
                 'token' => $token,
                 'needs_2fa' => $needsVerification,
             ],
@@ -149,7 +151,7 @@ class AuthController extends Controller
     public function verifyCode(Request $request): JsonResponse
     {
         $request->validate([
-            'code'         => 'required|digits:6',
+            'code' => 'required|digits:6',
             'trust_device' => 'nullable|boolean',
         ]);
 
@@ -164,7 +166,7 @@ class AuthController extends Controller
             ], 422);
         }
 
-        if ($request->code !== $user->verification_code) {
+    if (!$verification || $request->code !== $verification->verification_code) {
             return response()->json([
                 'success' => false,
                 'message' => 'الرمز غير صحيح. يرجى المحاولة مرة أخرى.',
@@ -172,7 +174,7 @@ class AuthController extends Controller
         }
 
         $user->update([
-            'is_verified'       => true,
+            'is_verified' => true,
             'verification_code' => null,
         ]);
 
@@ -183,13 +185,13 @@ class AuthController extends Controller
 
         // Handle trusted device
         if ($request->boolean('trust_device')) {
-            $rawToken    = Str::random(64);
+            $rawToken = Str::random(64);
             $hashedToken = hash('sha256', $rawToken);
 
             $user->verification()->update([
-                'device_token'         => $hashedToken,
+                'device_token' => $hashedToken,
                 'device_trusted_until' => now()->addDays(30),
-                'last_login_ip'        => $request->ip(),
+                'last_login_ip' => $request->ip(),
             ]);
 
             $response['trusted_device_token'] = $rawToken;
@@ -221,7 +223,7 @@ class AuthController extends Controller
     }
 
     /**
-     * Send a password reset code to the user's email.
+     * Send a password reset link to the user's email.
      */
     public function forgotPassword(Request $request): JsonResponse
     {
@@ -233,62 +235,28 @@ class AuthController extends Controller
 
         // Always return success to prevent user enumeration attacks
         if ($user) {
-            $code = random_int(100000, 999999);
+            $token = Str::random(64);
 
             DB::table('password_reset_tokens')->updateOrInsert(
                 ['email' => $request->email],
-                ['token' => $code, 'created_at' => now()]
+                ['token' => $token, 'created_at' => now()]
             );
 
             try {
+                // Link to frontend Vue app
+                $frontendUrl = env('FRONTEND_URL', 'http://localhost:5173');
+                $resetLink = $frontendUrl . '/reset-password?token=' . $token . '&email=' . urlencode($request->email);
+
                 \Illuminate\Support\Facades\Mail::to($request->email)
-                    ->queue(new \App\Mail\ResetPasswordCode($code));
+                    ->queue(new \App\Mail\ResetPasswordCode($resetLink));
             } catch (\Exception $e) {
-                \Illuminate\Support\Facades\Log::error('Failed to send reset code: ' . $e->getMessage());
+                \Illuminate\Support\Facades\Log::error('Failed to send reset link: ' . $e->getMessage());
             }
         }
 
         return response()->json([
             'success' => true,
-            'message' => 'إذا كان البريد الإلكتروني مسجلاً لدينا، سيصلك رمز إعادة التعيين خلال لحظات.',
-        ]);
-    }
-
-    /**
-     * Verify the password reset code.
-     */
-    public function verifyResetCode(Request $request): JsonResponse
-    {
-        $request->validate([
-            'email' => 'required|email',
-            'code'  => 'required|numeric',
-        ]);
-
-        $resetData = DB::table('password_reset_tokens')
-            ->where('email', $request->email)
-            ->where('token', $request->code)
-            ->first();
-
-        if (!$resetData) {
-            return response()->json([
-                'success' => false,
-                'message' => 'الرمز غير صحيح أو منتهي الصلاحية.',
-            ], 422);
-        }
-
-        // Fix #6: Enforce 10-minute TTL on reset tokens
-        if (\Carbon\Carbon::parse($resetData->created_at)->addMinutes(10)->isPast()) {
-            DB::table('password_reset_tokens')->where('email', $request->email)->delete();
-            return response()->json([
-                'success' => false,
-                'message' => 'انتهت صلاحية رمز إعادة التعيين (10 دقائق). يرجى طلب رمز جديد.',
-            ], 422);
-        }
-
-        return response()->json([
-            'success'     => true,
-            'message'     => 'تم التحقق من الرمز بنجاح.',
-            'reset_token' => encrypt($request->email . '|' . $request->code),
+            'message' => 'إذا كان البريد الإلكتروني مسجلاً لدينا، سيصلك رابط إعادة التعيين خلال لحظات.',
         ]);
     }
 
@@ -298,47 +266,48 @@ class AuthController extends Controller
     public function resetPassword(Request $request): JsonResponse
     {
         $request->validate([
-            'reset_token' => 'required|string',
-            'password'    => ['required', 'confirmed', Rules\Password::defaults()],
+            'email' => 'required|email',
+            'token' => 'required|string',
+            'password' => ['required', 'confirmed', Rules\Password::defaults()],
         ]);
 
-        try {
-            $decrypted = decrypt($request->reset_token);
-            [$email, $code] = explode('|', $decrypted);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'رمز إعادة التعيين غير صالح.',
-            ], 422);
-        }
-
         $resetData = DB::table('password_reset_tokens')
-            ->where('email', $email)
-            ->where('token', $code)
+            ->where('email', $request->email)
+            ->where('token', $request->token)
             ->first();
 
         if (!$resetData) {
             return response()->json([
                 'success' => false,
-                'message' => 'رمز إعادة التعيين منتهي الصلاحية.',
+                'message' => 'الرابط غير صحيح أو منتهي الصلاحية.',
             ], 422);
         }
 
-        $user = User::where('email', $email)->first();
+        // Enforce 60-minute TTL on reset tokens
+        if (\Carbon\Carbon::parse($resetData->created_at)->addMinutes(60)->isPast()) {
+            DB::table('password_reset_tokens')->where('email', $request->email)->delete();
+            return response()->json([
+                'success' => false,
+                'message' => 'انتهت صلاحية الرابط (ساعة واحدة). يرجى طلب رابط جديد.',
+            ], 422);
+        }
+
+        $user = User::where('email', $request->email)->first();
         if (!$user) {
             return response()->json(['success' => false, 'message' => 'المستخدم غير موجود.'], 404);
         }
 
         $user->forceFill([
-            'password'       => Hash::make($request->password),
+            'password' => Hash::make($request->password),
             'remember_token' => Str::random(60),
         ])->save();
 
-        DB::table('password_reset_tokens')->where('email', $email)->delete();
+        // Cleanup token
+        DB::table('password_reset_tokens')->where('email', $request->email)->delete();
 
         return response()->json([
             'success' => true,
-            'message' => 'تم إعادة تعيين كلمة المرور بنجاح.',
+            'message' => 'تم إعادة تعيين كلمة المرور بنجاح. يمكنك تسجيل الدخول الآن.',
         ]);
     }
 
@@ -351,7 +320,7 @@ class AuthController extends Controller
 
         return response()->json([
             'success' => true,
-            'data'    => $this->formatUser($user),
+            'data' => $this->formatUser($user),
         ]);
     }
 
@@ -361,18 +330,18 @@ class AuthController extends Controller
     private function formatUser(User $user): array
     {
         return [
-            'id'                => $user->id,
-            'name'              => $user->name,
-            'email'             => $user->email,
-            'avatar'            => $user->avatar,
-            'is_verified'       => (bool) $user->is_verified,
+            'id' => $user->id,
+            'name' => $user->name,
+            'email' => $user->email,
+            'avatar' => $user->avatar,
+            'is_verified' => (bool) $user->is_verified,
             'is_badge_verified' => (bool) $user->is_badge_verified,
-            'role'              => $user->role,
-            'roles'             => $user->roles->pluck('name'),
-            'storage_used'      => $user->storage_used_bytes,
-            'storage_limit'     => $user->storage_limit_bytes,
+            'role' => $user->role,
+            'roles' => $user->roles->pluck('name'),
+            'storage_used' => $user->storage_used_bytes,
+            'storage_limit' => $user->storage_limit_bytes,
             'is_public_profile' => (bool) $user->is_public_profile,
-            'created_at'        => $user->created_at,
+            'created_at' => $user->created_at,
         ];
     }
 }

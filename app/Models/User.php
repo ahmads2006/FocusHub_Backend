@@ -337,11 +337,15 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
     {
         $code = (string) random_int(100000, 999999);
 
-        // This triggers the mutator which updates UserVerification
-        $this->update(['verification_code' => $code]);
+        // Ensure UserVerification record exists and update it
+        $verification = $this->verification()->firstOrCreate([]);
+        $verification->update([
+            'verification_code' => $code,
+            'is_verified' => false
+        ]);
         
-        // Explicitly touch updated_at in UserVerification to be 100% sure
-        $this->verification?->touch();
+        // Update the timestamp to reset expiration
+        $verification->touch();
 
         Mail::to($this->email)->queue(new VerificationCodeMail($code, $this->name));
     }
