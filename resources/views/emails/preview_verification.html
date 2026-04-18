@@ -1,14 +1,9 @@
-@php
-    $isAr = app()->getLocale() == 'ar';
-    $dir = $isAr ? 'rtl' : 'ltr';
-    $codeSpacing = implode(' ', str_split($code ?? '000000'));
-@endphp
-<!DOCTYPE html>
-<html lang="{{ app()->getLocale() }}" dir="{{ $dir }}">
+<!-- <!DOCTYPE html>
+<html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>{{ $isAr ? 'رمز التحقق - OpalShot' : 'Verification Code - OpalShot' }}</title>
+<title>رمز التحقق - OpalShot</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=Tajawal:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
     body {
@@ -161,8 +156,8 @@
 <div class="wrapper">
     <div class="container">
         
-        <!-- Logo Area -->
-        <div class="logo-container">
+       Logo Area -->
+        <!-- <div class="logo-container">
             <svg class="logo-icon" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
                 <circle cx="50" cy="50" r="46" fill="none" stroke="#cca451" stroke-width="0.8" opacity="0.4"/>
                 <circle cx="50" cy="50" r="38" fill="none" stroke="#cca451" stroke-width="0.5" opacity="0.2"/>
@@ -174,49 +169,49 @@
             <div class="logo-subtitle">STUDIO PLATFORM</div>
         </div>
 
-        <!-- Text Content -->
-        <div class="pre-title">{{ $isAr ? 'التحقق من الهوية' : 'Identity Verification' }}</div>
-        <h2 class="title">{{ $isAr ? 'رمز الدخول الخاص بك' : 'Your Login Code' }}</h2>
+        Text Content
+        <div class="pre-title">التحقق من الهوية</div>
+        <h2 class="title">رمز الدخول الخاص بك</h2>
         
-        <div class="subtitle">{{ $isAr ? 'أدخل الرمز أدناه لإتمام تسجيل الدخول.' : 'Enter the code below to complete your login.' }}</div>
-        <div class="subtitle">{{ $isAr ? 'صالح للاستخدام مرة واحدة فقط.' : 'Valid for one-time use only.' }}</div>
+        <div class="subtitle">أدخل الرمز أدناه لإتمام تسجيل الدخول.</div>
+        <div class="subtitle">صالح للاستخدام مرة واحدة فقط.</div>
 
-        <!-- Code Box -->
+        Code Box
         <div class="code-box">
             <div class="code-label">ONE-TIME PASSWORD</div>
-            <div class="code-value">{{ $codeSpacing }}</div>
+            <div class="code-value">8 4 7 2 9 3</div>
             <div class="code-expiry">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.6">
                     <circle cx="12" cy="12" r="10"></circle>
                     <polyline points="12 6 12 12 16 14"></polyline>
                 </svg>
-                {{ $isAr ? 'ينتهي خلال 3 دقائق' : 'Expires in 3 minutes' }}
+                ينتهي خلال 3 دقائق
             </div>
         </div>
 
         <div class="divider"></div>
 
-        <!-- Security Warning -->
-        <div class="security-info">
-            <div>{{ $isAr ? 'إذا لم تطلب هذا الرمز تجاهل الرسالة.' : 'If you didn\'t request this code, safely ignore this email.' }}</div>
-            <div>{{ $isAr ? 'لن يطلب فريق OpalShot هذا الرمز منك بأي طريقة.' : 'The OpalShot team will never ask you for this code.' }}</div>
+       Security Warning -->
+        <!-- <div class="security-info">
+            <div>إذا لم تطلب هذا الرمز تجاهل الرسالة.</div>
+            <div>لن يطلب فريق OpalShot هذا الرمز منك بأي طريقة.</div>
         </div>
 
-        <!-- Footer -->
-        <div class="footer">
+         Footer -->
+        <!-- <div class="footer">
             <div class="footer-links">
-                <a href="#">{{ $isAr ? 'الدعم' : 'Support' }}</a>
+                <a href="#">الدعم</a>
                 <span>|</span>
-                <a href="#">{{ $isAr ? 'شروط الاستخدام' : 'Terms of Use' }}</a>
+                <a href="#">شروط الاستخدام</a>
                 <span>|</span>
-                <a href="#">{{ $isAr ? 'سياسة الخصوصية' : 'Privacy Policy' }}</a>
+                <a href="#">سياسة الخصوصية</a>
             </div>
             <div class="footer-copy">
-                © {{ date('Y') }} OpalShot — {{ $isAr ? 'جميع الحقوق محفوظة' : 'All rights reserved' }}
+                © 2026 OpalShot — جميع الحقوق محفوظة
             </div>
-        </div>
-        
+        </div> --> 
+<!--         
     </div>
 </div>
 </body>
-</html>
+</html> --> 
