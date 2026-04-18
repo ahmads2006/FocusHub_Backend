@@ -58,9 +58,12 @@ class ImageIntelligenceService
             'size' => $file->getSize(),
         ]);
 
-        // 3. Bridge the cache gap: Store the safety result using the new image->id
-        // so analyzeAndTag (Stage 2) knows safety is verified and proceeds to Tagging-only drivers.
-        Redis::setex("opticvault:safety:{$image->id}", 3600, 'safe_verified');
+        // 3. Bridge the cache gap (Resilient to Redis failure)
+        try {
+            Redis::setex("opticvault:safety:{$image->id}", 3600, 'safe_verified');
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::warning("Redis failure in processUpload: " . $e->getMessage());
+        }
         // 4. Analyze and Tag
         $this->analyzeAndTag($image);
 
@@ -85,9 +88,14 @@ class ImageIntelligenceService
                 $image->load('storage');
             }
 
-            // Stage 3: Check Redis Pipeline Cache for existing safety result
+            // Stage 3: Check Redis Pipeline Cache (Resilient to Redis failure)
             $safetyCacheKey = "opticvault:safety:{$image->id}";
-            $cachedSafety = Redis::get($safetyCacheKey);
+            $cachedSafety = null;
+            try {
+                $cachedSafety = Redis::get($safetyCacheKey);
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::warning("Redis failure in analyzeAndTag: " . $e->getMessage());
+            }
             
             if ($cachedSafety) {
                 Log::info("AI Intelligence: Safety verified via Redis cache for {$image->id}. Running TAGGING ONLY.");

@@ -29,7 +29,6 @@ class RecommendationEngine
             if ($like) {
                 // Unlike: remove it
                 $like->delete();
-                Redis::zincrby('trending_images_24h', -1, $image->id);
                 return 'unlike';
             } else {
                 // Like: create it (unique constraint in DB prevents double likes)
@@ -37,10 +36,16 @@ class RecommendationEngine
                     'user_id'  => $user->id,
                     'image_id' => $image->id,
                 ]);
-                Redis::zincrby('trending_images_24h', 1, $image->id);
                 return 'like';
             }
         });
+
+        // Redis operations outside of DB transaction to prevent rollbacks on Redis failure
+        try {
+            Redis::zincrby('trending_images_24h', ($action === 'like' ? 1 : -1), $image->id);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error("Redis zincrby failed for image {$image->id}: " . $e->getMessage());
+        }
 
         $weightAdjustment = ($action === 'like') ? 1 : -1;
 
@@ -56,9 +61,13 @@ class RecommendationEngine
         // Dispatch background job to update JSON affinities
         UpdateUserPreferencesJob::dispatch($user->id, $image->id, $weightAdjustment);
 
-        // Emit Datadog Gauge for Trending Set Size
-        $trendingSize = Redis::zcard('trending_images_24h');
-        $this->emitDatadogMetric('gauge', 'opticvault.trending.total_size', $trendingSize);
+        // Emit Datadog Gauge for Trending Set Size (Resilient to Redis failure)
+        try {
+            $trendingSize = Redis::zcard('trending_images_24h');
+            $this->emitDatadogMetric('gauge', 'opticvault.trending.total_size', $trendingSize);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::warning("Redis zcard failed: " . $e->getMessage());
+        }
 
         return ['success' => true, 'action' => $action];
     }
@@ -77,7 +86,12 @@ class RecommendationEngine
             $prefs = UserPreference::where('user_id', $user->id)->first();
 
             // --- Hidden images (not interested) from Redis ---
-            $hiddenIds = Redis::smembers("hidden_images:{$user->id}") ?? [];
+            $hiddenIds = [];
+            try {
+                $hiddenIds = Redis::smembers("hidden_images:{$user->id}") ?? [];
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::warning("Redis smembers failed for user {$user->id}: " . $e->getMessage());
+            }
 
             // Base query constraints for UNLIKED items (Discovery Phase)
             $unlikedConstraints = function ($q) use ($user, $hiddenIds, $includeOwnImages) {
@@ -280,7 +294,11 @@ class RecommendationEngine
      */
     public function invalidateUserFeedCache($userId): void
     {
-        Cache::tags(["user:{$userId}", 'feeds'])->flush();
+        try {
+            Cache::tags(["user:{$userId}", 'feeds'])->flush();
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error("Failed to invalidate user feed cache for {$userId}: " . $e->getMessage());
+        }
     }
 
     /**

@@ -31,7 +31,7 @@ class ContentSafetyService
     {
         Log::info("AI Safety: Starting failover check for " . $file->getClientOriginalName());
         $filePath = $file->getRealPath();
-        $fileHash = md5_file($filePath);
+        $fileHash = hash_file('sha256', $filePath);
         $metadata = [
             'hash' => $fileHash,
             'checks' => []

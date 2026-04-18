@@ -76,7 +76,13 @@ class MongoChatController extends Controller
                 ],
                 'last_message_at' => $message->created_at->toISOString(),
                 'unread_count' => $unreadCount,
-                'is_online'    => (bool) Redis::exists('user:online:' . $row->partner_id),
+                'is_online'    => (function() use ($row) {
+                    try {
+                        return (bool) Redis::exists('user:online:' . $row->partner_id);
+                    } catch (\Exception $e) {
+                        return false;
+                    }
+                })(),
             ];
         }
 
@@ -159,7 +165,13 @@ class MongoChatController extends Controller
                     'id'        => $partner->id,
                     'name'      => $partner->name,
                     'avatar'    => $partner->avatar,
-                    'is_online' => (bool) Redis::exists('user:online:' . $partner->id),
+                    'is_online' => (function() use ($partner) {
+                        try {
+                            return (bool) Redis::exists('user:online:' . $partner->id);
+                        } catch (\Exception $e) {
+                            return false;
+                        }
+                    })(),
                 ],
             ],
         ]);
@@ -267,7 +279,13 @@ class MongoChatController extends Controller
             'success' => true,
             'data'    => [
                 'messages'  => $newMessages,
-                'is_online' => (bool) Redis::exists('user:online:' . $partner->id),
+                'is_online' => (function() use ($partner) {
+                    try {
+                        return (bool) Redis::exists('user:online:' . $partner->id);
+                    } catch (\Exception $e) {
+                        return false;
+                    }
+                })(),
             ],
         ]);
     }

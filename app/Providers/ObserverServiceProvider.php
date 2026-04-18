@@ -24,5 +24,6 @@ class ObserverServiceProvider extends ServiceProvider
         \App\Models\Like::observe(\App\Observers\LikeObserver::class);
         \App\Models\Connection::observe(\App\Observers\ConnectionObserver::class);
         \App\Models\Image::observe(\App\Observers\ImageObserver::class);
+        \App\Models\Album::observe(\App\Observers\AlbumObserver::class);
     }
 }

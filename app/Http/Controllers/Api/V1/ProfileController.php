@@ -207,11 +207,18 @@ class ProfileController extends Controller
                 ->exists();
         }
 
-        // Stats from Redis
-        $redisPrefix    = "user:{$user->id}:stats";
-        $totalLikes     = (int) Redis::get("{$redisPrefix}:likes") ?: 0;
-        $totalPhotos    = (int) Redis::get("{$redisPrefix}:photos") ?: 0;
-        $totalConnections = (int) Redis::get("{$redisPrefix}:connections") ?: 0;
+        // Stats from Redis (Resilient to Redis failure)
+        $redisPrefix = "user:{$user->id}:stats";
+        try {
+            $totalLikes       = (int) Redis::get("{$redisPrefix}:likes") ?: 0;
+            $totalPhotos      = (int) Redis::get("{$redisPrefix}:photos") ?: 0;
+            $totalConnections = (int) Redis::get("{$redisPrefix}:connections") ?: 0;
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::warning("Redis is down while fetching profile stats for user {$user->id}: " . $e->getMessage());
+            $totalLikes       = 0;
+            $totalPhotos      = 0;
+            $totalConnections = 0;
+        }
 
         $tab = $request->get('tab', 'public');
         if (!$isOwner) $tab = 'public';

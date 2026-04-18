@@ -85,15 +85,19 @@ class AlbumUploadController extends Controller
         // Save safely to quarantine locally
         $path = $file->storeAs('quarantine/archives', $jobId . '.' . $file->getClientOriginalExtension(), 'local');
 
-        // Initialize progress
+        // Initialize progress (Resilient to Redis failure)
         $redisKey = 'opticvault:upload_progress:' . $jobId;
-        Redis::set($redisKey, json_encode([
-            'total_items' => 0,
-            'processed_items' => 0,
-            'rejected_items' => 0,
-            'failed_items' => 0,
-            'status' => 'extracting'
-        ]), 'EX', 86400);
+        try {
+            Redis::set($redisKey, json_encode([
+                'total_items' => 0,
+                'processed_items' => 0,
+                'rejected_items' => 0,
+                'failed_items' => 0,
+                'status' => 'extracting'
+            ]), 'EX', 86400);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error("Redis failure in uploadAlbum: " . $e->getMessage());
+        }
 
         // Dispatch extraction pipeline to background
         ExtractArchiveJob::dispatch($path, $jobId, (string) $albumId, (string) $user->id);
@@ -112,7 +116,15 @@ class AlbumUploadController extends Controller
     public function getUploadProgress($jobId)
     {
         $redisKey = 'opticvault:upload_progress:' . $jobId;
-        $data = Redis::get($redisKey);
+        try {
+            $data = Redis::get($redisKey);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::warning("Redis failure in getUploadProgress: " . $e->getMessage());
+            return response()->json([
+                'status' => 'error',
+                'message' => 'نظام تتبع التقدم غير متاح حالياً، ولكن عملية الرفع مستمرة.'
+            ]);
+        }
 
         if (!$data) {
             return response()->json([

@@ -107,8 +107,13 @@ class FeedController extends Controller
         $user = Auth::user();
         if ($user && $user->id !== $image->user_id) {
             $debounceKey = "viewed:{$user->id}:{$image->id}";
-            if (!Redis::exists($debounceKey)) {
-                Redis::setex($debounceKey, 3600, 1);
+            try {
+                if (!Redis::exists($debounceKey)) {
+                    Redis::setex($debounceKey, 3600, 1);
+                    UpdateUserPreferencesJob::dispatch($user->id, $image->id, 0.1);
+                }
+            } catch (\Exception $e) {
+                // If Redis is down, we just skip debouncing and dispatch the job directly
                 UpdateUserPreferencesJob::dispatch($user->id, $image->id, 0.1);
             }
         }
@@ -124,8 +129,13 @@ class FeedController extends Controller
         $user = Auth::user();
         if ($user && $user->id !== $image->user_id) {
             $debounceKey = "dwelled:{$user->id}:{$image->id}";
-            if (!Redis::exists($debounceKey)) {
-                Redis::setex($debounceKey, 43200, 1);
+            try {
+                if (!Redis::exists($debounceKey)) {
+                    Redis::setex($debounceKey, 43200, 1);
+                    UpdateUserPreferencesJob::dispatch($user->id, $image->id, 0.5);
+                }
+            } catch (\Exception $e) {
+                // If Redis is down, we just skip debouncing and dispatch the job directly
                 UpdateUserPreferencesJob::dispatch($user->id, $image->id, 0.5);
             }
         }
@@ -148,8 +158,12 @@ class FeedController extends Controller
             ]);
 
             $redisKey = "hidden_images:{$user->id}";
-            Redis::sadd($redisKey, $image->id);
-            Redis::expire($redisKey, 90 * 24 * 60 * 60);
+            try {
+                Redis::sadd($redisKey, $image->id);
+                Redis::expire($redisKey, 90 * 24 * 60 * 60);
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::error("Redis is down while hiding image {$image->id} for user {$user->id}");
+            }
 
             $this->engine->invalidateUserFeedCache($user->id);
         }

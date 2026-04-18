@@ -97,7 +97,13 @@ class GroupChatController extends Controller
                     'name'      => $p->name,
                     'avatar'    => $p->avatar,
                     'role'      => $p->pivot->role,
-                    'is_online' => (bool) Redis::exists('user:online:' . $p->id),
+                    'is_online' => (function() use ($p) {
+                        try {
+                            return (bool) Redis::exists('user:online:' . $p->id);
+                        } catch (\Exception $e) {
+                            return false;
+                        }
+                    })(),
                 ]),
                 'messages' => $messages,
             ],

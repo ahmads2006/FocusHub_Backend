@@ -165,7 +165,12 @@ class ProcessImageJob implements ShouldQueue
     protected function markAsProcessed()
     {
         $redisKey = 'opticvault:upload_progress:' . $this->jobId;
-        $data = json_decode(Redis::get($redisKey), true);
+        try {
+            $data = json_decode(Redis::get($redisKey), true);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::warning("Redis failure in markAsProcessed: " . $e->getMessage());
+            $data = null;
+        }
         if ($data) {
             if ($this->status === 'rejected') {
                 $data['rejected_items'] = ($data['rejected_items'] ?? 0) + 1;
@@ -179,7 +184,12 @@ class ProcessImageJob implements ShouldQueue
     protected function markAsFailed()
     {
         $redisKey = 'opticvault:upload_progress:' . $this->jobId;
-        $data = json_decode(Redis::get($redisKey), true);
+        try {
+            $data = json_decode(Redis::get($redisKey), true);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::warning("Redis failure in markAsFailed: " . $e->getMessage());
+            $data = null;
+        }
         if ($data) {
             $data['failed_items']++;
             $this->checkIfCompleted($data, $redisKey);
@@ -196,6 +206,10 @@ class ProcessImageJob implements ShouldQueue
             $data['status'] = 'completed';
             Storage::disk('local')->deleteDirectory('quarantine/extracted_' . $this->jobId);
         }
-        Redis::set($redisKey, json_encode($data), 'EX', 86400);
+        try {
+            Redis::set($redisKey, json_encode($data), 'EX', 86400);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error("Redis failure in checkIfCompleted: " . $e->getMessage());
+        }
     }
 }

@@ -117,7 +117,12 @@ class ProcessImageModeration implements ShouldQueue
     protected function incrementProgress(string $type): void
     {
         $redisKey = 'opticvault:upload_progress:' . $this->jobId;
-        $data = json_decode(Redis::get($redisKey), true);
+        $data = null;
+        try {
+            $data = json_decode(Redis::get($redisKey), true);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::warning("Redis failure in ProcessImageModeration progress: " . $e->getMessage());
+        }
 
         if (!$data) {
             return;
@@ -141,6 +146,10 @@ class ProcessImageModeration implements ShouldQueue
             $data['status'] = 'completed';
         }
 
-        Redis::set($redisKey, json_encode($data), 'EX', 86400);
+        try {
+            Redis::set($redisKey, json_encode($data), 'EX', 86400);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error("Redis failure in ProcessImageModeration set: " . $e->getMessage());
+        }
     }
 }

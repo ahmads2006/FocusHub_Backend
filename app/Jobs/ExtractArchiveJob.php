@@ -94,24 +94,32 @@ class ExtractArchiveJob implements ShouldQueue
 
             if ($totalImages === 0) {
                 // Done - nothing to process
-                Redis::set($redisKey, json_encode([
-                    'total_items' => 0,
-                    'processed_items' => 0,
-                    'failed_items' => 0,
-                    'status' => 'completed'
-                ]));
+                try {
+                    Redis::set($redisKey, json_encode([
+                        'total_items' => 0,
+                        'processed_items' => 0,
+                        'failed_items' => 0,
+                        'status' => 'completed'
+                    ]));
+                } catch (\Exception $e) {
+                    \Illuminate\Support\Facades\Log::error("Redis failure in ExtractArchiveJob: " . $e->getMessage());
+                }
                 $this->cleanup();
                 return;
             }
 
             // Initialize progress for the images found
-            Redis::set($redisKey, json_encode([
-                'total_items' => $totalImages,
-                'processed_items' => 0,
-                'rejected_items' => 0,
-                'failed_items' => 0,
-                'status' => 'processing'
-            ]), 'EX', 86400);
+            try {
+                Redis::set($redisKey, json_encode([
+                    'total_items' => $totalImages,
+                    'processed_items' => 0,
+                    'rejected_items' => 0,
+                    'failed_items' => 0,
+                    'status' => 'processing'
+                ]), 'EX', 86400);
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::error("Redis failure in ExtractArchiveJob init: " . $e->getMessage());
+            }
 
             // Dispatch Moderation job for each
             foreach ($imagePaths as $imagePath) {
@@ -123,13 +131,17 @@ class ExtractArchiveJob implements ShouldQueue
         } else {
             // Unzipping failed
             $redisKey = 'opticvault:upload_progress:' . $this->jobId;
-            Redis::set($redisKey, json_encode([
-                'total_items' => 0,
-                'processed_items' => 0,
-                'failed_items' => 1,
-                'status' => 'failed',
-                'error' => 'Archive could not be extracted.'
-            ]), 'EX', 86400);
+            try {
+                Redis::set($redisKey, json_encode([
+                    'total_items' => 0,
+                    'processed_items' => 0,
+                    'failed_items' => 1,
+                    'status' => 'failed',
+                    'error' => 'Archive could not be extracted.'
+                ]), 'EX', 86400);
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::error("Redis failure in ExtractArchiveJob error state: " . $e->getMessage());
+            }
             Storage::disk('local')->delete($this->filePath);
         }
     }
