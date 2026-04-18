@@ -4,7 +4,7 @@ services:
         build:
             context: .
             dockerfile: Dockerfile
-        image: ${PROJECT_NAME}_app:prod
+        image: opticvault_app:prod
         restart: unless-stopped
         ports:
             - '127.0.0.1:${APP_PORT:-80}:80'
@@ -17,7 +17,7 @@ services:
             - './.env:/var/www/html/.env:ro'    # ربط ملف البيئة مباشرة داخل الحاوية
         networks:
             - opticvault_network
-            - ${PROJECT_NAME}_default
+            - opticvault_default
 
         depends_on:
             redis:
@@ -25,7 +25,7 @@ services:
 
     # 1.B. خادم WebSockets (Laravel Reverb)
     reverb:
-        image: ${PROJECT_NAME}_app:prod
+        image: opticvault_app:prod
         restart: unless-stopped
         command: ["php", "artisan", "reverb:start", "--host=0.0.0.0", "--port=8080"]
         env_file:
@@ -37,7 +37,7 @@ services:
             - './.env:/var/www/html/.env:ro'
         networks:
             - opticvault_network
-            - ${PROJECT_NAME}_default
+            - opticvault_default
 
         depends_on:
             redis:
@@ -54,7 +54,7 @@ services:
             - 'redis-data:/data'
         networks:
             - opticvault_network
-            - ${PROJECT_NAME}_default
+            - opticvault_default
 
         healthcheck:
             test: ["CMD", "redis-cli", "ping"]
@@ -63,7 +63,7 @@ services:
 
     # 3. معالج المهام الخلفية (Queue Worker - لرفع الصور وتحليل AI)
     php-worker:
-        image: ${PROJECT_NAME}_app:prod
+        image: opticvault_app:prod
         restart: unless-stopped
         command: ["php", "artisan", "queue:work", "redis", "--queue=default", "--sleep=3", "--tries=3", "--timeout=300"]
         env_file:
@@ -73,7 +73,7 @@ services:
             - './.env:/var/www/html/.env:ro'
         networks:
             - opticvault_network
-            - ${PROJECT_NAME}_default
+            - opticvault_default
 
         depends_on:
             redis:
@@ -81,7 +81,7 @@ services:
 
     # 4. المجدول (Task Scheduler)
     php-scheduler:
-        image: ${PROJECT_NAME}_app:prod
+        image: opticvault_app:prod
         restart: unless-stopped
         command: ["php", "artisan", "schedule:work"]
         env_file:
@@ -91,7 +91,7 @@ services:
             - './.env:/var/www/html/.env:ro'
         networks:
             - opticvault_network
-            - ${PROJECT_NAME}_default
+            - opticvault_default
 
         depends_on:
             redis:

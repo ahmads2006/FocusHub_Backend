@@ -34,8 +34,8 @@ class SyncRedisCounters extends Command
         $usersQuery->chunk(100, function ($users) use ($bar) {
             foreach ($users as $user) {
                 // Key format: user:{id}:stats:likes (matches LikeObserver)
-                $likesReceived = DB::table('likes')
-                    ->join('images', 'likes.image_id', '=', 'images.id')
+                $likesReceived = DB::table('image_likes')
+                    ->join('images', 'image_likes.image_id', '=', 'images.id')
                     ->where('images.user_id', $user->id)
                     ->count();
                 Redis::set("user:{$user->id}:stats:likes", $likesReceived);
@@ -68,7 +68,7 @@ class SyncRedisCounters extends Command
         // ── 2. Trending Images Sorted Set ──────────────────────────
         $this->info('━━━ Trending Images (24h) ━━━');
 
-        $recentLikes = DB::table('likes')
+        $recentLikes = DB::table('image_likes')
             ->where('created_at', '>=', now()->subDay())
             ->select('image_id', DB::raw('COUNT(*) as score'))
             ->groupBy('image_id')
