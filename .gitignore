@@ -23,8 +23,7 @@ yarn-error.log
 /.zed
 .env.server
 api.opalshot.studio.conf
-
-# Project Specific (OpticVault)
+audit_database.php# Project Specific (OpticVault)
 /venv/
 /.venv/
 /localstack_data/
