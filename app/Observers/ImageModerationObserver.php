@@ -4,6 +4,7 @@ namespace App\Observers;
 
 use App\Models\ImageModeration;
 use App\Services\Core\VerificationService;
+use Illuminate\Support\Facades\Log;
 
 class ImageModerationObserver
 {
@@ -42,7 +43,11 @@ class ImageModerationObserver
                 
                 // Analytics: increment if public
                 if ($image->privacy === 'public') {
-                    \Illuminate\Support\Facades\Redis::incr("user:{$image->user_id}:stats:photos");
+                    try {
+                        \Illuminate\Support\Facades\Redis::incr("user:{$image->user_id}:stats:photos");
+                    } catch (\Throwable $e) {
+                        Log::warning('ImageModerationObserver Redis incr failed', ['error' => $e->getMessage()]);
+                    }
                 }
             } elseif ($moderation->status === 'rejected') {
                 // Determine reason if available (e.g., sensitivity_reason)
@@ -53,7 +58,11 @@ class ImageModerationObserver
             // Analytics: decrement if it was approved and public, but changed
             if ($moderation->getOriginal('status') === 'approved' && $moderation->status !== 'approved') {
                 if ($image->privacy === 'public') {
-                    \Illuminate\Support\Facades\Redis::decr("user:{$image->user_id}:stats:photos");
+                    try {
+                        \Illuminate\Support\Facades\Redis::decr("user:{$image->user_id}:stats:photos");
+                    } catch (\Throwable $e) {
+                        Log::warning('ImageModerationObserver Redis decr failed', ['error' => $e->getMessage()]);
+                    }
                 }
             }
         }

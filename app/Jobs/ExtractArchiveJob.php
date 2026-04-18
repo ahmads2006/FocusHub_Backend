@@ -108,6 +108,7 @@ class ExtractArchiveJob implements ShouldQueue
             Redis::set($redisKey, json_encode([
                 'total_items' => $totalImages,
                 'processed_items' => 0,
+                'rejected_items' => 0,
                 'failed_items' => 0,
                 'status' => 'processing'
             ]), 'EX', 86400);

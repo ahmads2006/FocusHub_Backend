@@ -188,7 +188,11 @@ class ProcessImageJob implements ShouldQueue
 
     protected function checkIfCompleted($data, $redisKey)
     {
-        if (($data['processed_items'] + $data['failed_items']) >= $data['total_items']) {
+        $done = ($data['processed_items'] ?? 0)
+              + ($data['rejected_items'] ?? 0)
+              + ($data['failed_items'] ?? 0);
+
+        if ($done >= ($data['total_items'] ?? 0)) {
             $data['status'] = 'completed';
             Storage::disk('local')->deleteDirectory('quarantine/extracted_' . $this->jobId);
         }
