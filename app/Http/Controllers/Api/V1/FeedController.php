@@ -49,7 +49,7 @@ class FeedController extends Controller
             try {
                 $redisKey = "seen_images:{$user->id}";
                 Redis::sadd($redisKey, ...$imageIds);
-                Redis::expire($redisKey, 604800); // 7 Days in seconds
+                Redis::expire($redisKey, 1728000); // 20 Days in seconds
             } catch (\Exception $e) {
                 \Illuminate\Support\Facades\Log::warning("Could not record seen images for user {$user->id}: " . $e->getMessage());
             }

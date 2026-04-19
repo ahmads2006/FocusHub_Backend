@@ -227,21 +227,46 @@ class RecommendationEngine
             // Return as simple array of IDs
             $finalIds = array_values(array_unique(array_merge($spacedIds, $likedResults)));
 
-            // --- 🛡️ SAFETY FALLBACK (صمام الأمان) ---
-            // If the user has seen everything and the list is empty, fetch latest public images as fallback
-            // We use the blockIndex to ensure even the fallback is paginated and doesn't repeat.
-            if (empty($finalIds)) {
-                $fallbackOffset = $blockIndex * 50;
-                $finalIds = Image::where('privacy', 'public')
-                    ->where('moderation_status', 'approved')
-                    ->latest()
-                    ->offset($fallbackOffset)
-                    ->take(50)
-                    ->pluck('id')
-                    ->toArray();
+            // --- 🛡️ INTELLIGENT TIERED QUALITY FALLBACK (النظام الطبقي المتكامل) ---
+            if (count($finalIds) < $limit) {
+                $needed = $limit - count($finalIds);
+                $fallbackOffset = $blockIndex * $needed;
+
+                // Tier 2a: Personalized Old Content (Images seen in last 20 days but match user interests)
+                $personalizedOldIds = [];
+                if (!empty($topTags)) {
+                    $personalizedOldIds = Image::where('privacy', 'public')
+                        ->where('moderation_status', 'approved')
+                        ->whereNotIn('id', $finalIds)
+                        ->withAnyTags($topTags)
+                        ->withCount('likes')
+                        ->orderBy('likes_count', 'desc')
+                        ->offset($fallbackOffset)
+                        ->take($needed)
+                        ->pluck('id')
+                        ->toArray();
+                    
+                    $finalIds = array_merge($finalIds, $personalizedOldIds);
+                }
+
+                // Tier 2b: General High-Quality Fallback (If still needed)
+                if (count($finalIds) < $limit) {
+                    $stillNeeded = $limit - count($finalIds);
+                    $extraIds = Image::where('privacy', 'public')
+                        ->where('moderation_status', 'approved')
+                        ->whereNotIn('id', $finalIds)
+                        ->withCount('likes')
+                        ->orderBy('likes_count', 'desc')
+                        ->offset($fallbackOffset)
+                        ->take($stillNeeded)
+                        ->pluck('id')
+                        ->toArray();
+
+                    $finalIds = array_merge($finalIds, $extraIds);
+                }
             }
 
-            return $finalIds;
+            return array_values(array_unique($finalIds));
         });
 
         // 3. Emit Feed Datadog Metrics
