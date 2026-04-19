@@ -249,26 +249,27 @@ class RecommendationEngine
     }
 
     /**
-     * Ultra-fast Cold Start using Redis ZREVRANGE.
+     * Ultra-fast Cold Start using Redis ZREVRANGE or Cached Query.
      */
     protected function getTrendingFeed(int $limit = 20, bool $includeOwnImages = false)
     {
-        $query = Image::where('privacy', 'public')
-            ->with(['storage', 'settings', 'user'])
-            ->withCount('likes');
+        $cacheKey = "feed:trending:" . ($includeOwnImages ? 'all' : 'others') . ":limit_{$limit}";
 
-        // Optional: Include owner images in Gallery context
-        if (!$includeOwnImages && auth()->check()) {
-            $query->where('user_id', '!=', auth()->id());
-        }
+        return Cache::remember($cacheKey, 60, function () use ($limit, $includeOwnImages) {
+            $query = Image::where('privacy', 'public')
+                ->where('moderation_status', 'approved') // Added: Only show approved images for performance & safety
+                ->with(['storage', 'settings', 'user'])
+                ->withCount('likes');
 
-        // Logic: 
-        // 1. Order by Likes (most popular first, even if old)
-        // 2. Order by Date (if same likes, newest first)
-        return $query->orderBy('likes_count', 'desc')
-            ->latest()
-            ->take($limit)
-            ->get();
+            if (!$includeOwnImages && auth()->check()) {
+                $query->where('user_id', '!=', auth()->id());
+            }
+
+            return $query->orderBy('likes_count', 'desc')
+                ->latest()
+                ->take($limit)
+                ->get();
+        });
     }
 
     /**
