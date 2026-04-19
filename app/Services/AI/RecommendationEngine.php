@@ -232,19 +232,33 @@ class RecommendationEngine
     }
 
     /**
-     * Backward-compatible method returning fully hydrated Models for API endpoints
+     * Highly optimized Feed Hydration with Pagination support.
+     * Slices the pre-calculated ID pool in memory to avoid redundant AI logic.
      */
-    public function getForYouFeed(User $user, int $limit = 500, bool $includeOwnImages = false)
+    public function getForYouFeed(User $user, int $limit = 50, bool $includeOwnImages = false, int $page = 1)
     {
-        $ids = $this->getForYouFeedIds($user, $limit, $includeOwnImages);
-        if (empty($ids)) return collect();
+        // 1. Get the full pre-calculated pool (500 IDs max, cached for 30s)
+        $allIds = $this->getForYouFeedIds($user, 500, $includeOwnImages);
+        
+        if (empty($allIds)) return collect();
 
-        $placeholders = implode(',', array_fill(0, count($ids), '?'));
-        return Image::whereIn('id', $ids)
-            ->where('privacy', 'public') // Prevents stale cache from exposing newly-private images
+        // 2. Calculate the slice (Pagination in memory)
+        // If page=1, limit=20 -> offset=0
+        // If page=2, limit=20 -> offset=20
+        $offset = ($page - 1) * $limit;
+        $slicedIds = array_slice($allIds, $offset, $limit);
+
+        if (empty($slicedIds)) return collect();
+
+        // 3. Hydrate only the sliced chunk from DB (Uses Primary Key Index - Ultra Fast)
+        $placeholders = implode(',', array_fill(0, count($slicedIds), '?'));
+        
+        return Image::whereIn('id', $slicedIds)
+            ->where('privacy', 'public')
+            ->where('moderation_status', 'approved')
             ->with(['settings', 'user', 'labelData', 'storage'])
             ->withCount('likes')
-            ->orderByRaw("FIELD(id, {$placeholders})", $ids)
+            ->orderByRaw("FIELD(id, {$placeholders})", $slicedIds)
             ->get();
     }
 

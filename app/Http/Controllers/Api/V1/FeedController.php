@@ -27,10 +27,12 @@ class FeedController extends Controller
      */
     public function forYou(Request $request): JsonResponse
     {
-        $limit = min($request->get('limit', 20), 50);
+        $limit = min($request->get('per_page', 20), 100); // Allow up to 100 per batch
+        $page  = max($request->get('page', 1), 1);
         $user  = Auth::user();
 
-        $feed = $this->engine->getForYouFeed($user, $limit);
+        // Pass the page to the engine for memory-slicing
+        $feed = $this->engine->getForYouFeed($user, $limit, false, $page);
 
         $likedImageIds = [];
         $bookmarkedImageIds = [];
