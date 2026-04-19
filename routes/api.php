@@ -186,7 +186,7 @@ Route::prefix('v1')->group(function () {
         });
 
         // ─── 🎯 Feed (For You Algorithm) ────────
-        Route::get('/feed/for-you', [App\Http\Controllers\Api\V1\FeedController::class, 'forYou']);
+        Route::get('/feed/home', [App\Http\Controllers\Api\V1\FeedController::class, 'home']);
 
         // ─── 📦 Bulk Upload ─────────────────────
         Route::prefix('upload')->group(function () {

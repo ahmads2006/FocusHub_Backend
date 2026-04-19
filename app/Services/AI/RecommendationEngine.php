@@ -33,7 +33,7 @@ class RecommendationEngine
             } else {
                 // Like: create it (unique constraint in DB prevents double likes)
                 Like::create([
-                    'user_id'  => $user->id,
+                    'user_id' => $user->id,
                     'image_id' => $image->id,
                 ]);
                 return 'like';
@@ -76,19 +76,25 @@ class RecommendationEngine
      * Gets the personalized feed IDs using the 50/20/30 distribution strategy.
      * Caches lightweight integer arrays instead of full heavy Models.
      */
-    public function getForYouFeedIds(User $user, int $limit = 500, bool $includeOwnImages = false)
+    public function getForYouFeedIds(User $user, int $limit = 500, bool $includeOwnImages = false, int $blockIndex = 0)
     {
         $startTime = microtime(true);
-        $cacheKey = "feed:for_you_ids:{$user->id}:" . ($includeOwnImages ? 'all' : 'others') . ":v10"; // Version bump
+        $cacheKey = "feed:for_you_ids:{$user->id}:" . ($includeOwnImages ? 'all' : 'others') . ":block:{$blockIndex}:v11";
 
         // Cache tied to user ID. Reduced to 30 seconds so pulling-to-refresh quickly yields a new Pinterest-style feed.
-        $feedIds = Cache::tags(["user:{$user->id}", 'feeds'])->remember($cacheKey, 30, function () use ($user, $limit, $includeOwnImages) {
+        $feedIds = Cache::tags(["user:{$user->id}", 'feeds'])->remember($cacheKey, 30, function () use ($user, $limit, $includeOwnImages, $blockIndex) {
             $prefs = UserPreference::where('user_id', $user->id)->first();
 
-            // --- Hidden images (not interested) from Redis ---
+            // --- Hidden images (not interested OR already seen) from Redis ---
             $hiddenIds = [];
             try {
-                $hiddenIds = Redis::smembers("hidden_images:{$user->id}") ?? [];
+                // Get explicitly hidden images
+                $dislikedIds = Redis::smembers("hidden_images:{$user->id}") ?? [];
+
+                // Get images seen in the last 7 days (New Feature)
+                $seenIds = Redis::smembers("seen_images:{$user->id}") ?? [];
+
+                $hiddenIds = array_unique(array_merge($dislikedIds, $seenIds));
             } catch (\Exception $e) {
                 \Illuminate\Support\Facades\Log::warning("Redis smembers failed for user {$user->id}: " . $e->getMessage());
             }
@@ -96,8 +102,9 @@ class RecommendationEngine
             // Base query constraints for UNLIKED items (Discovery Phase)
             $unlikedConstraints = function ($q) use ($user, $hiddenIds, $includeOwnImages) {
                 $q->where('privacy', 'public')
-                  ->whereDoesntHave('likes', fn($lq) => $lq->where('user_id', $user->id));
-                
+                    ->where('moderation_status', 'approved')
+                    ->whereDoesntHave('likes', fn($lq) => $lq->where('user_id', $user->id));
+
                 if (!$includeOwnImages) {
                     $q->where('user_id', '!=', $user->id);
                 }
@@ -108,9 +115,9 @@ class RecommendationEngine
             };
 
             // Bucket Sizes (Aim for the limit with unliked content first)
-            $directCount    = (int) ceil($limit * 0.50);  // 50%
+            $directCount = (int) ceil($limit * 0.50);  // 50%
             $discoveryCount = (int) ceil($limit * 0.20);  // 20%
-            $randomCount    = $limit - $directCount - $discoveryCount; // 30%
+            $randomCount = $limit - $directCount - $discoveryCount; // 30%
 
             // 1. Parse Preferences
             $tagWeights = $prefs->tag_weights ?? [];
@@ -163,14 +170,14 @@ class RecommendationEngine
             // ── BUCKET 3: Fresh/Latest Content (Seed traffic for new uploads) ──
             $excludeIds = array_merge($hiddenIds, $directIds, $discoveryIds);
             $remainingFreshCount = max(0, $limit - count($directResults) - count($discoveryResults));
-            
+
             $freshAllocation = (int) ceil($remainingFreshCount * 0.4); // 40% of leftover strictly for newness
 
             $freshResults = Image::query()
                 ->tap($unlikedConstraints)
                 ->whereNotIn('id', $excludeIds)
                 ->latest() // Strictly newest first, no sorting by likes
-                ->take((int)($freshAllocation * 4))
+                ->take((int) ($freshAllocation * 4))
                 ->get(['id', 'user_id', 'labels'])
                 ->shuffle()
                 ->take($freshAllocation)
@@ -188,7 +195,7 @@ class RecommendationEngine
                 ->withCount('likes')
                 ->orderBy('likes_count', 'desc')
                 ->latest()
-                ->take((int)($trendingAllocation * 4))
+                ->take((int) ($trendingAllocation * 4))
                 ->get(['id', 'user_id', 'labels'])
                 ->shuffle()
                 ->take($trendingAllocation)
@@ -203,7 +210,7 @@ class RecommendationEngine
 
             // Merge unliked models into a pool (Keeps priority: Direct -> Discovery -> Fresh -> Trending)
             $freshDiscoveryPool = array_merge($directResults, $discoveryResults, $freshResults, $trendingResults);
-            
+
             // Uniquify based on ID
             $uniquePool = [];
             $seenIds = [];
@@ -218,13 +225,29 @@ class RecommendationEngine
             $spacedIds = $this->smartSpaceItems($uniquePool);
 
             // Return as simple array of IDs
-            return array_values(array_unique(array_merge($spacedIds, $likedResults)));
+            $finalIds = array_values(array_unique(array_merge($spacedIds, $likedResults)));
+
+            // --- 🛡️ SAFETY FALLBACK (صمام الأمان) ---
+            // If the user has seen everything and the list is empty, fetch latest public images as fallback
+            // We use the blockIndex to ensure even the fallback is paginated and doesn't repeat.
+            if (empty($finalIds)) {
+                $fallbackOffset = $blockIndex * 50;
+                $finalIds = Image::where('privacy', 'public')
+                    ->where('moderation_status', 'approved')
+                    ->latest()
+                    ->offset($fallbackOffset)
+                    ->take(50)
+                    ->pluck('id')
+                    ->toArray();
+            }
+
+            return $finalIds;
         });
 
         // 3. Emit Feed Datadog Metrics
         $latencyMs = (microtime(true) - $startTime) * 1000;
         $this->emitDatadogMetric('distribution', 'opticvault.recommendation.latency', $latencyMs);
-        
+
         $status = $latencyMs < 10 ? 'hit' : 'miss';
         $this->emitDatadogMetric('count', 'opticvault.redis.hit_rate', 1, ["status:{$status}"]);
 
@@ -237,22 +260,29 @@ class RecommendationEngine
      */
     public function getForYouFeed(User $user, int $limit = 50, bool $includeOwnImages = false, int $page = 1)
     {
-        // 1. Get the full pre-calculated pool (500 IDs max, cached for 30s)
-        $allIds = $this->getForYouFeedIds($user, 500, $includeOwnImages);
-        
-        if (empty($allIds)) return collect();
+        // 1. Calculate which "Block" of 500 images the user is currently in.
+        // Block 0: Images 1-500 (Pages 1-5 if limit=100)
+        // Block 1: Images 501-1000 (Pages 6-10)
+        $batchSize = 500;
+        $blockIndex = (int) floor((($page - 1) * $limit) / $batchSize);
 
-        // 2. Calculate the slice (Pagination in memory)
-        // If page=1, limit=20 -> offset=0
-        // If page=2, limit=20 -> offset=20
-        $offset = ($page - 1) * $limit;
-        $slicedIds = array_slice($allIds, $offset, $limit);
+        // 2. Get IDs for this specific block (Cached for 30s per block)
+        $allIds = $this->getForYouFeedIds($user, $batchSize, $includeOwnImages, $blockIndex);
 
-        if (empty($slicedIds)) return collect();
+        if (empty($allIds))
+            return collect();
+
+        // 3. Calculate the slice relative to the current block
+        // Example: Page 6, Limit 100 -> Offset 500. Offset in Block 1 is 0.
+        $offsetInBlock = (($page - 1) * $limit) % $batchSize;
+        $slicedIds = array_slice($allIds, $offsetInBlock, $limit);
+
+        if (empty($slicedIds))
+            return collect();
 
         // 3. Hydrate only the sliced chunk from DB (Uses Primary Key Index - Ultra Fast)
         $placeholders = implode(',', array_fill(0, count($slicedIds), '?'));
-        
+
         return Image::whereIn('id', $slicedIds)
             ->where('privacy', 'public')
             ->where('moderation_status', 'approved')
@@ -297,7 +327,7 @@ class RecommendationEngine
             'value' => $value,
             'tags' => $tagString
         ]);
-        
+
         // E.g., if using php-datadogstatsd package:
         // if ($type === 'count') \DataDog\DogStatsd::increment($metric, $value, $tags);
         // if ($type === 'gauge') \DataDog\DogStatsd::gauge($metric, $value, $tags);
@@ -317,39 +347,36 @@ class RecommendationEngine
     }
 
     /**
-     * Smart Spacing Algorithm (Anti-Clustering)
-     * Distributes images so that the same creator or the same primary tag
-     * does not appear consecutively in the feed.
+     * Advanced Anti-Clustering Algorithm.
+     * Ensures visual diversity by spacing out items from the same creator or with the same primary tags.
      */
-    protected function smartSpaceItems(array $items)
+    protected function smartSpaceItems(array $items): array
     {
-        $buffer = []; 
-        $penaltyBox = []; 
+        if (empty($items))
+            return [];
+
+        $buffer = [];
+        $itemsCollection = $items;
+        $penaltyBox = [];
+
         $lastCreatorId = null;
         $lastPrimaryTag = null;
-        
-        // We DO NOT shuffle here to preserve the Priority Buckets (Direct > Discovery > Fresh)
-        // Shuffling would destroy the 50/20/30 distribution weighting.
-        $itemsCollection = $items; 
 
-        while (!empty($itemsCollection) || !empty($penaltyBox)) {
+        $maxAttempts = count($items) * 2;
+        $attempts = 0;
+
+        while ((!empty($itemsCollection) || !empty($penaltyBox)) && $attempts < $maxAttempts) {
+            $attempts++;
             $placed = false;
-            
-            // Try to place an item from the main pool
-            foreach ($itemsCollection as $index => $item) {
-                // Determine primary tag
-                $primaryTag = null;
-                $labels = is_string($item['labels'] ?? null) ? json_decode($item['labels'], true) : ($item['labels'] ?? []);
-                if (!empty($labels)) {
-                    $firstLabel = $labels[0];
-                    $primaryTag = is_string($firstLabel) ? $firstLabel : ($firstLabel['description'] ?? null);
-                }
 
-                // Check conflict
+            // Try to pull from main collection first
+            foreach ($itemsCollection as $index => $item) {
+                $primaryTag = $this->getPrimaryTag($item);
+
                 $creatorConflict = ($item['user_id'] === $lastCreatorId);
                 $tagConflict = ($primaryTag !== null && $primaryTag === $lastPrimaryTag);
 
-                if (!$creatorConflict && (!$tagConflict || empty($primaryTag))) {
+                if (!$creatorConflict && !$tagConflict) {
                     $buffer[] = $item['id'];
                     $lastCreatorId = $item['user_id'];
                     $lastPrimaryTag = $primaryTag;
@@ -357,23 +384,22 @@ class RecommendationEngine
                     $itemsCollection = array_values($itemsCollection);
                     $placed = true;
                     break;
+                } else {
+                    // Move to penalty box if it conflicts
+                    $penaltyBox[] = $item;
+                    unset($itemsCollection[$index]);
+                    $itemsCollection = array_values($itemsCollection);
                 }
             }
 
+            // If we couldn't place from main, try the penalty box (but with relaxed rules if needed)
             if (!$placed && !empty($penaltyBox)) {
-                // Try penalty box
                 foreach ($penaltyBox as $index => $item) {
-                    $primaryTag = null;
-                    $labels = is_string($item['labels'] ?? null) ? json_decode($item['labels'], true) : ($item['labels'] ?? []);
-                    if (!empty($labels)) {
-                        $firstLabel = $labels[0];
-                        $primaryTag = is_string($firstLabel) ? $firstLabel : ($firstLabel['description'] ?? null);
-                    }
-
+                    $primaryTag = $this->getPrimaryTag($item);
                     $creatorConflict = ($item['user_id'] === $lastCreatorId);
-                    $tagConflict = ($primaryTag !== null && $primaryTag === $lastPrimaryTag);
 
-                    if (!$creatorConflict && (!$tagConflict || empty($primaryTag))) {
+                    // In penalty box, we only care about creator conflict to avoid complete deadlocks
+                    if (!$creatorConflict) {
                         $buffer[] = $item['id'];
                         $lastCreatorId = $item['user_id'];
                         $lastPrimaryTag = $primaryTag;
@@ -385,36 +411,31 @@ class RecommendationEngine
                 }
             }
 
-            // If we are absolutely stuck, force insert to keep moving
+            // Absolute Fallback: If still stuck, just take the first one available to prevent deadlocks
             if (!$placed) {
-                if (!empty($itemsCollection)) {
-                    // Pull item and force it into the feed buffer (FIX: Removed duplicate insertion into penaltyBox)
-                    $item = array_shift($itemsCollection);
+                $item = !empty($itemsCollection) ? array_shift($itemsCollection) : array_shift($penaltyBox);
+                if ($item) {
                     $buffer[] = $item['id'];
                     $lastCreatorId = $item['user_id'];
-                    
-                    $labels = is_string($item['labels'] ?? null) ? json_decode($item['labels'], true) : ($item['labels'] ?? []);
-                    $lastPrimaryTag = null;
-                    if (!empty($labels)) {
-                        $firstLabel = $labels[0];
-                        $lastPrimaryTag = is_string($firstLabel) ? $firstLabel : ($firstLabel['description'] ?? null);
-                    }
-                } elseif (!empty($penaltyBox)) {
-                    $item = array_shift($penaltyBox);
-                    $buffer[] = $item['id'];
-                    $lastCreatorId = $item['user_id'];
-                    
-                    $labels = is_string($item['labels'] ?? null) ? json_decode($item['labels'], true) : ($item['labels'] ?? []);
-                    $lastPrimaryTag = null;
-                    if (!empty($labels)) {
-                        $firstLabel = $labels[0];
-                        $lastPrimaryTag = is_string($firstLabel) ? $firstLabel : ($firstLabel['description'] ?? null);
-                    }
+                    $lastPrimaryTag = $this->getPrimaryTag($item);
                 }
             }
         }
 
         return $buffer;
+    }
+
+    /**
+     * Helper to extract the primary tag for anti-clustering logic.
+     */
+    protected function getPrimaryTag(array $item): ?string
+    {
+        $labels = is_string($item['labels'] ?? null) ? json_decode($item['labels'], true) : ($item['labels'] ?? []);
+        if (empty($labels))
+            return null;
+
+        $firstLabel = $labels[0];
+        return is_string($firstLabel) ? $firstLabel : ($firstLabel['description'] ?? null);
     }
 }
 

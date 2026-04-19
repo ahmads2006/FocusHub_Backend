@@ -23,11 +23,11 @@ class FeedController extends Controller
     }
 
     /**
-     * Get the highly personalized "For You" feed.
+     * Get the highly personalized "Home" feed (General Gallery).
      */
-    public function forYou(Request $request): JsonResponse
+    public function home(Request $request): JsonResponse
     {
-        $limit = min($request->get('per_page', 20), 100); // Allow up to 100 per batch
+        $limit = min($request->get('per_page', 50), 100); // Default 50, Max 100
         $page  = max($request->get('page', 1), 1);
         $user  = Auth::user();
 
@@ -42,6 +42,17 @@ class FeedController extends Controller
                 ->whereIn('image_id', $imageIds)->pluck('image_id')->toArray();
             $bookmarkedImageIds = \App\Models\Bookmark::where('user_id', $user->id)
                 ->whereIn('image_id', $imageIds)->pluck('image_id')->toArray();
+        }
+
+        $imageIds = $feed->pluck('id')->toArray();
+        if (!empty($imageIds) && $user) {
+            try {
+                $redisKey = "seen_images:{$user->id}";
+                Redis::sadd($redisKey, ...$imageIds);
+                Redis::expire($redisKey, 604800); // 7 Days in seconds
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::warning("Could not record seen images for user {$user->id}: " . $e->getMessage());
+            }
         }
 
         return response()->json([
