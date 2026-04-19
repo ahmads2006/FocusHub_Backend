@@ -14,43 +14,59 @@ return new class extends Migration
     {
         // 1. Optimize Feed & Exploration
         Schema::table('images', function (Blueprint $table) {
-            // High-frequency query: Public images excluding current user
-            if (!indexExists('images', 'idx_images_discovery_v2')) {
+            $indexes = Schema::getIndexes('images');
+            $exists = collect($indexes)->contains('name', 'idx_images_discovery_v2');
+            
+            if (!$exists) {
                 $table->index(['privacy', 'user_id', 'created_at'], 'idx_images_discovery_v2');
             }
         });
 
-        // 2. Social Interaction Speed (Checking if user liked/bookmarked/hidden)
-        // Note: Unique constraints already create indexes, but we can add secondary ones if needed for sorting
+        // 2. Social Interaction Speed
         Schema::table('image_likes', function (Blueprint $table) {
-            if (!indexExists('image_likes', 'idx_likes_user_created')) {
+            $indexes = Schema::getIndexes('image_likes');
+            $exists = collect($indexes)->contains('name', 'idx_likes_user_created');
+            
+            if (!$exists) {
                 $table->index(['user_id', 'created_at'], 'idx_likes_user_created');
             }
         });
 
         Schema::table('bookmarks', function (Blueprint $table) {
-            if (!indexExists('bookmarks', 'idx_bookmarks_user_created')) {
+            $indexes = Schema::getIndexes('bookmarks');
+            $exists = collect($indexes)->contains('name', 'idx_bookmarks_user_created');
+            
+            if (!$exists) {
                 $table->index(['user_id', 'created_at'], 'idx_bookmarks_user_created');
             }
         });
 
         // 3. User Preferences Fast Retrieval
         Schema::table('user_preferences', function (Blueprint $table) {
-            if (!indexExists('user_preferences', 'idx_prefs_user_id')) {
+            $indexes = Schema::getIndexes('user_preferences');
+            $exists = collect($indexes)->contains('name', 'idx_prefs_user_id');
+            
+            if (!$exists) {
                 $table->index('user_id', 'idx_prefs_user_id');
             }
         });
 
-        // 4. Notifications (Ordering by date for specific user)
+        // 4. Notifications
         Schema::table('notifications', function (Blueprint $table) {
-            if (!indexExists('notifications', 'idx_notifications_user_date')) {
+            $indexes = Schema::getIndexes('notifications');
+            $exists = collect($indexes)->contains('name', 'idx_notifications_user_date');
+            
+            if (!$exists) {
                 $table->index(['notifiable_id', 'created_at'], 'idx_notifications_user_date');
             }
         });
         
-        // 5. Activity Log (Standard Spatie improvement)
+        // 5. Activity Log
         Schema::table('activity_log', function (Blueprint $table) {
-            if (!indexExists('activity_log', 'idx_activity_causer_subject')) {
+            $indexes = Schema::getIndexes('activity_log');
+            $exists = collect($indexes)->contains('name', 'idx_activity_causer_subject');
+            
+            if (!$exists) {
                 $table->index(['causer_id', 'subject_id'], 'idx_activity_causer_subject');
             }
         });
@@ -58,39 +74,11 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::table('images', function (Blueprint $table) {
-            $table->dropIndex('idx_images_discovery_v2');
-        });
-        Schema::table('image_likes', function (Blueprint $table) {
-            $table->dropIndex('idx_likes_user_created');
-        });
-        Schema::table('bookmarks', function (Blueprint $table) {
-            $table->dropIndex('idx_bookmarks_user_created');
-        });
-        Schema::table('user_preferences', function (Blueprint $table) {
-            $table->dropIndex('idx_prefs_user_id');
-        });
-        Schema::table('notifications', function (Blueprint $table) {
-            $table->dropIndex('idx_notifications_user_date');
-        });
-        Schema::table('activity_log', function (Blueprint $table) {
-            $table->dropIndex('idx_activity_causer_subject');
-        });
+        Schema::table('images', function (Blueprint $table) { $table->dropIndex('idx_images_discovery_v2'); });
+        Schema::table('image_likes', function (Blueprint $table) { $table->dropIndex('idx_likes_user_created'); });
+        Schema::table('bookmarks', function (Blueprint $table) { $table->dropIndex('idx_bookmarks_user_created'); });
+        Schema::table('user_preferences', function (Blueprint $table) { $table->dropIndex('idx_prefs_user_id'); });
+        Schema::table('notifications', function (Blueprint $table) { $table->dropIndex('idx_notifications_user_date'); });
+        Schema::table('activity_log', function (Blueprint $table) { $table->dropIndex('idx_activity_causer_subject'); });
     }
 };
-
-/**
- * Helper to prevent migration crashes if indexes already exist.
- */
-function indexExists($table, $index)
-{
-    try {
-        $indexes = Schema::getIndexes($table);
-        foreach ($indexes as $i) {
-            if ($i['name'] === $index) return true;
-        }
-    } catch (\Exception $e) {
-        return false;
-    }
-    return false;
-}

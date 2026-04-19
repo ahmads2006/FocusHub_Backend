@@ -19,7 +19,10 @@ RUN apt-get update && apt-get install -y \
     && pecl install redis mongodb \
     && docker-php-ext-enable redis mongodb \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install pdo pdo_mysql pdo_sqlite gd bcmath zip pcntl exif
+    && docker-php-ext-install pdo pdo_mysql pdo_sqlite gd bcmath zip pcntl exif opcache
+
+# نسخ إعدادات OpCache الخاصة بنا
+COPY docker/php/opcache.ini /usr/local/etc/php/conf.d/opcache.ini
 
 # تثبيت وكيل New Relic (APM)
 RUN curl -L https://download.newrelic.com/php_agent/release/newrelic-php5-12.6.0.34-linux.tar.gz | tar -C /tmp -zx \
