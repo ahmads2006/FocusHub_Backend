@@ -316,7 +316,23 @@ class AuthController extends Controller
      */
     public function me(Request $request): JsonResponse
     {
-        $user = $request->user()->load(['profile', 'roles', 'verification']);
+        $user = $request->user();
+        
+        // Ensure profile exists (Lazy-initialization for legacy users)
+        if (!$user->profile) {
+            $displayName = $user->name ?? 'User';
+            $user->profile()->create([
+                'name' => $displayName,
+                'username' => \App\Helpers\RestrictedNameHelper::generateUniqueHandle($displayName),
+                'username_last_changed_at' => now(),
+            ]);
+        }
+
+        if (!$user->userStatus) {
+            $user->userStatus()->create([]);
+        }
+
+        $user->load(['profile', 'roles', 'verification', 'userStatus']);
 
         return response()->json([
             'success' => true,
