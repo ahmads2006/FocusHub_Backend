@@ -320,7 +320,8 @@ class AuthController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $this->formatUser($user),
+            'user' => $this->formatUser($user),
+            'data' => $this->formatUser($user), // Keep for backward compatibility if needed
         ]);
     }
 
