@@ -163,28 +163,45 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
      */
     protected function getRelatedAttribute($relation, $column, $default = null)
     {
-        if ($this->relationLoaded($relation)) {
+        // 1. Check if it's in temporary relationData (unsaved changes)
+        if (isset($this->relationData[$relation][$column])) {
+            return $this->relationData[$relation][$column];
+        }
+
+        // 2. Check if the relation is already loaded
+        if ($this->relationLoaded($relation) && $this->{$relation}) {
             return $this->{$relation}->{$column} ?? $default;
         }
 
-        return $this->relationData[$relation][$column] 
-            ?? $this->attributes[$column] 
-            ?? ($this->{$relation}->{$column} ?? $default);
+        // 3. Fallback to main attributes (for backward compatibility during migration)
+        if (isset($this->attributes[$column])) {
+            return $this->attributes[$column];
+        }
+
+        // 4. Lazy-load as a last resort if we are not in a serialization context
+        // Note: During serialization (toArray/toJson), we should avoid lazy loading
+        if ($this->exists && !isset($this->attributes[$column])) {
+            $rel = $this->{$relation}; // This triggers lazy loading
+            return $rel ? ($rel->{$column} ?? $default) : $default;
+        }
+
+        return $default;
     }
 
     protected function setRelatedAttribute($relation, $column, $value)
     {
         if ($this->exists) {
-            // This will lazy-load the relation if not loaded
+            // Ensure relation is loaded
             $rel = $this->{$relation};
             if ($rel) {
                 $rel->{$column} = $value;
+                // If the relation is dirty, we don't need to do more here
+                // as save() is overridden to save relations.
                 return;
             }
         }
         
-        // During creation, store in relationData instead of main attributes
-        // to avoid SQL Unknown Column errors.
+        // During creation or if relation is missing, store in relationData
         $this->relationData[$relation][$column] = $value;
     }
 
@@ -423,26 +440,27 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
      */
     public function getAvatarAttribute(): string
     {
-        // 1. Check provider_avatar (Social Login)
+        // 1. Check custom uploaded profile picture (Manual change)
+        // We prefer this over the social provider avatar once the user changes it.
+        $profilePicture = $this->profile ? $this->profile->profile_picture : ($this->attributes['profile_picture'] ?? null);
+        
+        if ($profilePicture) {
+            if (filter_var($profilePicture, FILTER_VALIDATE_URL)) {
+                return $profilePicture;
+            }
+            return asset('storage/' . $profilePicture);
+        }
+
+        // 2. Check provider_avatar (Social Login)
         if ($this->provider_avatar && filter_var($this->provider_avatar, FILTER_VALIDATE_URL)) {
             return $this->provider_avatar;
         }
 
-        // 2. Check profile picture from Profile relation
-        $profilePicture = $this->profile ? $this->profile->profile_picture : ($this->attributes['profile_picture'] ?? null);
-        
-        if ($profilePicture) {
-            // If it's a full URL (like UI Avatars), return it
-            if (filter_var($profilePicture, FILTER_VALIDATE_URL)) {
-                return $profilePicture;
-            }
-
-            // Return the stored path (which is already optimized to 150x150 WebP)
-            return asset('storage/' . $profilePicture);
-        }
-
-        return 'https://ui-avatars.com/api/?name=' . urlencode($this->name) . '&color=7F9CF5&background=EBF4FF&size=150';
+        // 3. Fallback to UI Avatars
+        $name = $this->name ?? 'User';
+        return 'https://ui-avatars.com/api/?name=' . urlencode($name) . '&color=7F9CF5&background=EBF4FF&size=150';
     }
+
 
     /**
      * حساب إجمالي المساحة المستخدمة (5GB Limit System)

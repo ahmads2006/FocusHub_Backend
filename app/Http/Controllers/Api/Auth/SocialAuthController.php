@@ -44,13 +44,12 @@ class SocialAuthController extends Controller
                     ->where('provider_id', $socialUser->getId());
             })->orWhere('email', $socialUser->getEmail())->first();
 
+            $displayName = $socialUser->getName() ?? $socialUser->getNickname() ?? 'User';
+
             if (!$user) {
-                // New User Creation: The User model's 'booted' event handles:
-                // 1. Creating the 'user_profiles' record.
-                // 2. Generating the unique '@handle' (Fixed Name) based on Display Name.
-                // 3. Setting the 30-day change cooldown.
+                // New User Creation: The User model's 'booted' event handles profile creation
                 $user = User::create([
-                    'name' => $socialUser->getName() ?? $socialUser->getNickname() ?? 'User',
+                    'name' => $displayName,
                     'email' => $socialUser->getEmail() ?? $socialUser->getId() . "@{$provider}.local",
                     'provider_name' => $provider,
                     'provider_id' => $socialUser->getId(),
@@ -66,12 +65,24 @@ class SocialAuthController extends Controller
                     Log::warning("Welcome Email failed for social user {$user->email}: " . $e->getMessage());
                 }
             } else {
-                // Update existing user with fresh social data (especially avatar)
+                // Update existing user with fresh social data
                 $user->update([
                     'provider_name' => $provider,
                     'provider_id' => $socialUser->getId(),
                     'provider_avatar' => $socialUser->getAvatar(),
                 ]);
+
+                // Ensure profile exists (for users created before the profile system or if deleted)
+                if (!$user->profile) {
+                    $user->profile()->create([
+                        'name' => $displayName,
+                        'username' => \App\Helpers\RestrictedNameHelper::generateUniqueHandle($displayName),
+                        'username_last_changed_at' => now(),
+                    ]);
+                } elseif (empty($user->profile->name)) {
+                    // Sync name to profile if it was empty
+                    $user->profile->update(['name' => $displayName]);
+                }
             }
 
             $token = $user->createToken("{$provider}_login_token")->plainTextToken;
