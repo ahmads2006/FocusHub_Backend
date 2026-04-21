@@ -18,7 +18,10 @@ class SocialAuthController extends Controller
     public function redirectToProvider($provider)
     {
         try {
-            return Socialite::driver($provider)->stateless()->redirect();
+            return Socialite::driver($provider)
+                ->with(['prompt' => 'select_account'])
+                ->stateless()
+                ->redirect();
         } catch (\Exception $e) {
             Log::error("Social Redirect Failed ({$provider}): " . $e->getMessage());
             return redirect()->route('login')->with('error', 'Invalid provider or configuration');
