@@ -6,15 +6,11 @@ use Illuminate\Support\Facades\Route;
 // Redirect Root to Frontend
 // ────────────────────────────────────────────────
 Route::get('/', function () {
-    return redirect(config('app.frontend_url', 'https://opalshot.studio'));
+    return redirect(config('app.frontend_url', 'https://www.opalshot.studio'));
 });
 
-// ────────────────────────────────────────────────
-// Shared Links (These shouldn't return HTML, maybe we need to API-fy them later)
-// But for now, let's keep the routes or redirect them? 
-// No, we are strictly removing ALL Views. So we will drop the Shared Link HTML views. 
-// If they are accessed via browser, they will hit fallback.
-// ────────────────────────────────────────────────
+
+
 
 // ────────────────────────────────────────────────
 // Signed Assets Serving (Files, No HTML)
@@ -47,6 +43,6 @@ Route::fallback(function () {
     if (request()->is('api/*')) {
         return response()->json(['message' => 'Not Found.'], 404);
     }
-    return redirect(config('app.frontend_url', 'https://opalshot.studio'));
+    return redirect(config('app.frontend_url', 'https://www.opalshot.studio'));
 });
 
