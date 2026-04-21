@@ -9,6 +9,8 @@ use Laravel\Socialite\Facades\Socialite;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
+use App\Mail\WelcomeMail;
 
 class SocialAuthController extends Controller
 {
@@ -43,6 +45,10 @@ class SocialAuthController extends Controller
             })->orWhere('email', $socialUser->getEmail())->first();
 
             if (!$user) {
+                // New User Creation: The User model's 'booted' event handles:
+                // 1. Creating the 'user_profiles' record.
+                // 2. Generating the unique '@handle' (Fixed Name) based on Display Name.
+                // 3. Setting the 30-day change cooldown.
                 $user = User::create([
                     'name' => $socialUser->getName() ?? $socialUser->getNickname() ?? 'User',
                     'email' => $socialUser->getEmail() ?? $socialUser->getId() . "@{$provider}.local",
@@ -52,8 +58,15 @@ class SocialAuthController extends Controller
                     'password' => Hash::make(Str::random(24)),
                     'email_verified_at' => now(),
                 ]);
+
+                // Send Welcome Email
+                try {
+                    Mail::to($user->email)->queue(new WelcomeMail($user->name));
+                } catch (\Exception $e) {
+                    Log::warning("Welcome Email failed for social user {$user->email}: " . $e->getMessage());
+                }
             } else {
-                // Update existing user with new social info
+                // Update existing user with fresh social data (especially avatar)
                 $user->update([
                     'provider_name' => $provider,
                     'provider_id' => $socialUser->getId(),
@@ -64,12 +77,12 @@ class SocialAuthController extends Controller
             $token = $user->createToken("{$provider}_login_token")->plainTextToken;
 
             // Redirect back to frontend with token
-            $frontendUrl = env('FRONTEND_URL', 'https://opalshot.studio') . '/auth/callback?token=' . $token;
+            $frontendUrl = env('FRONTEND_URL', 'https://www.opalshot.studio') . '/auth/callback?token=' . $token;
             return redirect()->away($frontendUrl);
 
         } catch (\Exception $e) {
             Log::error("Social Login Callback Failed ({$provider}): " . $e->getMessage());
-            $errorUrl = env('FRONTEND_URL', 'https://opalshot.studio') . '/login?error=auth_failed';
+            $errorUrl = env('FRONTEND_URL', 'https://www.opalshot.studio') . '/login?error=auth_failed';
             return redirect()->away($errorUrl);
         }
     }
