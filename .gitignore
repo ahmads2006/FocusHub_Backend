@@ -21,6 +21,8 @@ yarn-error.log
 /.phpunit.cache
 /.vscode
 /.zed
+/.ssh
+/.ssh-mysql
 .env.server
 api.opalshot.studio.conf
 audit_database.php# Project Specific (OpticVault)
@@ -34,6 +36,7 @@ storage/app/public/images/*
 storage/app/public/uploads/*
 storage/app/private/secure_uploads/*
 storage/app/private/quarantine/*
+
 
 # OS Files
 .DS_Store

@@ -421,7 +421,13 @@ class ImageService
         $fileName = uniqid('optic_') . '_' . $shortName;
         $relativePath = ltrim($folder, '/') . '/' . $fileName;
 
-        Storage::disk('s3')->put($relativePath, file_get_contents($filePath));
+        // التحسين 1: استخدام Streams بدلاً من file_get_contents لعدم استهلاك الـ RAM
+        // التحسين 2: تحديد صلاحية الملف كـ public لكي لا يظهر خطأ AccessDenied في الـ CDN
+        $stream = fopen($filePath, 'r');
+        Storage::disk('s3')->put($relativePath, $stream, 'public');
+        if (is_resource($stream)) {
+            fclose($stream);
+        }
 
         return $relativePath;
     }

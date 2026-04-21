@@ -16,8 +16,8 @@ RUN apt-get update && apt-get install -y \
     fonts-liberation \
     libmagickwand-dev \
     libssl-dev \
-    && pecl install redis mongodb \
-    && docker-php-ext-enable redis mongodb \
+    && pecl install redis mongodb imagick \
+    && docker-php-ext-enable redis mongodb imagick \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install pdo pdo_mysql pdo_sqlite gd bcmath zip pcntl exif opcache
 

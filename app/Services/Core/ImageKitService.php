@@ -37,7 +37,7 @@ class ImageKitService
     public function getOptimizedUrl(string $path, ?int $width = null, ?int $height = null): string
     {
         $transformations = [
-            ['format' => 'webp', 'quality' => 'auto']
+            ['format' => 'webp', 'quality' => 'auto', 'progressive' => 'true']
         ];
 
         if ($width || $height) {
@@ -68,6 +68,7 @@ class ImageKitService
                 [
                     'format' => 'webp',
                     'quality' => 'auto',
+                    'progressive' => 'true'
                 ],
                 [
                     'overlayText' => $text,
@@ -92,7 +93,7 @@ class ImageKitService
             'signed' => $signed,
             'expireSeconds' => $expireMinutes * 60,
             'transformation' => array_merge([
-                ['format' => 'webp', 'quality' => 'auto']
+                ['format' => 'webp', 'quality' => 'auto', 'progressive' => 'true']
             ], $transformations),
         ]);
     }

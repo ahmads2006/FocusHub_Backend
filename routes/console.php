@@ -19,3 +19,6 @@ Schedule::command('preferences:decay')->weekly();
 
 // Auto-close inactive support chats
 Schedule::command('support:autoclose')->everyMinute();
+
+// Clean up temporary files and old quarantined files weekly (Sunday at 2:00 AM - Low Traffic)
+Schedule::command('opticvault:clean-garbage')->weeklyOn(0, '02:00');
