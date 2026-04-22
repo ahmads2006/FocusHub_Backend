@@ -16,7 +16,7 @@ class FormatHelper
         $pow = min($pow, count($units) - 1);
 
         $bytes /= pow(1024, $pow);
-
+        
         return round($bytes, $precision) . ' ' . $units[$pow];
     }
 

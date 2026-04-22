@@ -102,7 +102,7 @@ class AssetDeliveryService
         // Cache-busting via updated_at for fresh restoration/transition results
         return URL::temporarySignedRoute(
             'assets.original',
-            now()->addMinutes(10),
+            now()->addMinutes(5),
             ['image' => $image->id, 'v' => $image->updated_at->timestamp]
         );
     }
@@ -115,7 +115,7 @@ class AssetDeliveryService
     {
         return URL::temporarySignedRoute(
             'assets.preview',
-            now()->addMinutes(30),  // Longer TTL for gallery caching
+            now()->addMinutes(10),  // Shorter TTL for better security
             ['image' => $image->id, 'v' => $image->updated_at->timestamp]
         );
     }

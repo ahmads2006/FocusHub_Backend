@@ -21,7 +21,7 @@ class ImageKitService
     /**
      * Generate a secure, signed URL for an asset.
      */
-    public function generateSignedUrl(string $path, array $transformations = [], int $expireMinutes = 30): string
+    public function generateSignedUrl(string $path, array $transformations = [], int $expireMinutes = 10): string
     {
         return $this->imagekit->url([
             'path' => $path,
@@ -58,7 +58,7 @@ class ImageKitService
      * Apply a dynamic watermark (SecureShield) via ImageKit overlay.
      * Returns a signed URL by default for maximum security to prevent manual tampering.
      */
-    public function getWatermarkedUrl(string $path, string $text, bool $signed = true, int $expireMinutes = 30): string
+    public function getWatermarkedUrl(string $path, string $text, bool $signed = true, int $expireMinutes = 10): string
     {
         return $this->imagekit->url([
             'path' => $path,

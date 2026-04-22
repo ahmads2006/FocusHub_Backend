@@ -28,6 +28,11 @@ class InitLocalstack extends Command
      */
     public function handle()
     {
+        if (!app()->environment('local')) {
+            $this->error('This command can only be run in the local environment.');
+            return Command::FAILURE;
+        }
+
         $bucket = config('filesystems.disks.s3.bucket');
         $this->info("Initializing LocalStack S3 Bucket: {$bucket}...");
 

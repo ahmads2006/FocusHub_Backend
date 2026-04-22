@@ -91,10 +91,13 @@ class RecommendationEngine
                 // Get explicitly hidden images
                 $dislikedIds = Redis::smembers("hidden_images:{$user->id}") ?? [];
 
-                // Get images seen in the last 7 days (New Feature)
-                $seenIds = Redis::smembers("seen_images:{$user->id}") ?? [];
+                // Get images seen in the last 7 days (Using ZSET v2 for memory capping)
+                $seenIdsV2 = Redis::zrange("seen_images_v2:{$user->id}", 0, -1) ?? [];
+                
+                // Fallback: Also merge legacy v1 seen_images during the 20-day transition period
+                $legacySeenIds = Redis::smembers("seen_images:{$user->id}") ?? [];
 
-                $hiddenIds = array_unique(array_merge($dislikedIds, $seenIds));
+                $hiddenIds = array_unique(array_merge($dislikedIds, $seenIdsV2, $legacySeenIds));
             } catch (\Exception $e) {
                 \Illuminate\Support\Facades\Log::warning("Redis smembers failed for user {$user->id}: " . $e->getMessage());
             }

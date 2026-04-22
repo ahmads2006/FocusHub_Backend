@@ -47,9 +47,19 @@ class FeedController extends Controller
         $imageIds = $feed->pluck('id')->toArray();
         if (!empty($imageIds) && $user) {
             try {
-                $redisKey = "seen_images:{$user->id}";
-                Redis::sadd($redisKey, ...$imageIds);
-                Redis::expire($redisKey, 1728000); // 20 Days in seconds
+                // Changed to ZSET (v2) to support memory capping (max 1000 items)
+                $redisKey = "seen_images_v2:{$user->id}";
+                
+                Redis::pipeline(function ($pipe) use ($redisKey, $imageIds) {
+                    $time = time();
+                    foreach ($imageIds as $id) {
+                        $pipe->zadd($redisKey, $time, $id);
+                    }
+                    // Retain only the most recent 1000 items (Memory Cap)
+                    $pipe->zremrangebyrank($redisKey, 0, -1001);
+                    // Expire in 7 days (604800 seconds)
+                    $pipe->expire($redisKey, 604800);
+                });
             } catch (\Exception $e) {
                 \Illuminate\Support\Facades\Log::warning("Could not record seen images for user {$user->id}: " . $e->getMessage());
             }
