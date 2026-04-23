@@ -47,7 +47,7 @@ class FeedController extends Controller
         $imageIds = $feed->pluck('id')->toArray();
         if (!empty($imageIds) && $user) {
             try {
-                // Changed to ZSET (v2) to support memory capping (max 1000 items)
+                // Changed to ZSET (v2) to support memory capping (max 2000 items)
                 $redisKey = "seen_images_v2:{$user->id}";
                 
                 Redis::pipeline(function ($pipe) use ($redisKey, $imageIds) {
@@ -55,8 +55,8 @@ class FeedController extends Controller
                     foreach ($imageIds as $id) {
                         $pipe->zadd($redisKey, $time, $id);
                     }
-                    // Retain only the most recent 1000 items (Memory Cap)
-                    $pipe->zremrangebyrank($redisKey, 0, -1001);
+                    // Retain only the most recent 2000 items (Memory Cap)
+                    $pipe->zremrangebyrank($redisKey, 0, -2001);
                     // Expire in 7 days (604800 seconds)
                     $pipe->expire($redisKey, 604800);
                 });

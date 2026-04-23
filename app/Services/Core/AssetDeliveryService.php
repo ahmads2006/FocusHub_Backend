@@ -17,14 +17,14 @@ class AssetDeliveryService
      */
     public function getUrl(Image $image, string $context = 'gallery'): string
     {
-        // 🚀 SMART ROUTING (v4.1): Support S3 Origins.
-        // An asset is "In Cloud" if it has an imagekit_file_id (legacy) OR an imagekit_file_path (S3/Origin).
+        // 🚀 SMART ROUTING (v5.1): Maximum Privacy for Private Assets.
         $isInCloud = !empty($image->storage?->imagekit_file_id) || !empty($image->storage?->imagekit_file_path);
+        $isPublic = $image->privacy === 'public' && (!$image->album || $image->album->privacy === 'public') && !$image->isRejected();
 
-        if (app()->environment('local') || !$isInCloud || $image->privacy !== 'public' || $image->isRejected() || ($image->album && $image->album->privacy !== 'public')) {
-            if ($this->canAccessOriginal($image) || $image->privacy === 'public') {
-                // For gallery/thumbnail display → use inline preview route (renders in <img> tags)
-                // For download contexts → use original route (forces download)
+        // 🛡️ SECURITY LAYER: If image is PRIVATE or on LOCAL, always use secure server-side routes.
+        // This ensures private images never pass through ImageKit (Third-party CDN).
+        if (!$isPublic || app()->environment('local') || !$isInCloud) {
+            if ($this->canAccessOriginal($image) || $isPublic) {
                 if (in_array($context, ['gallery', 'preview', 'thumbnail', 'avatar', 'icon', 'square'])) {
                     return $this->generateSecurePreviewUrl($image);
                 }
@@ -32,14 +32,13 @@ class AssetDeliveryService
                     return $this->generateSecureOriginalUrl($image);
                 }
             }
+            return asset('images/locked.png');
         }
 
-        // Using ImageKit directly whenever it's available.
+        // 🚀 PERFORMANCE LAYER: For PUBLIC CLOUD images, use ImageKit for CDN speed & WebP.
         $imageKit = app(\App\Services\Core\ImageKitService::class);
         $path = $image->storage?->imagekit_file_path ?? $image->storage?->path;
 
-        // Path Normalization: Strip redundant folder prefix returned by some ImageKit uploads
-        // to prevent doubling it up in the final URL (ik.imagekit.io/vault/vault/...)
         if ($path) {
             $path = ltrim($path, '/');
             $folderPrefix = 'opticvault/';
@@ -51,26 +50,24 @@ class AssetDeliveryService
         switch ($context) {
             case 'avatar':
             case 'icon':
-                return $isInCloud ? $imageKit->getOptimizedUrl($path, 150, 150) : $image->getThumbnailUrl('avatar');
+                return $imageKit->getOptimizedUrl($path, 150, 150);
 
             case 'thumbnail':
             case 'square':
-                return $isInCloud ? $imageKit->getOptimizedUrl($path, 400, 400) : $image->getThumbnailUrl('square');
+                return $imageKit->getOptimizedUrl($path, 400, 400);
 
             case 'card':
-                // Optimized 4:3 aspect ratio for gallery cards
-                return $isInCloud ? $imageKit->getOptimizedUrl($path, 400, 300) : $image->getThumbnailUrl('medium');
+                return $imageKit->getOptimizedUrl($path, 400, 300);
 
             case 'list':
-                // Small version for list items/miniatures
-                return $isInCloud ? $imageKit->getOptimizedUrl($path, 200, 150) : $image->getThumbnailUrl('avatar');
+                return $imageKit->getOptimizedUrl($path, 200, 150);
 
             case 'gallery':
             case 'preview':
-                return $isInCloud ? $imageKit->getOptimizedUrl($path, 800) : $image->getThumbnailUrl('medium');
+                return $imageKit->getOptimizedUrl($path, 800);
 
             case 'placeholder':
-                return $isInCloud ? $imageKit->getOptimizedUrl($path, 20, 20) : $image->getThumbnailUrl('avatar');
+                return $imageKit->getOptimizedUrl($path, 20, 20);
 
             case 'original':
             case 'source':
@@ -78,19 +75,18 @@ class AssetDeliveryService
 
             case 'gallery_watermarked':
                 $transformations = [['width' => 800]];
-                // إذا لم يكن المستخدم هو المالك، أضف علامة مائية
                 if (!Auth::check() || Auth::id() !== $image->user_id) {
                     $transformations[] = [
-                        'overlayImage' => 'logo.png', // المسار في ImageKit
+                        'overlayImage' => 'logo.png',
                         'overlayFocus' => 'bottom_right',
-                        'overlayAlpha' => '40', // شفافية العلامة المائية
+                        'overlayAlpha' => '40',
                         'overlayWidth' => '150',
                     ];
                 }
-                return $isInCloud ? $imageKit->getEnhancedUrl($path, $transformations) : $image->getThumbnailUrl('medium');
+                return $imageKit->getEnhancedUrl($path, $transformations);
 
             default:
-                return $isInCloud ? $imageKit->getOptimizedUrl($path) : $image->getThumbnailUrl('medium');
+                return $imageKit->getOptimizedUrl($path);
         }
     }
 

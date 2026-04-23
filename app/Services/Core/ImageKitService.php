@@ -42,8 +42,10 @@ class ImageKitService
 
         if ($width || $height) {
             $resize = [];
-            if ($width) $resize['width'] = (string) $width;
-            if ($height) $resize['height'] = (string) $height;
+            if ($width)
+                $resize['width'] = (string) $width;
+            if ($height)
+                $resize['height'] = (string) $height;
             $resize['crop'] = 'at_max';
             $transformations[] = $resize;
         }
