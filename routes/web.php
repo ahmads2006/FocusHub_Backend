@@ -38,6 +38,10 @@ if (app()->environment('local', 'development')) {
     });
 }
 
+Route::get('/test-honeybadger', function () {
+    throw new Exception('My first Honeybadger error!');
+});
+
 Route::fallback(function () {
     // Exclude API routes from this fallback, let Laravel API handler deal with 404s
     if (request()->is('api/*')) {

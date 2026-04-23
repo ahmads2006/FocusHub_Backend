@@ -52,6 +52,9 @@ return Application::configure(basePath: dirname(__DIR__))
             if (app()->bound('sentry') && app()->environment('production')) {
                 app('sentry')->captureException($exception);
             }
+            if (app()->bound('honeybadger')) {
+                app('honeybadger')->notify($exception, app('request'));
+            }
         });
         Integration::handles($exceptions);
     })->create();

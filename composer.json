@@ -11,6 +11,7 @@
     "require": {
         "php": "^8.2",
         "darkaonline/l5-swagger": "^10.1",
+        "honeybadger-io/honeybadger-laravel": "^5.0",
         "imagekit/imagekit": "^4.0",
         "intervention/image": "^3.11",
         "laravel/framework": "^12.0",
