@@ -34,9 +34,8 @@ class ValidateSharedLink
             abort(404, 'Shared link is invalid or expired.');
         }
 
-        // Handle token rotation and session locking
-        if ($link->auto_rotate) {
-            $sessionId = $request->session()->getId();
+        // 🛡️ SECURITY ENFORCEMENT: Mandatory session locking and token rotation for all links.
+        $sessionId = $request->session()->getId();
 
             if (empty($link->session_id)) {
                 // First visit: lock link to this session and rotate token
@@ -69,7 +68,6 @@ class ValidateSharedLink
                     abort(403, 'هذا الرابط مخصص لجلسة أخرى غير مصرح لك بفتحه.');
                 }
             }
-        }
 
         // Use token hash as fallback ID for ephemeral links
         $authId = $link->id ?? $tokenHash;

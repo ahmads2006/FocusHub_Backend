@@ -59,6 +59,7 @@ class Album extends Model implements HasMedia
 
     protected $fillable = [
         'user_id',
+        'invitation_code',
         'title',
         'description',
         'privacy',           // Kept for mass-assignment proxying
@@ -168,6 +169,11 @@ class Album extends Model implements HasMedia
     public function sharedLinks(): MorphMany
     {
         return $this->morphMany(SharedLink::class, 'shareable');
+    }
+
+    public function invitations(): HasMany
+    {
+        return $this->hasMany(AlbumInvitation::class);
     }
 
     public function groupConversation(): HasOne

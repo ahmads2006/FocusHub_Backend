@@ -54,7 +54,7 @@ class UserController extends Controller
         ]);
         $role = $request->role;
         $user->syncRoles([$role]);
-        $user->update(['role' => self::ROLE_MAP[$role] ?? $role]);
+        $user->forceFill(['role' => self::ROLE_MAP[$role] ?? $role])->save();
         return back()->with('success', 'تم تحديث الدور.');
     }
 

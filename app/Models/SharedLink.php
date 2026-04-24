@@ -14,6 +14,7 @@ class SharedLink extends Model
         'shareable_id',
         'shareable_type',
         'token',
+        'label',
         'password',
         'session_id',
         'auto_rotate',

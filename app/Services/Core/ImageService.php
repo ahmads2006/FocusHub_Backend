@@ -53,6 +53,20 @@ class ImageService
 
             if (config('services.content_safety.enabled', true)) {
                 $moderationResult = $this->contentSafety->validate($file);
+                
+                // Privacy-Aware Status Override (v24.0)
+                $privacy = $data['privacy'] ?? 'public';
+                if ($privacy === 'public') {
+                    // Public content always needs admin review before it goes live, even if AI says safe.
+                    if ($moderationResult['status'] === Image::STATUS_APPROVED) {
+                        $moderationResult['status'] = Image::STATUS_PENDING_REVIEW;
+                    }
+                } else {
+                    // Private/Shared content is auto-approved unless AI flagged it as REJECTED.
+                    if ($moderationResult['status'] === Image::STATUS_PENDING_REVIEW) {
+                        $moderationResult['status'] = Image::STATUS_APPROVED;
+                    }
+                }
             }
 
             // 1. Local Pre-Processing: Extract Technical EXIF
@@ -424,7 +438,10 @@ class ImageService
         // التحسين 1: استخدام Streams بدلاً من file_get_contents لعدم استهلاك الـ RAM
         // التحسين 2: تحديد صلاحية الملف كـ public لكي لا يظهر خطأ AccessDenied في الـ CDN
         $stream = fopen($filePath, 'r');
-        Storage::disk('s3')->put($relativePath, $stream, 'public');
+        Storage::disk('s3')->put($relativePath, $stream, [
+            'visibility' => 'public',
+            'ServerSideEncryption' => 'AES256',
+        ]);
         if (is_resource($stream)) {
             fclose($stream);
         }

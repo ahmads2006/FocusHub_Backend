@@ -57,6 +57,7 @@ class SharedLinkController extends Controller
             'max_access'        => 'nullable|integer|min:1',
             'auto_rotate'       => 'nullable|boolean',
             'require_watermark' => 'nullable|boolean',
+            'label'             => 'nullable|string|max:100',
         ]);
 
         $modelClass = $request->shareable_type;
@@ -72,8 +73,9 @@ class SharedLinkController extends Controller
         $password   = $request->password ?: null;
         $autoRotate = $request->input('auto_rotate', false);
         $requireWatermark = $request->has('require_watermark') ? (bool) $request->input('require_watermark') : null;
+        $label      = $request->input('label');
 
-        $link = $this->service->generate($model, $expiry, $password, $maxAccess, $permission, $autoRotate, $requireWatermark);
+        $link = $this->service->generate($model, $expiry, $password, $maxAccess, $permission, $autoRotate, $requireWatermark, $label);
         $url  = $this->service->getFullUrl($link);
 
         return response()->json([

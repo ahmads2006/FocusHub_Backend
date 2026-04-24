@@ -19,21 +19,21 @@ class ImageController extends Controller
 
     public function index(Request $request)
     {
-        // Public images are visible to everyone
-        // Private images only to owners
         $query = Image::query();
 
         if ($request->has('album_id')) {
-            $query->where('album_id', $request->album_id);
-        }
-
-        if (Auth::check()) {
+            $album = \App\Models\Album::findOrFail($request->album_id);
+            
+            // Check if user has access to this album
+            $this->authorize('view', $album);
+            
+            $query->where('album_id', $album->id);
+        } else {
+            // Global feed: only public images or user's own images
             $query->where(function ($q) {
                 $q->where('privacy', 'public')
                   ->orWhere('user_id', Auth::id());
             });
-        } else {
-            $query->where('privacy', 'public');
         }
 
         return response()->json($query->latest()->paginate(20));
@@ -51,6 +51,12 @@ class ImageController extends Controller
         ]);
 
         $user = Auth::user();
+        
+        if ($request->album_id) {
+            $album = \App\Models\Album::findOrFail($request->album_id);
+            $this->authorize('uploadPhoto', $album);
+        }
+
         $file = $request->file('image');
 
         // ── Storage Quota Check (5GB Drive System) ──
@@ -75,18 +81,13 @@ class ImageController extends Controller
 
     public function show(Image $image)
     {
-        if ($image->privacy !== 'public' && Auth::id() !== $image->user_id) {
-            abort(403, 'Unauthorized.');
-        }
-
+        $this->authorize('view', $image);
         return response()->json($image);
     }
 
     public function update(Request $request, Image $image)
     {
-        if (Auth::id() !== $image->user_id) {
-            abort(403, 'Unauthorized.');
-        }
+        $this->authorize('update', $image);
         
         $validated = $request->validate([
             'title' => 'nullable|string|max:255',
@@ -98,29 +99,29 @@ class ImageController extends Controller
 
         $image->update($validated);
 
-        return response()->json(['message' => 'Image updated successfully.', 'data' => $image]);
+        return response()->json([
+            'message' => 'Image updated successfully.',
+            'data' => $image
+        ]);
     }
 
     public function destroy(Image $image)
     {
-        if (Auth::id() !== $image->user_id) {
-            abort(403, 'Unauthorized.');
-        }
+        $this->authorize('delete', $image);
         
         $this->imageService->delete($image);
 
-        return response()->json(['message' => 'Image deleted successfully.']);
+        return response()->json([
+            'message' => 'Image deleted successfully.'
+        ]);
     }
 
     /**
      * Re-trigger AI analysis (Safety + Tagging) for a specific image.
-     * Only the image owner can request a retry.
      */
     public function retryScan(Image $image)
     {
-        if (Auth::id() !== $image->user_id) {
-            abort(403, 'Unauthorized.');
-        }
+        $this->authorize('update', $image);
 
         // Dispatch the AI analysis job to the queue
         \App\Jobs\AnalyzeImageLabelsJob::dispatch($image);

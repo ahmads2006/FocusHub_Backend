@@ -19,6 +19,7 @@ class ModerationController extends Controller
     public function index(): JsonResponse
     {
         $pendingImages = Image::withoutGlobalScopes()
+            ->where('privacy', 'public')
             ->whereHas('moderation', function ($query) {
                 $query->whereIn('status', [Image::STATUS_PENDING_REVIEW, Image::STATUS_UNDER_REVIEW]);
             })

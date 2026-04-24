@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\Album;
+use App\Models\AlbumInvitation;
 use App\Models\Message;
 use App\Models\User;
 use App\Notifications\AlbumInvitationNotification;
+use App\Notifications\AlbumJoinRequestNotification;
 use App\Services\Core\ImageService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -297,6 +299,208 @@ class AlbumController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'تم رفض الدعوة.',
+        ]);
+    }
+
+    /**
+     * Get all active invitations for the album.
+     */
+    public function getInvitations(Album $album): JsonResponse
+    {
+        $this->authorize('update', $album);
+
+        $invitations = $album->invitations()->latest()->get();
+
+        return response()->json([
+            'success' => true,
+            'data'    => $invitations->map(function ($inv) {
+                return [
+                    'id'   => $inv->id,
+                    'code' => $inv->code,
+                    'role' => $inv->role,
+                    'uses' => $inv->uses,
+                    'url'  => url("/join/{$inv->code}"),
+                ];
+            }),
+        ]);
+    }
+
+    /**
+     * Generate a new invitation link for a specific role.
+     */
+    public function generateInvitation(Request $request, Album $album): JsonResponse
+    {
+        $this->authorize('update', $album);
+
+        $request->validate([
+            'role' => 'required|in:admin,contributor,viewer',
+        ]);
+
+        $role = $request->role;
+
+        // Generate a unique branded code with role suffix (e.g. opalshot_3Aj89o2f_viewer)
+        do {
+            $randomPart = \Illuminate\Support\Str::random(8);
+            $code = "opalshot_{$randomPart}_{$role}";
+        } while (AlbumInvitation::where('code', $code)->exists());
+
+        $invitation = $album->invitations()->create([
+            'code'       => $code,
+            'role'       => $role,
+            'max_uses'   => 1,
+            'expires_at' => now()->addHour(), // ⏳ Expires in 1 hour for auto-rotation
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => "تم إنشاء رابط دعوة جديد برتبة ({$role}).",
+            'data'    => [
+                'code' => $invitation->code,
+                'role' => $invitation->role,
+                'url'  => url("/join/{$invitation->code}"),
+            ],
+        ]);
+    }
+
+    /**
+     * Delete an invitation link.
+     */
+    public function deleteInvitation(AlbumInvitation $invitation): JsonResponse
+    {
+        $this->authorize('update', $invitation->album);
+
+        $invitation->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'تم حذف رابط الدعوة بنجاح.',
+        ]);
+    }
+
+    /**
+     * Join an album using an invitation code.
+     */
+    public function joinByCode(Request $request): JsonResponse
+    {
+        $request->validate([
+            'code' => 'required|string|max:64',
+            'note' => 'nullable|string|max:500', // 📝 Optional intro note
+        ]);
+
+        $invitation = AlbumInvitation::where('code', $request->code)->first();
+
+        if (!$invitation || !$invitation->isValid()) {
+            return response()->json(['success' => false, 'message' => 'رابط الدعوة غير صحيح أو منتهي الصلاحية.'], 404);
+        }
+
+        $album = $invitation->album;
+        $user = Auth::user();
+
+        if ($album->user_id === $user->id) {
+            return response()->json(['success' => false, 'message' => 'أنت مالك هذا الألبوم بالفعل.'], 400);
+        }
+
+        if ($album->collaborators->contains($user->id)) {
+            return response()->json(['success' => false, 'message' => 'أنت عضو في هذا الألبوم بالفعل.'], 409);
+        }
+
+        // Add user with the role defined in the invitation, but as PENDING
+        $album->collaborators()->attach($user->id, [
+            'role'      => $invitation->role,
+            'status'    => 'pending', // ⏳ Requires approval
+            'join_note' => $request->note, // 📝 Save the intro note
+        ]);
+
+        // Increment usage count
+        $invitation->increment('uses');
+
+        // 🔔 Trigger Notification for Owner and Admins
+        $notifiableUsers = collect([$album->owner])->concat(
+            $album->collaborators()
+                ->wherePivot('role', 'admin')
+                ->wherePivot('status', 'accepted')
+                ->get()
+        )->unique('id');
+
+        foreach ($notifiableUsers as $notifiable) {
+            $notifiable->notify(new AlbumJoinRequestNotification($album, $user, $invitation->role));
+        }
+
+        // 🔄 AUTO-ROTATE: If it was a single-use link, generate a new replacement link automatically
+        if ($invitation->max_uses === 1) {
+            do {
+                $newRandomPart = \Illuminate\Support\Str::random(8);
+                $newCode = "opalshot_{$newRandomPart}_{$invitation->role}";
+            } while (AlbumInvitation::where('code', $newCode)->exists());
+
+            $album->invitations()->create([
+                'code'       => $newCode,
+                'role'       => $invitation->role,
+                'max_uses'   => 1,
+                'expires_at' => now()->addHour(),
+            ]);
+
+            // Delete the used link to keep DB clean
+            $invitation->delete();
+        }
+
+        // Sync group conversation if applicable
+        $this->syncGroupConversation($album);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'لقد تم إرسال طلب الانضمام بنجاح، بانتظار موافقة صاحب الألبوم.',
+            'data'    => $album->load('owner'),
+        ]);
+    }
+
+    /**
+     * Approve a pending collaborator join request.
+     */
+    public function approveCollaborator(Request $request, Album $album, User $user): JsonResponse
+    {
+        $currentUser = Auth::user();
+        $isOwner = $album->user_id === $currentUser->id;
+
+        // Get the pending collaborator data
+        $collaborator = $album->collaborators()->where('user_id', $user->id)->first();
+
+        if (!$collaborator || $collaborator->pivot->status !== 'pending') {
+            return response()->json(['success' => false, 'message' => 'لا يوجد طلب انضمام معلق لهذا المستخدم.'], 404);
+        }
+
+        $pendingRole = $collaborator->pivot->role;
+
+        // Security Rules:
+        // 1. If role is 'admin', only Owner can approve.
+        if ($pendingRole === 'admin') {
+            if (!$isOwner) {
+                return response()->json(['success' => false, 'message' => 'عذراً، صاحب الألبوم فقط هو من يمكنه قبول طلبات المدراء الجدد.'], 403);
+            }
+        } else {
+            // 2. Otherwise, Owner OR any existing Admin can approve.
+            $isAdmin = $album->collaborators()
+                ->where('user_id', $currentUser->id)
+                ->wherePivot('role', 'admin')
+                ->wherePivot('status', 'accepted')
+                ->exists();
+
+            if (!$isOwner && !$isAdmin) {
+                return response()->json(['success' => false, 'message' => 'ليس لديك صلاحية لقبول طلبات الانضمام.'], 403);
+            }
+        }
+
+        // Approve
+        $album->collaborators()->updateExistingPivot($user->id, [
+            'status' => 'accepted',
+        ]);
+
+        // Sync group conversation
+        $this->syncGroupConversation($album);
+
+        return response()->json([
+            'success' => true,
+            'message' => "تم قبول انضمام {$user->name} بنجاح كـ ({$pendingRole}).",
         ]);
     }
 

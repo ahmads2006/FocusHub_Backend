@@ -17,7 +17,26 @@ class ImagePolicy
             return true;
         }
 
-        return $user && $user->id === $image->user_id;
+        if (!$user) {
+            return false;
+        }
+
+        // Owner can always view
+        if ($user->id === $image->user_id) {
+            return true;
+        }
+
+        // Album owner can view
+        if ($image->album && $user->id === $image->album->user_id) {
+            return true;
+        }
+
+        // Collaborators can view
+        if ($image->album && $image->album->collaborators()->where('user_id', $user->id)->exists()) {
+            return true;
+        }
+
+        return false;
     }
 
     public function download(?User $user, Image $image): \Illuminate\Auth\Access\Response

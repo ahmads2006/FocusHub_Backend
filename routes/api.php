@@ -176,9 +176,15 @@ Route::prefix('v1')->group(function () {
             // Collaborators
             Route::post('/{album}/collaborators', [App\Http\Controllers\Api\V1\AlbumController::class, 'addCollaborator']);
             Route::put('/{album}/collaborators/{user}', [App\Http\Controllers\Api\V1\AlbumController::class, 'updateCollaboratorRole']);
+            Route::post('/{album}/collaborators/{user}/approve', [App\Http\Controllers\Api\V1\AlbumController::class, 'approveCollaborator']);
             Route::delete('/{album}/collaborators/{user}', [App\Http\Controllers\Api\V1\AlbumController::class, 'removeCollaborator']);
 
-            // Invitations
+            // Invitations (Multi-Role Support)
+            Route::get('/{album}/invitations', [App\Http\Controllers\Api\V1\AlbumController::class, 'getInvitations']);
+            Route::post('/{album}/invitations', [App\Http\Controllers\Api\V1\AlbumController::class, 'generateInvitation']);
+            Route::delete('/invitations/{invitation}', [App\Http\Controllers\Api\V1\AlbumController::class, 'deleteInvitation']);
+            Route::post('/join', [App\Http\Controllers\Api\V1\AlbumController::class, 'joinByCode']);
+            
             Route::post('/{album}/invitation/accept', [App\Http\Controllers\Api\V1\AlbumController::class, 'acceptInvitation']);
             Route::post('/{album}/invitation/decline', [App\Http\Controllers\Api\V1\AlbumController::class, 'declineInvitation']);
 

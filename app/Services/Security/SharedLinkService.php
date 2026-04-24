@@ -13,7 +13,7 @@ class SharedLinkService
     /**
      * Generate a secure shared link for a model (Album or Photo/Image).
      */
-    public function generate(Model $model, ?Carbon $expiry = null, ?string $password = null, ?int $maxAccess = null, string $permission = 'view', bool $autoRotate = false, ?bool $requireWatermark = null): SharedLink
+    public function generate(Model $model, ?Carbon $expiry = null, ?string $password = null, ?int $maxAccess = null, string $permission = 'view', bool $autoRotate = true, ?bool $requireWatermark = null, ?string $label = null): SharedLink
     {
         $token = Str::random(64);
         $tokenHash = hash('sha256', $token);
@@ -22,6 +22,7 @@ class SharedLinkService
             'shareable_id' => $model->id,
             'shareable_type' => get_class($model),
             'token' => $token,
+            'label' => $label,
             'password' => $password ? Hash::make($password) : null,
             'permission' => $permission,
             'expires_at' => $expiry,

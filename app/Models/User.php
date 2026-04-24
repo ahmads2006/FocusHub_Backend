@@ -97,19 +97,16 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
     protected $fillable = [
         'email',
         'password',
-        'role',
         // Still in fillable to allow creating users with these fields (handled by accessors/mutators or boots)
         'name',
         'username',
         'bio',
         'profile_picture',
-        'verification_code',
         'dynamic_watermark',
         'watermark_text_color',
         'watermark_neon_color',
         'watermark_opacity',
         'auto_orient_default',
-        'is_verified',
         'stay_logged_in',
         'google_id',
         'adobe_id',
@@ -123,8 +120,6 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
         'watermark_text',
         'watermark_logo',
         'watermark_mode',
-        'storage_limit_bytes',
-        'storage_used_bytes',
         'notification_preferences',
     ];  
     

@@ -129,7 +129,7 @@ class AdminController extends Controller
         $role = $request->role;
         $user->syncRoles([$role]);
         $roleMap = ['super-admin' => 'super_admin', 'user' => 'user', 'photographer' => 'photographer', 'editor' => 'editor'];
-        $user->update(['role' => $roleMap[$role] ?? $role]);
+        $user->forceFill(['role' => $roleMap[$role] ?? $role])->save();
 
         return response()->json([
             'message' => __('User role has been updated.'),

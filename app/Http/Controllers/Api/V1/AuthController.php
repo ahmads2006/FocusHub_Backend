@@ -173,10 +173,10 @@ class AuthController extends Controller
             ], 422);
         }
 
-        $user->update([
+        $user->forceFill([
             'is_verified' => true,
             'verification_code' => null,
-        ]);
+        ])->save();
 
         $response = [
             'success' => true,
