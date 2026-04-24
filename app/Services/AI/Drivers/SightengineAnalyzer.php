@@ -111,8 +111,12 @@ class SightengineAnalyzer implements MediaAnalyzerInterface
             }
 
             $tags = [];
-            if (isset($data['text']['profanity'])) {
-                foreach ($data['text']['profanity'] as $p) $tags[] = $p['text'];
+            if (isset($data['text']['profanity']) && is_array($data['text']['profanity'])) {
+                foreach ($data['text']['profanity'] as $p) {
+                    if (isset($p['text'])) {
+                        $tags[] = (string)$p['text'];
+                    }
+                }
             }
 
             // Extract scene-related tags from properties
@@ -231,8 +235,12 @@ class SightengineAnalyzer implements MediaAnalyzerInterface
             }
 
             $tags = [];
-            if (isset($data['text']['profanity'])) {
-                foreach ($data['text']['profanity'] as $p) $tags[] = $p['text'];
+            if (isset($data['text']['profanity']) && is_array($data['text']['profanity'])) {
+                foreach ($data['text']['profanity'] as $p) {
+                    if (isset($p['text'])) {
+                        $tags[] = (string)$p['text'];
+                    }
+                }
             }
           
 

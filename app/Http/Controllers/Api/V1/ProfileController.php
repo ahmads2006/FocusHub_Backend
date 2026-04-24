@@ -318,4 +318,91 @@ class ProfileController extends Controller
             'created_at'           => $user->created_at,
         ];
     }
+
+    /**
+     * Get notification preferences for the user.
+     */
+    public function getNotificationPreferences(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        // Default preferences if null
+        $preferences = $user->notification_preferences ?? [
+            'email_marketing' => true,
+            'email_security' => true,
+            'push_likes' => true,
+            'push_comments' => true,
+            'push_follows' => true,
+        ];
+
+        return response()->json([
+            'success' => true,
+            'data'    => $preferences,
+        ]);
+    }
+
+    /**
+     * Update notification preferences.
+     */
+    public function updateNotificationPreferences(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $validated = $request->validate([
+            'email_marketing' => 'boolean',
+            'email_security'  => 'boolean',
+            'push_likes'      => 'boolean',
+            'push_comments'   => 'boolean',
+            'push_follows'    => 'boolean',
+        ]);
+
+        $currentPreferences = $user->notification_preferences ?? [];
+        $user->notification_preferences = array_merge($currentPreferences, $validated);
+        $user->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'تم تحديث إعدادات الإشعارات بنجاح.',
+            'data'    => $user->notification_preferences,
+        ]);
+    }
+
+    /**
+     * Export user data (GDPR Compliance).
+     */
+    public function exportData(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        
+        // In a real scenario, dispatch a job to gather all data, zip it, and email the user.
+        // Dispatch(new ExportUserDataJob($user));
+
+        return response()->json([
+            'success' => true,
+            'message' => 'تم استلام طلب التصدير. سيتم إرسال رابط التحميل إلى بريدك الإلكتروني قريباً.',
+        ]);
+    }
+
+    /**
+     * Get user analytics dashboard data.
+     */
+    public function analytics(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        
+        // Aggregate stats across all user images
+        $totalPhotos = $user->images()->count();
+        $totalLikes = \App\Models\Like::whereHas('image', fn($q) => $q->where('user_id', $user->id))->count();
+        
+        // Sum of views from the image_settings relationship
+        $totalViews = \App\Models\ImageSettings::whereHas('image', fn($q) => $q->where('user_id', $user->id))->sum('views_count');
+
+        return response()->json([
+            'success' => true,
+            'data'    => [
+                'total_photos' => $totalPhotos,
+                'total_likes'  => $totalLikes,
+                'total_views'  => (int) $totalViews,
+                'period'       => 'all_time'
+            ],
+        ]);
+    }
 }

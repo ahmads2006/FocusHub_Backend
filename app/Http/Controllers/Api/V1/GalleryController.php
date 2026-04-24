@@ -9,6 +9,8 @@ use App\Services\Core\AssetDeliveryService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
 class GalleryController extends Controller
 {
@@ -109,6 +111,69 @@ class GalleryController extends Controller
                     'search' => $searchQuery,
                 ],
             ],
+        ]);
+    }
+
+    /**
+     * Get top popular tags from Redis Cache (refreshed every 6 hours)
+     */
+    public function popularTags(): JsonResponse
+    {
+        // Cache the result in Redis for 6 hours (21600 seconds)
+        $popularTags = Cache::store('redis')->remember('gallery:popular_tags', 21600, function () {
+            // Query Spatie tags table joined with taggables to count occurrences
+            return DB::table('tags')
+                ->join('taggables', 'tags.id', '=', 'taggables.tag_id')
+                ->select('tags.name', DB::raw('COUNT(taggables.tag_id) as usage_count'))
+                ->groupBy('tags.id', 'tags.name')
+                ->orderBy('usage_count', 'desc')
+                ->limit(20)
+                ->get()
+                ->map(function ($tag) {
+                    // Handle Spatie's JSON translatable names (fallback to extracting string if needed)
+                    $decodedName = json_decode($tag->name, true);
+                    $finalName = is_array($decodedName) ? ($decodedName['en'] ?? current($decodedName)) : $tag->name;
+                    
+                    return [
+                        'name' => $finalName,
+                        'count' => $tag->usage_count
+                    ];
+                });
+        });
+
+        return response()->json([
+            'success' => true,
+            'data'    => $popularTags
+        ]);
+    }
+
+    /**
+     * Autocomplete tags based on user input query.
+     */
+    public function autocompleteTags(Request $request): JsonResponse
+    {
+        $query = trim($request->query('q', ''));
+        
+        if (empty($query) || strlen($query) < 2) {
+            return response()->json(['success' => true, 'data' => []]);
+        }
+
+        // Search inside Spatie tags
+        $tags = DB::table('tags')
+            ->whereRaw('LOWER(name) LIKE ?', ['%' . strtolower($query) . '%'])
+            ->limit(10)
+            ->get()
+            ->map(function ($tag) {
+                $decodedName = json_decode($tag->name, true);
+                $finalName = is_array($decodedName) ? ($decodedName['en'] ?? current($decodedName)) : $tag->name;
+                return ['name' => $finalName];
+            })
+            ->unique('name')
+            ->values();
+
+        return response()->json([
+            'success' => true,
+            'data'    => $tags
         ]);
     }
 }

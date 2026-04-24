@@ -125,6 +125,7 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
         'watermark_mode',
         'storage_limit_bytes',
         'storage_used_bytes',
+        'notification_preferences',
     ];  
     
     protected $with = ['userStatus', 'profile' ];
@@ -146,6 +147,7 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
             'role' => 'string',
             'storage_limit_bytes' => 'integer',
             'storage_used_bytes' => 'integer',
+            'notification_preferences' => 'array',
         ];
     }
 

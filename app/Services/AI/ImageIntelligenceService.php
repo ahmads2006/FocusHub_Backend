@@ -167,12 +167,15 @@ class ImageIntelligenceService
      */
     protected function updateImageTags(Image $image, array $tags): void
     {
+        // Filter out nulls, empty strings, and ensure all are strings
+        $tags = array_filter($tags, fn($tag) => !empty($tag) && is_string($tag));
+        
         if (empty($tags)) {
             return;
         }
 
         // Spatie Tags allows syncing tags by providing an array of strings
-        $image->syncTags($tags);
+        $image->syncTags(array_values($tags));
     }
 
     /**

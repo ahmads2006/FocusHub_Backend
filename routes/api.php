@@ -63,6 +63,10 @@ Route::prefix('auth/{provider}')->group(function () {
     Route::get('/callback', [\App\Http\Controllers\Api\Auth\SocialAuthController::class, 'handleProviderCallback']);
 });
 
+// Meta/Facebook Data Deletion Callback
+Route::post('/auth/facebook/deletion', [\App\Http\Controllers\Api\Auth\FacebookDeletionController::class, 'handle'])
+    ->name('api.auth.facebook.deletion');
+
 
 // ╔══════════════════════════════════════════════════════════════════╗
 // ║                   API V1 — Full REST API                        ║
@@ -112,6 +116,12 @@ Route::prefix('v1')->group(function () {
             Route::post('/avatar', [App\Http\Controllers\Api\V1\ProfileController::class, 'updateAvatar']);
             Route::delete('/', [App\Http\Controllers\Api\V1\ProfileController::class, 'destroy']);
             Route::get('/drive-stats', [App\Http\Controllers\Api\V1\ProfileController::class, 'driveStats']);
+            
+            // New Endpoints
+            Route::get('/notification-preferences', [App\Http\Controllers\Api\V1\ProfileController::class, 'getNotificationPreferences']);
+            Route::put('/notification-preferences', [App\Http\Controllers\Api\V1\ProfileController::class, 'updateNotificationPreferences']);
+            Route::post('/export', [App\Http\Controllers\Api\V1\ProfileController::class, 'exportData']);
+            Route::get('/analytics', [App\Http\Controllers\Api\V1\ProfileController::class, 'analytics']);
         });
 
         // ─── 🖼️ Images (Enhanced CRUD) ──────────
@@ -144,6 +154,9 @@ Route::prefix('v1')->group(function () {
             // Reporting
             Route::post('/{image}/report', [App\Http\Controllers\Api\V1\ReportController::class, 'store']);
 
+            // AI Retry Scan
+            Route::post('/{image}/retry-scan', [App\Http\Controllers\Api\ImageController::class, 'retryScan']);
+
             // Appeals
             Route::post('/{image}/appeal', [App\Http\Controllers\Api\V1\AppealController::class, 'store']);
 
@@ -174,6 +187,8 @@ Route::prefix('v1')->group(function () {
         });
 
         // ─── 🎨 Gallery ─────────────────────────
+        Route::get('/gallery/tags/popular', [App\Http\Controllers\Api\V1\GalleryController::class, 'popularTags']);
+        Route::get('/gallery/tags/autocomplete', [App\Http\Controllers\Api\V1\GalleryController::class, 'autocompleteTags']);
         Route::get('/gallery', [App\Http\Controllers\Api\V1\GalleryController::class, 'index']);
 
         // ─── 🛠️ Utilities & Helpers ─────────────────

@@ -111,4 +111,23 @@ class ImageController extends Controller
 
         return response()->json(['message' => 'Image deleted successfully.']);
     }
+
+    /**
+     * Re-trigger AI analysis (Safety + Tagging) for a specific image.
+     * Only the image owner can request a retry.
+     */
+    public function retryScan(Image $image)
+    {
+        if (Auth::id() !== $image->user_id) {
+            abort(403, 'Unauthorized.');
+        }
+
+        // Dispatch the AI analysis job to the queue
+        \App\Jobs\AnalyzeImageLabelsJob::dispatch($image);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'تم إرسال طلب إعادة التحليل بنجاح. سيتم تحديث التاجات قريباً.',
+        ]);
+    }
 }
