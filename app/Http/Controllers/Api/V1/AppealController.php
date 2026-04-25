@@ -35,14 +35,14 @@ class AppealController extends Controller
         if ($image->user_id !== Auth::id()) {
             return response()->json([
                 'success' => false,
-                'message' => 'غير مصرح لك بتقديم طلب مراجعة لهذه الصورة.',
+                'message' => __('messages.unauthorized_appeal'),
             ], 403);
         }
 
         if ($image->status !== 'rejected') {
             return response()->json([
                 'success' => false,
-                'message' => 'هذه الصورة ليست محظورة لطلب مراجعتها.',
+                'message' => __('messages.image_not_banned'),
             ], 400);
         }
 
@@ -50,7 +50,7 @@ class AppealController extends Controller
         if ($image->appeals()->where('status', 'pending')->exists()) {
             return response()->json([
                 'success' => false,
-                'message' => 'يوجد طلب مراجعة قيد الانتظار حالياً لهذه الصورة.',
+                'message' => __('messages.appeal_pending'),
             ], 409);
         }
 
@@ -58,7 +58,7 @@ class AppealController extends Controller
         if ($image->appeals()->where('status', 'rejected')->exists()) {
             return response()->json([
                 'success' => false,
-                'message' => 'تم رفض طلب المراجعة مسبقاً. قرار الإدارة نهائي.',
+                'message' => __('messages.appeal_already_rejected'),
             ], 403);
         }
 
@@ -80,7 +80,7 @@ class AppealController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'تم إرسال طلب المراجعة بنجاح.',
+            'message' => __('messages.appeal_sent'),
             'data'    => $appeal,
         ], 201);
     }
@@ -124,7 +124,7 @@ class AppealController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'تم قبول الاستئناف واستعادة الصورة.',
+            'message' => __('messages.appeal_accepted'),
         ]);
     }
 
@@ -137,7 +137,7 @@ class AppealController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'تم رفض الاستئناف. القرار نهائي.',
+            'message' => __('messages.appeal_rejected'),
         ]);
     }
 }

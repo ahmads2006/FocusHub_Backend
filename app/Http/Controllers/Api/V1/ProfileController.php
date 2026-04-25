@@ -59,7 +59,7 @@ class ProfileController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'تم تحديث الملف الشخصي بنجاح.',
+            'message' => __('messages.profile_updated'),
             'data'    => $this->formatProfile($user->fresh(['profile', 'roles'])),
         ]);
     }
@@ -75,7 +75,7 @@ class ProfileController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'تم تحديث إعدادات الأمان.',
+            'message' => __('messages.security_updated'),
         ]);
     }
 
@@ -121,7 +121,7 @@ class ProfileController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'تم تحديث إعدادات التصوير.',
+            'message' => __('messages.shooting_updated'),
             'data'    => $this->formatProfile($user->fresh(['profile', 'roles'])),
         ]);
     }
@@ -147,7 +147,7 @@ class ProfileController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'تم تحديث صورة البروفايل.',
+            'message' => __('messages.profile_picture_updated'),
             'data'    => ['avatar' => $user->avatar],
         ]);
     }
@@ -169,7 +169,7 @@ class ProfileController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'تم حذف حسابك نهائياً.',
+            'message' => __('messages.account_deleted'),
         ]);
     }
 
@@ -368,7 +368,7 @@ class ProfileController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'تم تحديث إعدادات الإشعارات بنجاح.',
+            'message' => __('messages.notifications_updated'),
             'data'    => $user->notification_preferences,
         ]);
     }
@@ -385,7 +385,7 @@ class ProfileController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'تم استلام طلب التصدير. سيتم إرسال رابط التحميل إلى بريدك الإلكتروني قريباً.',
+            'message' => __('messages.export_requested'),
         ]);
     }
 

@@ -193,7 +193,7 @@ class FeedController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'لن تظهر لك صور مشابهة كثيراً',
+            'message' => __('messages.less_similar_images'),
         ]);
     }
 }

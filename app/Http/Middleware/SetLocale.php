@@ -23,8 +23,19 @@ class SetLocale
             }
         }
 
-        // 2. Set the application locale from session
-        $locale = Session::get('vault_locale', config('app.locale'));
+        // 2. Determine the locale
+        $locale = config('app.locale');
+        
+        if ($request->hasHeader('Accept-Language')) {
+            $headerLang = substr($request->header('Accept-Language'), 0, 2);
+            if (in_array($headerLang, ['en', 'ar'])) {
+                $locale = $headerLang;
+            }
+        } elseif (Session::has('vault_locale')) {
+            $locale = Session::get('vault_locale');
+        }
+
+        // 3. Set the application locale
         App::setLocale($locale);
 
         return $next($request);

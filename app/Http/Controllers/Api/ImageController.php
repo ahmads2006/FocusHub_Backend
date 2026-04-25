@@ -62,7 +62,7 @@ class ImageController extends Controller
         // ── Storage Quota Check (5GB Drive System) ──
         if (!$user->hasEnoughStorage($file->getSize())) {
             return response()->json([
-                'message' => 'لقد تجاوزت الحد الأقصى للمساحة المسموحة (5 جيجابايت). يُرجى تفريغ بعض المساحة لتتمكن من الرفع.'
+                'message' => __('messages.storage_limit_exceeded')
             ], 403);
         }
 
@@ -128,7 +128,7 @@ class ImageController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'تم إرسال طلب إعادة التحليل بنجاح. سيتم تحديث التاجات قريباً.',
+            'message' => __('messages.reanalyze_sent'),
         ]);
     }
 }

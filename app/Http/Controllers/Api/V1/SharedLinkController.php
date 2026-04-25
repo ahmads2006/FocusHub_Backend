@@ -30,7 +30,7 @@ class SharedLinkController extends Controller
     public function generateShareOnceLink(Image $image): JsonResponse
     {
         if (Auth::id() !== $image->user_id) {
-            return response()->json(['success' => false, 'message' => 'غير مصرح لك بمشاركة هذه الصورة.'], 403);
+            return response()->json(['success' => false, 'message' => __('messages.cannot_share_image')], 403);
         }
 
         $link = $this->service->generate($image, null, null, 1);
@@ -38,7 +38,7 @@ class SharedLinkController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'تم إنشاء رابط التدمير الذاتي بنجاح!',
+            'message' => __('messages.self_destruct_link_created'),
             'data'    => ['url' => $url],
         ]);
     }
@@ -64,7 +64,7 @@ class SharedLinkController extends Controller
         $model      = $modelClass::findOrFail($request->shareable_id);
 
         if (Auth::id() !== $model->user_id) {
-            return response()->json(['success' => false, 'message' => 'غير مصرح لك بمشاركة هذا العنصر.'], 403);
+            return response()->json(['success' => false, 'message' => __('messages.cannot_share_item')], 403);
         }
 
         $expiry     = $request->expires_in ? now()->addHours((int) $request->expires_in) : null;
@@ -80,7 +80,7 @@ class SharedLinkController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'تم إنشاء رابط المشاركة بنجاح!',
+            'message' => __('messages.share_link_created'),
             'data'    => [
                 'url'        => $url,
                 'expires_at' => $expiry,
@@ -97,7 +97,7 @@ class SharedLinkController extends Controller
         $link = $request->attributes->get('shared_link');
 
         if (!$link) {
-            return response()->json(['success' => false, 'message' => 'الرابط غير صالح أو منتهي الصلاحية.'], 404);
+            return response()->json(['success' => false, 'message' => __('messages.invalid_link')], 404);
         }
 
         // Check if password is required
@@ -105,7 +105,7 @@ class SharedLinkController extends Controller
             return response()->json([
                 'success'           => false,
                 'requires_password' => true,
-                'message'           => 'هذا الرابط محمي بكلمة مرور.',
+                'message'           => __('messages.link_password_protected'),
             ], 401);
         }
 
@@ -145,7 +145,7 @@ class SharedLinkController extends Controller
             ]);
         }
 
-        return response()->json(['success' => false, 'message' => 'نوع المحتوى غير مدعوم.'], 404);
+        return response()->json(['success' => false, 'message' => __('messages.unsupported_content')], 404);
     }
 
     /**
@@ -157,7 +157,7 @@ class SharedLinkController extends Controller
         $authId = $request->attributes->get('shared_link_auth_id');
 
         if (!$link) {
-            return response()->json(['success' => false, 'message' => 'الرابط غير صالح.'], 404);
+            return response()->json(['success' => false, 'message' => __('messages.invalid_link_short')], 404);
         }
 
         $request->validate(['password' => 'required|string']);
@@ -165,12 +165,12 @@ class SharedLinkController extends Controller
         if (Hash::check($request->password, $link->password)) {
             return response()->json([
                 'success'    => true,
-                'message'    => 'تم التحقق بنجاح.',
+                'message'    => __('messages.verified_successfully'),
                 'auth_token' => encrypt("link_auth_{$authId}"),
             ]);
         }
 
-        return response()->json(['success' => false, 'message' => 'كلمة المرور غير صحيحة.'], 401);
+        return response()->json(['success' => false, 'message' => __('messages.incorrect_password')], 401);
     }
 
     /**
@@ -182,16 +182,16 @@ class SharedLinkController extends Controller
         $shareable = $link->shareable;
 
         if (!$shareable instanceof Album) {
-            return response()->json(['success' => false, 'message' => 'الرابط لا يشير إلى ألبوم.'], 404);
+            return response()->json(['success' => false, 'message' => __('messages.link_not_album')], 404);
         }
 
         if ($link->permission !== 'download') {
-            return response()->json(['success' => false, 'message' => 'غير مصرح بتنزيل هذا الألبوم.'], 403);
+            return response()->json(['success' => false, 'message' => __('messages.unauthorized_download')], 403);
         }
 
         $items = $shareable->photos ?? $shareable->images ?? collect();
         if ($items->isEmpty()) {
-            return response()->json(['success' => false, 'message' => 'الألبوم فارغ.'], 404);
+            return response()->json(['success' => false, 'message' => __('messages.album_empty')], 404);
         }
 
         $zipFileName = 'Album_' . Str::slug($shareable->title) . '_' . time() . '.zip';
@@ -237,6 +237,6 @@ class SharedLinkController extends Controller
             }
         }
 
-        return response()->json(['success' => false, 'message' => 'فشل في إنشاء ملف ZIP.'], 500);
+        return response()->json(['success' => false, 'message' => __('messages.zip_failed')], 500);
     }
 }

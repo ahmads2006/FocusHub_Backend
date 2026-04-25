@@ -68,7 +68,7 @@ class GroupChatController extends Controller
         $userId = Auth::id();
 
         if (!$conversation->hasParticipant($userId)) {
-            return response()->json(['success' => false, 'message' => 'غير مصرح.'], 403);
+            return response()->json(['success' => false, 'message' => __('chat.unauthorized')], 403);
         }
 
         // Mark as read
@@ -117,7 +117,7 @@ class GroupChatController extends Controller
     {
         $request->validate([
             'name'           => 'required|string|max:255',
-            'participant_ids' => 'required|array|min:2',
+            'participant_ids' => 'required|array|min:2|max:50',
             'participant_ids.*' => 'uuid|exists:users,id',
         ]);
 
@@ -129,8 +129,18 @@ class GroupChatController extends Controller
         if ($participantIds->count() < 2) {
             return response()->json([
                 'success' => false,
-                'message' => 'المجموعة تحتاج إلى 3 أشخاص على الأقل (أنت + 2 آخرين).',
+                'message' => __('chat.group_min_members'),
             ], 422);
+        }
+
+        // 🛡️ SECURITY: Verify all added participants are accepted connections
+        foreach ($participantIds as $pid) {
+            if (!$this->isAcceptedConnection($userId, $pid)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => __('chat.only_add_connections'),
+                ], 403);
+            }
         }
 
         $conversation = DB::transaction(function () use ($userId, $participantIds, $request) {
@@ -169,7 +179,7 @@ class GroupChatController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'تم إنشاء المجموعة بنجاح.',
+            'message' => __('chat.group_created'),
             'data'    => [
                 'id'   => $conversation->id,
                 'name' => $conversation->name,
@@ -188,19 +198,19 @@ class GroupChatController extends Controller
         ]);
 
         if (!$request->body && !$request->image_id) {
-            return response()->json(['success' => false, 'message' => 'الرسالة لا يمكن أن تكون فارغة.'], 422);
+            return response()->json(['success' => false, 'message' => __('chat.message_empty')], 422);
         }
 
         $userId = Auth::id();
 
         if (!$conversation->hasParticipant($userId)) {
-            return response()->json(['success' => false, 'message' => 'غير مصرح.'], 403);
+            return response()->json(['success' => false, 'message' => __('chat.unauthorized')], 403);
         }
 
         if ($request->image_id) {
             $image = Image::find($request->image_id);
             if ($image->user_id !== $userId) {
-                return response()->json(['success' => false, 'message' => 'يمكنك مشاركة صورك فقط.'], 403);
+                return response()->json(['success' => false, 'message' => __('chat.only_share_own_photos')], 403);
             }
         }
 
@@ -243,7 +253,7 @@ class GroupChatController extends Controller
         $userId  = Auth::id();
 
         if (!$conversation->hasParticipant($userId)) {
-            return response()->json(['success' => false, 'message' => 'غير مصرح.'], 403);
+            return response()->json(['success' => false, 'message' => __('chat.unauthorized')], 403);
         }
 
         $afterId = $request->query('after_id', 0);
@@ -279,7 +289,7 @@ class GroupChatController extends Controller
         // Only owner can add participants
         $participant = $conversation->participants()->where('users.id', $userId)->first();
         if (!$participant || $participant->pivot->role !== 'owner') {
-            return response()->json(['success' => false, 'message' => 'فقط مالك المجموعة يمكنه إضافة أعضاء.'], 403);
+            return response()->json(['success' => false, 'message' => __('chat.only_owner_can_add')], 403);
         }
 
         $request->validate([
@@ -287,7 +297,15 @@ class GroupChatController extends Controller
         ]);
 
         if ($conversation->hasParticipant($request->user_id)) {
-            return response()->json(['success' => false, 'message' => 'هذا المستخدم عضو بالفعل.'], 409);
+            return response()->json(['success' => false, 'message' => __('chat.user_already_member')], 409);
+        }
+
+        // 🛡️ SECURITY: Verify the added participant is an accepted connection
+        if (!$this->isAcceptedConnection($userId, $request->user_id)) {
+            return response()->json([
+                'success' => false,
+                'message' => __('chat.only_add_connections'),
+            ], 403);
         }
 
         $userToAdd = User::find($request->user_id);
@@ -302,14 +320,14 @@ class GroupChatController extends Controller
             'sender_id'       => $userId,
             'receiver_id'     => $userId,
             'conversation_id' => $conversation->id,
-            'body'            => "📥 تم إضافة {$userToAdd->name} إلى المجموعة.",
+            'body'            => __('chat.system_member_added', ['name' => $userToAdd->name]),
         ]);
 
         $conversation->update(['last_message_at' => now()]);
 
         return response()->json([
             'success' => true,
-            'message' => "تم إضافة {$userToAdd->name} إلى المجموعة.",
+            'message' => __('chat.member_added', ['name' => $userToAdd->name]),
         ]);
     }
 
@@ -323,26 +341,26 @@ class GroupChatController extends Controller
         // Only owner can remove, or user can remove themselves (leave)
         $actor = $conversation->participants()->where('users.id', $userId)->first();
         if (!$actor) {
-            return response()->json(['success' => false, 'message' => 'غير مصرح.'], 403);
+            return response()->json(['success' => false, 'message' => __('chat.unauthorized')], 403);
         }
 
         $isOwner = $actor->pivot->role === 'owner';
         $isSelf  = $userId === $user->id;
 
         if (!$isOwner && !$isSelf) {
-            return response()->json(['success' => false, 'message' => 'فقط مالك المجموعة يمكنه إزالة الأعضاء.'], 403);
+            return response()->json(['success' => false, 'message' => __('chat.only_owner_can_remove')], 403);
         }
 
         // Owner cannot be removed
         $targetParticipant = $conversation->participants()->where('users.id', $user->id)->first();
         if ($targetParticipant && $targetParticipant->pivot->role === 'owner' && !$isSelf) {
-            return response()->json(['success' => false, 'message' => 'لا يمكن إزالة مالك المجموعة.'], 400);
+            return response()->json(['success' => false, 'message' => __('chat.cannot_remove_owner')], 400);
         }
 
         $conversation->participants()->detach($user->id);
 
         // System message
-        $actionText = $isSelf ? "👋 غادر {$user->name} المجموعة." : "🚫 تم إزالة {$user->name} من المجموعة.";
+        $actionText = $isSelf ? __('chat.system_member_left', ['name' => $user->name]) : __('chat.system_member_removed', ['name' => $user->name]);
         Message::create([
             'sender_id'       => $userId,
             'receiver_id'     => $userId,
@@ -354,7 +372,7 @@ class GroupChatController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => $isSelf ? 'غادرت المجموعة.' : "تم إزالة {$user->name} من المجموعة.",
+            'message' => $isSelf ? __('chat.left_group') : __('chat.member_removed', ['name' => $user->name]),
         ]);
     }
 
@@ -367,7 +385,7 @@ class GroupChatController extends Controller
 
         $participant = $conversation->participants()->where('users.id', $userId)->first();
         if (!$participant || $participant->pivot->role !== 'owner') {
-            return response()->json(['success' => false, 'message' => 'فقط مالك المجموعة يمكنه تغيير الاسم.'], 403);
+            return response()->json(['success' => false, 'message' => __('chat.only_owner_can_rename')], 403);
         }
 
         $request->validate([
@@ -381,7 +399,7 @@ class GroupChatController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'تم تغيير اسم المجموعة.',
+            'message' => __('chat.group_renamed'),
             'data'    => ['name' => $conversation->name],
         ]);
     }
@@ -406,5 +424,19 @@ class GroupChatController extends Controller
             'created_at'      => $msg->created_at->format('H:i'),
             'date'            => $msg->created_at->format('Y-m-d'),
         ];
+    }
+
+    private function isAcceptedConnection(string $userId, string $partnerId): bool
+    {
+        return DB::table('connections')
+            ->where('status', 'accepted')
+            ->where(function ($q) use ($userId, $partnerId) {
+                $q->where(function ($inner) use ($userId, $partnerId) {
+                    $inner->where('user_id', $userId)->where('connected_user_id', $partnerId);
+                })->orWhere(function ($inner) use ($userId, $partnerId) {
+                    $inner->where('user_id', $partnerId)->where('connected_user_id', $userId);
+                });
+            })
+            ->exists();
     }
 }

@@ -31,7 +31,7 @@ class SharedLinkController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'تم إنشاء رابط التدمير الذاتي بنجاح!',
+            'message' => __('messages.self_destruct_link_created'),
             'url' => $url
         ]);
     }
@@ -71,7 +71,7 @@ class SharedLinkController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'تم إنشاء رابط المشاركة بنجاح!',
+            'message' => __('messages.share_link_created'),
             'url' => $url
         ]);
     }

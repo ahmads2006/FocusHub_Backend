@@ -50,7 +50,7 @@ class AuthController extends Controller
         return response()->json([
             'success' => true,
             'requires_verification' => true,
-            'message' => 'تم إنشاء الحساب بنجاح. يرجى التحقق من بريدك الإلكتروني.',
+            'message' => __('messages.account_created'),
             'data' => [
                 'user' => $this->formatUser($user),
                 'token' => $token,
@@ -71,7 +71,7 @@ class AuthController extends Controller
         if (!Auth::attempt($request->only('email', 'password'))) {
             return response()->json([
                 'success' => false,
-                'message' => 'بيانات الدخول غير صحيحة.',
+                'message' => __('messages.invalid_credentials'),
             ], 401);
         }
 
@@ -81,7 +81,7 @@ class AuthController extends Controller
         if ($user->is_banned) {
             return response()->json([
                 'success' => false,
-                'message' => 'تم حظر حسابك. يرجى التواصل مع الدعم الفني.',
+                'message' => __('messages.account_banned'),
             ], 403);
         }
 
@@ -111,7 +111,7 @@ class AuthController extends Controller
             return response()->json([
                 'success' => true,
                 'requires_verification' => true,
-                'message' => 'يجب تأكيد بريدك الإلكتروني أولاً.',
+                'message' => __('messages.email_unverified'),
                 'data' => [
                     'user' => $this->formatUser($user),
                     'token' => $token,
@@ -123,7 +123,7 @@ class AuthController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'تم تسجيل الدخول بنجاح.',
+            'message' => __('messages.login_success'),
             'data' => [
                 'user' => $this->formatUser($user),
                 'token' => $token,
@@ -141,7 +141,7 @@ class AuthController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'تم تسجيل الخروج بنجاح.',
+            'message' => __('messages.logout_success'),
         ]);
     }
 
@@ -162,14 +162,14 @@ class AuthController extends Controller
         if ($verification && $verification->updated_at->addMinutes(3)->isPast()) {
             return response()->json([
                 'success' => false,
-                'message' => 'انتهت صلاحية هذا الكود (3 دقائق). يرجى طلب كود جديد.',
+                'message' => __('messages.code_expired'),
             ], 422);
         }
 
     if (!$verification || $request->code !== $verification->verification_code) {
             return response()->json([
                 'success' => false,
-                'message' => 'الرمز غير صحيح. يرجى المحاولة مرة أخرى.',
+                'message' => __('messages.invalid_code'),
             ], 422);
         }
 
@@ -180,7 +180,7 @@ class AuthController extends Controller
 
         $response = [
             'success' => true,
-            'message' => 'تم تأكيد الحساب بنجاح.',
+            'message' => __('messages.account_verified'),
         ];
 
         // Handle trusted device
@@ -210,7 +210,7 @@ class AuthController extends Controller
         if ($user->is_verified) {
             return response()->json([
                 'success' => false,
-                'message' => 'حسابك مُفعّل بالفعل.',
+                'message' => __('messages.already_verified'),
             ], 400);
         }
 
@@ -218,7 +218,7 @@ class AuthController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'تم إعادة إرسال رمز التحقق بنجاح.',
+            'message' => __('messages.code_resent'),
         ]);
     }
 
@@ -256,7 +256,7 @@ class AuthController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'إذا كان البريد الإلكتروني مسجلاً لدينا، سيصلك رابط إعادة التعيين خلال لحظات.',
+            'message' => __('messages.reset_link_sent'),
         ]);
     }
 
@@ -279,7 +279,7 @@ class AuthController extends Controller
         if (!$resetData) {
             return response()->json([
                 'success' => false,
-                'message' => 'الرابط غير صحيح أو منتهي الصلاحية.',
+                'message' => __('messages.invalid_reset_link'),
             ], 422);
         }
 
@@ -288,13 +288,13 @@ class AuthController extends Controller
             DB::table('password_reset_tokens')->where('email', $request->email)->delete();
             return response()->json([
                 'success' => false,
-                'message' => 'انتهت صلاحية الرابط (ساعة واحدة). يرجى طلب رابط جديد.',
+                'message' => __('messages.reset_link_expired'),
             ], 422);
         }
 
         $user = User::where('email', $request->email)->first();
         if (!$user) {
-            return response()->json(['success' => false, 'message' => 'المستخدم غير موجود.'], 404);
+            return response()->json(['success' => false, 'message' => __('messages.user_not_found')], 404);
         }
 
         $user->forceFill([
@@ -307,7 +307,7 @@ class AuthController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'تم إعادة تعيين كلمة المرور بنجاح. يمكنك تسجيل الدخول الآن.',
+            'message' => __('messages.password_reset'),
         ]);
     }
 

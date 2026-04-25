@@ -122,7 +122,7 @@ class ChatController extends Controller
         $userId = Auth::id();
 
         if (!$this->isAcceptedConnection($userId, $partner->id)) {
-            return response()->json(['success' => false, 'message' => 'غير مصرح.'], 403);
+            return response()->json(['success' => false, 'message' => __('chat.unauthorized')], 403);
         }
 
         // Mark messages as read
@@ -164,19 +164,19 @@ class ChatController extends Controller
         ]);
 
         if (!$request->body && !$request->image_id) {
-            return response()->json(['success' => false, 'message' => 'الرسالة لا يمكن أن تكون فارغة.'], 422);
+            return response()->json(['success' => false, 'message' => __('chat.message_empty')], 422);
         }
 
         $userId = Auth::id();
 
         if (!$this->isAcceptedConnection($userId, $request->receiver_id)) {
-            return response()->json(['success' => false, 'message' => 'غير مصرح.'], 403);
+            return response()->json(['success' => false, 'message' => __('chat.unauthorized')], 403);
         }
 
         if ($request->image_id) {
             $image = Image::find($request->image_id);
             if ($image->user_id !== $userId) {
-                return response()->json(['success' => false, 'message' => 'يمكنك مشاركة صورك فقط.'], 403);
+                return response()->json(['success' => false, 'message' => __('chat.only_share_own_photos')], 403);
             }
         }
 
@@ -209,6 +209,11 @@ class ChatController extends Controller
     {
         $userId  = Auth::id();
         $afterId = $request->query('after_id', 0);
+
+        // 🛡️ SECURITY: Prevent unauthorized polling of messages and online status
+        if (!$this->isAcceptedConnection($userId, $partner->id)) {
+            return response()->json(['success' => false, 'message' => __('chat.unauthorized')], 403);
+        }
 
         $newMessages = Message::conversation($userId, $partner->id)
             ->where('id', '>', $afterId)

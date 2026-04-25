@@ -53,7 +53,7 @@ class AlbumUploadController extends Controller
 
             if (!$executed) {
                 return response()->json([
-                    'message' => 'لقد تجاوزت الحد الأقصى للرفع (20 ألبوم في الساعة). يرجى المحاولة لاحقاً.'
+                    'message' => __('messages.upload_limit_albums')
                 ], 429);
             }
         }
@@ -63,7 +63,7 @@ class AlbumUploadController extends Controller
         // ── Storage Quota Check (5GB Drive System) ──
         if (!$user->hasEnoughStorage($file->getSize())) {
             return response()->json([
-                'message' => 'لقد تجاوزت الحد الأقصى للمساحة المسموحة (5 جيجابايت). يُرجى تفريغ بعض المساحة لتتمكن من رفع هذا الأرشيف.'
+                'message' => __('messages.storage_limit_archive')
             ], 403);
         }
 
@@ -126,7 +126,7 @@ class AlbumUploadController extends Controller
             \Illuminate\Support\Facades\Log::warning("Redis failure in getUploadProgress: " . $e->getMessage());
             return response()->json([
                 'status' => 'error',
-                'message' => 'نظام تتبع التقدم غير متاح حالياً، ولكن عملية الرفع مستمرة.'
+                'message' => __('messages.progress_unavailable')
             ]);
         }
 
@@ -187,7 +187,7 @@ class AlbumUploadController extends Controller
 
             if (!$executed) {
                 return response()->json([
-                    'message' => 'لقد تجاوزت الحد الأقصى للرفع (20 دفعة صور في الساعة). يرجى المحاولة لاحقاً.'
+                    'message' => __('messages.upload_limit_batches')
                 ], 429);
             }
         }
@@ -214,7 +214,7 @@ class AlbumUploadController extends Controller
         $totalBatchSize = array_reduce($files, fn($carry, $f) => $carry + $f->getSize(), 0);
         if (!$user->hasEnoughStorage($totalBatchSize)) {
             return response()->json([
-                'message' => 'عذراً، مساحة التخزين الخاصة بك غير كافية لرفع هذه المجموعة من الصور. الحد الأقصى للمستخدم هو 5 جيجابايت.'
+                'message' => __('messages.storage_limit_batch')
             ], 403);
         }
 
@@ -322,7 +322,7 @@ class AlbumUploadController extends Controller
 
         // ── Immediate 200 Response (Fast Response Pattern) ──
         return response()->json([
-            'message'  => 'تم رفع الصور بنجاح. جاري تحليلها بالذكاء الاصطناعي.',
+            'message' => __('messages.images_uploaded_analyzing'),
             'job_id'   => $jobId,
             'album_id' => $albumId,
             'total'    => $totalFiles,

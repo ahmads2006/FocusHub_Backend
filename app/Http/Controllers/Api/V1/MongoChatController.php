@@ -136,7 +136,7 @@ class MongoChatController extends Controller
         $userId = Auth::id();
 
         if (!$this->isAcceptedConnection($userId, $partner->id)) {
-            return response()->json(['success' => false, 'message' => 'غير مصرح.'], 403);
+            return response()->json(['success' => false, 'message' => __('chat.unauthorized')], 403);
         }
 
         // Mark messages as read directly in Mongo (fallback to direct updates usually, or via outbox)
@@ -189,20 +189,20 @@ class MongoChatController extends Controller
         ]);
 
         if (!$request->body && !$request->image_id) {
-            return response()->json(['success' => false, 'message' => 'الرسالة لا يمكن أن تكون فارغة.'], 422);
+            return response()->json(['success' => false, 'message' => __('chat.message_empty')], 422);
         }
 
         $userId = Auth::id();
 
         if (!$this->isAcceptedConnection($userId, $request->receiver_id)) {
-            return response()->json(['success' => false, 'message' => 'غير مصرح.'], 403);
+            return response()->json(['success' => false, 'message' => __('chat.unauthorized')], 403);
         }
 
         $image = null;
         if ($request->image_id) {
             $image = Image::find($request->image_id);
             if ($image->user_id !== $userId) {
-                return response()->json(['success' => false, 'message' => 'يمكنك مشاركة صورك فقط.'], 403);
+                return response()->json(['success' => false, 'message' => __('chat.only_share_own_photos')], 403);
             }
         }
 
@@ -253,6 +253,11 @@ class MongoChatController extends Controller
     {
         $userId  = Auth::id();
         $afterDate = $request->query('after_date'); // Better to use ISO date for polling in NoSQL than incremental integers
+
+        // 🛡️ SECURITY: Prevent unauthorized polling of messages and online status
+        if (!$this->isAcceptedConnection($userId, $partner->id)) {
+            return response()->json(['success' => false, 'message' => __('chat.unauthorized')], 403);
+        }
 
         $query = MongoMessage::whereIn('sender_id', [$userId, $partner->id])
             ->whereIn('receiver_id', [$userId, $partner->id])

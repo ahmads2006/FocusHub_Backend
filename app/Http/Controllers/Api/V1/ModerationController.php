@@ -79,7 +79,7 @@ class ModerationController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'تم اعتماد الصورة بنجاح.',
+            'message' => __('messages.image_approved'),
         ]);
     }
 
@@ -98,7 +98,7 @@ class ModerationController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'تم رفض وحجب الصورة.',
+            'message' => __('messages.image_rejected'),
         ]);
     }
 
@@ -115,7 +115,7 @@ class ModerationController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'تم تحديث حالة البلاغ.',
+            'message' => __('messages.report_status_updated'),
         ]);
     }
 }

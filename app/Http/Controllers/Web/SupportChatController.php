@@ -213,7 +213,7 @@ class SupportChatController extends Controller
         if ($conversation->isClaimed() && !$conversation->isClaimedBy(Auth::id())) {
             return response()->json([
                 'success' => false,
-                'message' => 'هذه المحادثة محجوزة لأدمن آخر بالفعل.',
+                'message' => __('messages.chat_already_claimed'),
             ], 409);
         }
 

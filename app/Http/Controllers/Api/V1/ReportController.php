@@ -30,7 +30,7 @@ class ReportController extends Controller
         if ($exists) {
             return response()->json([
                 'success' => false,
-                'message' => 'لقد قمت بالتبليغ عن هذه الصورة مسبقاً.',
+                'message' => __('messages.already_reported'),
             ], 409);
         }
 
@@ -49,7 +49,7 @@ class ReportController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'شكرًا لك. تم استلام بلاغك وسيقوم فريق الإشراف بمراجعته.',
+            'message' => __('messages.report_received'),
         ], 201);
     }
 }

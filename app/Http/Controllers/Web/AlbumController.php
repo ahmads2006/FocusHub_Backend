@@ -140,10 +140,10 @@ class AlbumController extends Controller
             Mail::to(Auth::user()->email)->queue(new AlbumDeletionOTP($code, $album->title));
         } catch (\Exception $e) {
             Log::error("Failed to send album deletion OTP: " . $e->getMessage());
-            return response()->json(['success' => false, 'message' => 'فشل إرسال البريد الإلكتروني. يرجى المحاولة لاحقاً.'], 500);
+            return response()->json(['success' => false, 'message' => __('messages.email_failed')], 500);
         }
 
-        return response()->json(['success' => true, 'message' => 'تم إرسال رمز التحقق إلى بريدك الإلكتروني.']);
+        return response()->json(['success' => true, 'message' => __('messages.verification_sent')]);
     }
 
     /**
@@ -212,7 +212,7 @@ class AlbumController extends Controller
         $album->collaborators()->updateExistingPivot($userId, ['status' => 'accepted']);
 
         if (request()->expectsJson()) {
-            return response()->json(['success' => true, 'message' => 'تم قبول الدعوة بنجاح.']);
+            return response()->json(['success' => true, 'message' => __('messages.invite_accepted')]);
         }
 
         return back()->with('success', 'تم قبول الدعوة بنجاح.');
@@ -235,7 +235,7 @@ class AlbumController extends Controller
         $album->collaborators()->detach($userId);
 
         if (request()->expectsJson()) {
-            return response()->json(['success' => true, 'message' => 'تم رفض الدعوة.']);
+            return response()->json(['success' => true, 'message' => __('messages.invite_rejected')]);
         }
 
         return back()->with('success', 'تم رفض الدعوة.');

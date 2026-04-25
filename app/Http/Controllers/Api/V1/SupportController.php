@@ -67,7 +67,7 @@ class SupportController extends Controller
         $conversation = SupportConversation::findOrFail($request->conversation_id);
 
         if ($conversation->user_id !== $userId) {
-            return response()->json(['success' => false, 'message' => 'غير مصرح.'], 403);
+            return response()->json(['success' => false, 'message' => __('messages.unauthorized')], 403);
         }
 
         // Reopen if closed
@@ -121,7 +121,7 @@ class SupportController extends Controller
     {
         $userId = Auth::id();
         if ($conversation->user_id !== $userId) {
-            return response()->json(['success' => false, 'message' => 'غير مصرح.'], 403);
+            return response()->json(['success' => false, 'message' => __('messages.unauthorized')], 403);
         }
 
         $afterId     = $request->query('after_id', 0);
@@ -216,7 +216,7 @@ class SupportController extends Controller
         if ($conversation->isClaimed() && !$conversation->isClaimedBy(Auth::id())) {
             return response()->json([
                 'success' => false,
-                'message' => 'هذه المحادثة محجوزة لأدمن آخر.',
+                'message' => __('messages.chat_reserved'),
             ], 409);
         }
 
@@ -232,7 +232,7 @@ class SupportController extends Controller
             'is_system'       => true,
         ]);
 
-        return response()->json(['success' => true, 'message' => 'تم قبول المحادثة.']);
+        return response()->json(['success' => true, 'message' => __('messages.chat_accepted')]);
     }
 
     /**
@@ -242,7 +242,7 @@ class SupportController extends Controller
     {
         $adminId = Auth::id();
         if ($conversation->admin_id !== $adminId) {
-            return response()->json(['success' => false, 'message' => 'ليست محادثتك.'], 403);
+            return response()->json(['success' => false, 'message' => __('messages.not_your_chat')], 403);
         }
 
         $messages = $conversation->messages()
@@ -278,7 +278,7 @@ class SupportController extends Controller
         $conversation = SupportConversation::findOrFail($request->conversation_id);
 
         if ($conversation->admin_id !== $adminId) {
-            return response()->json(['success' => false, 'message' => 'ليست محادثتك.'], 403);
+            return response()->json(['success' => false, 'message' => __('messages.not_your_chat')], 403);
         }
 
         $message = SupportMessage::create([
@@ -302,7 +302,7 @@ class SupportController extends Controller
     {
         $adminId = Auth::id();
         if ($conversation->admin_id !== $adminId) {
-            return response()->json(['success' => false, 'message' => 'ليست محادثتك.'], 403);
+            return response()->json(['success' => false, 'message' => __('messages.not_your_chat')], 403);
         }
 
         $afterId     = $request->query('after_id', 0);
@@ -326,7 +326,7 @@ class SupportController extends Controller
     {
         $adminId = Auth::id();
         if ($conversation->admin_id !== $adminId) {
-            return response()->json(['success' => false, 'message' => 'ليست محادثتك.'], 403);
+            return response()->json(['success' => false, 'message' => __('messages.not_your_chat')], 403);
         }
 
         SupportMessage::create([
@@ -338,7 +338,7 @@ class SupportController extends Controller
 
         $conversation->update(['status' => 'closed']);
 
-        return response()->json(['success' => true, 'message' => 'تم إغلاق المحادثة.']);
+        return response()->json(['success' => true, 'message' => __('messages.chat_closed')]);
     }
 
     // ═══════════════════════════════════════════

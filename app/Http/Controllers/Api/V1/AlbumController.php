@@ -63,7 +63,7 @@ class AlbumController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'تم إنشاء الألبوم بنجاح.',
+            'message' => __('messages.album_created'),
             'data'    => $album,
         ], 201);
     }
@@ -79,7 +79,7 @@ class AlbumController extends Controller
             && !$album->collaborators->contains(Auth::id())) {
             return response()->json([
                 'success' => false,
-                'message' => 'غير مصرح لك بالوصول لهذا الألبوم.',
+                'message' => __('messages.album_unauthorized'),
             ], 403);
         }
 
@@ -107,7 +107,7 @@ class AlbumController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'تم تحديث الألبوم بنجاح.',
+            'message' => __('messages.album_updated'),
             'data'    => $album,
         ]);
     }
@@ -128,13 +128,13 @@ class AlbumController extends Controller
             Log::error("Failed to send album deletion OTP: " . $e->getMessage());
             return response()->json([
                 'success' => false,
-                'message' => 'فشل إرسال البريد الإلكتروني. يرجى المحاولة لاحقاً.',
+                'message' => __('messages.email_failed'),
             ], 500);
         }
 
         return response()->json([
             'success' => true,
-            'message' => 'تم إرسال رمز التحقق إلى بريدك الإلكتروني.',
+            'message' => __('messages.verification_sent'),
         ]);
     }
 
@@ -154,7 +154,7 @@ class AlbumController extends Controller
         if (!$otpCode || !hash_equals((string) $otpCode, (string) $request->otp)) {
             return response()->json([
                 'success' => false,
-                'message' => 'رمز التحقق غير صحيح أو منتهي الصلاحية.',
+                'message' => __('messages.invalid_verification'),
             ], 422);
         }
 
@@ -168,7 +168,7 @@ class AlbumController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'تم حذف الألبوم وكافة محتوياته بنجاح.',
+            'message' => __('messages.album_deleted'),
         ]);
     }
 
@@ -178,7 +178,7 @@ class AlbumController extends Controller
     public function addCollaborator(Request $request, Album $album): JsonResponse
     {
         if (Auth::id() !== $album->user_id) {
-            return response()->json(['success' => false, 'message' => 'غير مصرح.'], 403);
+            return response()->json(['success' => false, 'message' => __('messages.unauthorized')], 403);
         }
 
         $validated = $request->validate([
@@ -188,15 +188,15 @@ class AlbumController extends Controller
 
         $userToAdd = User::find($validated['user_id']);
         if (!$userToAdd) {
-            return response()->json(['success' => false, 'message' => 'لم يتم العثور على المستخدم.'], 404);
+            return response()->json(['success' => false, 'message' => __('messages.user_not_found')], 404);
         }
 
         if ($userToAdd->id === $album->user_id) {
-            return response()->json(['success' => false, 'message' => 'لا يمكنك إضافة نفسك كمتعاون.'], 400);
+            return response()->json(['success' => false, 'message' => __('messages.cannot_add_self_collaborator')], 400);
         }
 
         if ($album->collaborators->contains($userToAdd->id)) {
-            return response()->json(['success' => false, 'message' => 'هذا المستخدم متعاون بالفعل.'], 409);
+            return response()->json(['success' => false, 'message' => __('messages.already_collaborator')], 409);
         }
 
         $album->collaborators()->attach($userToAdd->id, ['role' => $validated['role']]);
@@ -211,7 +211,7 @@ class AlbumController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => "تم إضافة {$userToAdd->name} كمتعاون بنجاح.",
+            'message' => __('messages.collaborator_added', ['name' => $userToAdd->name]),
         ]);
     }
 
@@ -221,24 +221,24 @@ class AlbumController extends Controller
     public function updateCollaboratorRole(Request $request, Album $album, User $user): JsonResponse
     {
         if (Auth::id() !== $album->user_id) {
-            return response()->json(['success' => false, 'message' => 'غير مصرح.'], 403);
+            return response()->json(['success' => false, 'message' => __('messages.unauthorized')], 403);
         }
 
         $request->validate(['role' => 'required|in:admin,contributor,viewer']);
 
         if (!$album->collaborators->contains($user->id)) {
-            return response()->json(['success' => false, 'message' => 'هذا المستخدم ليس متعاوناً.'], 404);
+            return response()->json(['success' => false, 'message' => __('messages.not_collaborator')], 404);
         }
 
         if ($album->user_id === $user->id) {
-            return response()->json(['success' => false, 'message' => 'لا يمكن تغيير رتبة مالك الألبوم.'], 400);
+            return response()->json(['success' => false, 'message' => __('messages.cannot_change_owner_role')], 400);
         }
 
         $album->collaborators()->updateExistingPivot($user->id, ['role' => $request->role]);
 
         return response()->json([
             'success' => true,
-            'message' => 'تم تحديث رتبة المتعاون.',
+            'message' => __('messages.collaborator_role_updated'),
         ]);
     }
 
@@ -248,14 +248,14 @@ class AlbumController extends Controller
     public function removeCollaborator(Album $album, User $user): JsonResponse
     {
         if (Auth::id() !== $album->user_id) {
-            return response()->json(['success' => false, 'message' => 'غير مصرح.'], 403);
+            return response()->json(['success' => false, 'message' => __('messages.unauthorized')], 403);
         }
 
         $album->collaborators()->detach($user->id);
 
         return response()->json([
             'success' => true,
-            'message' => "تم إزالة المتعاون {$user->name} بنجاح.",
+            'message' => __('messages.collaborator_removed', ['name' => $user->name]),
         ]);
     }
 
@@ -268,7 +268,7 @@ class AlbumController extends Controller
         $collaborator = $album->collaborators()->where('user_id', $userId)->first();
 
         if (!$collaborator || $collaborator->pivot->status !== 'invited') {
-            return response()->json(['success' => false, 'message' => 'لا توجد دعوة معلقة.'], 403);
+            return response()->json(['success' => false, 'message' => __('messages.no_pending_invite')], 403);
         }
 
         $album->collaborators()->updateExistingPivot($userId, ['status' => 'accepted']);
@@ -278,7 +278,7 @@ class AlbumController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'تم قبول الدعوة بنجاح.',
+            'message' => __('messages.invite_accepted'),
         ]);
     }
 
@@ -291,14 +291,14 @@ class AlbumController extends Controller
         $collaborator = $album->collaborators()->where('user_id', $userId)->first();
 
         if (!$collaborator || $collaborator->pivot->status !== 'invited') {
-            return response()->json(['success' => false, 'message' => 'لا توجد دعوة معلقة.'], 403);
+            return response()->json(['success' => false, 'message' => __('messages.no_pending_invite')], 403);
         }
 
         $album->collaborators()->detach($userId);
 
         return response()->json([
             'success' => true,
-            'message' => 'تم رفض الدعوة.',
+            'message' => __('messages.invite_rejected'),
         ]);
     }
 
@@ -353,7 +353,7 @@ class AlbumController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => "تم إنشاء رابط دعوة جديد برتبة ({$role}).",
+            'message' => __('messages.invite_link_created', ['role' => $role]),
             'data'    => [
                 'code' => $invitation->code,
                 'role' => $invitation->role,
@@ -373,7 +373,7 @@ class AlbumController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'تم حذف رابط الدعوة بنجاح.',
+            'message' => __('messages.invite_link_deleted'),
         ]);
     }
 
@@ -390,18 +390,18 @@ class AlbumController extends Controller
         $invitation = AlbumInvitation::where('code', $request->code)->first();
 
         if (!$invitation || !$invitation->isValid()) {
-            return response()->json(['success' => false, 'message' => 'رابط الدعوة غير صحيح أو منتهي الصلاحية.'], 404);
+            return response()->json(['success' => false, 'message' => __('messages.invalid_invite_link')], 404);
         }
 
         $album = $invitation->album;
         $user = Auth::user();
 
         if ($album->user_id === $user->id) {
-            return response()->json(['success' => false, 'message' => 'أنت مالك هذا الألبوم بالفعل.'], 400);
+            return response()->json(['success' => false, 'message' => __('messages.already_owner')], 400);
         }
 
         if ($album->collaborators->contains($user->id)) {
-            return response()->json(['success' => false, 'message' => 'أنت عضو في هذا الألبوم بالفعل.'], 409);
+            return response()->json(['success' => false, 'message' => __('messages.already_member')], 409);
         }
 
         // Add user with the role defined in the invitation, but as PENDING
@@ -449,7 +449,7 @@ class AlbumController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'لقد تم إرسال طلب الانضمام بنجاح، بانتظار موافقة صاحب الألبوم.',
+            'message' => __('messages.join_request_sent'),
             'data'    => $album->load('owner'),
         ]);
     }
@@ -466,7 +466,7 @@ class AlbumController extends Controller
         $collaborator = $album->collaborators()->where('user_id', $user->id)->first();
 
         if (!$collaborator || $collaborator->pivot->status !== 'pending') {
-            return response()->json(['success' => false, 'message' => 'لا يوجد طلب انضمام معلق لهذا المستخدم.'], 404);
+            return response()->json(['success' => false, 'message' => __('messages.no_join_request')], 404);
         }
 
         $pendingRole = $collaborator->pivot->role;
@@ -475,7 +475,7 @@ class AlbumController extends Controller
         // 1. If role is 'admin', only Owner can approve.
         if ($pendingRole === 'admin') {
             if (!$isOwner) {
-                return response()->json(['success' => false, 'message' => 'عذراً، صاحب الألبوم فقط هو من يمكنه قبول طلبات المدراء الجدد.'], 403);
+                return response()->json(['success' => false, 'message' => __('messages.only_owner_can_accept_managers')], 403);
             }
         } else {
             // 2. Otherwise, Owner OR any existing Admin can approve.
@@ -486,7 +486,7 @@ class AlbumController extends Controller
                 ->exists();
 
             if (!$isOwner && !$isAdmin) {
-                return response()->json(['success' => false, 'message' => 'ليس لديك صلاحية لقبول طلبات الانضمام.'], 403);
+                return response()->json(['success' => false, 'message' => __('messages.cannot_accept_join_requests')], 403);
             }
         }
 
@@ -500,7 +500,7 @@ class AlbumController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => "تم قبول انضمام {$user->name} بنجاح كـ ({$pendingRole}).",
+            'message' => __('messages.join_accepted', ['name' => $user->name, 'role' => $pendingRole]),
         ]);
     }
 

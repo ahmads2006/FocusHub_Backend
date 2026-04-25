@@ -37,7 +37,7 @@ class NotificationController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'تم تعليم الإشعار كمقروء.',
+            'message' => __('messages.notification_read'),
         ]);
     }
 
@@ -50,7 +50,7 @@ class NotificationController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'تم تعليم جميع الإشعارات كمقروءة.',
+            'message' => __('messages.all_notifications_read'),
         ]);
     }
 
@@ -64,7 +64,7 @@ class NotificationController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'تم حذف الإشعار.',
+            'message' => __('messages.notification_deleted'),
         ]);
     }
 }

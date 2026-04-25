@@ -18,7 +18,7 @@ class ConnectionController extends Controller
         $currentUserId = Auth::id();
 
         if ($currentUserId === $user->id) {
-            return response()->json(['success' => false, 'message' => 'لا يمكنك متابعة نفسك.'], 400);
+            return response()->json(['success' => false, 'message' => __('messages.cannot_follow_self')], 400);
         }
 
         $connection = Connection::where(function ($q) use ($currentUserId, $user) {
@@ -32,7 +32,7 @@ class ConnectionController extends Controller
             return response()->json([
                 'success' => true,
                 'status'  => 'unfollowed',
-                'message' => 'تم إلغاء المتابعة.',
+                'message' => __('messages.unfollowed'),
             ]);
         }
 
@@ -45,7 +45,7 @@ class ConnectionController extends Controller
         return response()->json([
             'success' => true,
             'status'  => 'followed',
-            'message' => 'تم المتابعة بنجاح.',
+            'message' => __('messages.followed'),
         ]);
     }
 
