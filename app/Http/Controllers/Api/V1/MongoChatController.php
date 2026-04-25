@@ -368,13 +368,14 @@ class MongoChatController extends Controller
     private function isAcceptedConnection(string $userId, string $partnerId): bool
     {
         return DB::table('connections')
-            ->where(function ($q) use ($userId, $partnerId) {
-                $q->where('user_id', $userId)->where('connected_user_id', $partnerId);
-            })
-            ->orWhere(function ($q) use ($userId, $partnerId) {
-                $q->where('user_id', $partnerId)->where('connected_user_id', $userId);
-            })
             ->where('status', 'accepted')
+            ->where(function ($q) use ($userId, $partnerId) {
+                $q->where(function ($inner) use ($userId, $partnerId) {
+                    $inner->where('user_id', $userId)->where('connected_user_id', $partnerId);
+                })->orWhere(function ($inner) use ($userId, $partnerId) {
+                    $inner->where('user_id', $partnerId)->where('connected_user_id', $userId);
+                });
+            })
             ->exists();
     }
 }

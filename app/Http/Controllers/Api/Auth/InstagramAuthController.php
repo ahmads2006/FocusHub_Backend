@@ -49,12 +49,12 @@ class InstagramAuthController extends Controller
             $token = $user->createToken('instagram_login_token')->plainTextToken;
 
             // Redirect back to frontend
-            $frontendUrl = env('FRONTEND_URL', 'https://opalshot.studio') . '/auth/callback?token=' . $token;
+            $frontendUrl = config('app.frontend_url', 'https://www.opalshot.studio') . '/auth/callback?token=' . $token;
             return redirect()->away($frontendUrl);
 
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error("Instagram Social Login Failed: " . $e->getMessage());
-            $errorUrl = env('FRONTEND_URL', 'https://opalshot.studio') . '/login?error=instagram_auth_failed';
+            $errorUrl = config('app.frontend_url', 'https://www.opalshot.studio') . '/login?error=instagram_auth_failed';
             return redirect()->away($errorUrl);
         }
     }

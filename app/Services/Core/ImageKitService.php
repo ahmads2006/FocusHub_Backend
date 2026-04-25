@@ -12,9 +12,9 @@ class ImageKitService
     public function __construct()
     {
         $this->imagekit = new ImageKit(
-            config('services.imagekit.public_key') ?? env('IMAGEKIT_PUBLIC_KEY'),
-            config('services.imagekit.private_key') ?? env('IMAGEKIT_PRIVATE_KEY'),
-            config('services.imagekit.url_endpoint') ?? env('IMAGEKIT_URL_ENDPOINT')
+            config('services.imagekit.public_key'),
+            config('services.imagekit.private_key'),
+            config('services.imagekit.url_endpoint')
         );
     }
 

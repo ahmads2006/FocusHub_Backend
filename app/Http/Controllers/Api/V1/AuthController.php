@@ -244,7 +244,7 @@ class AuthController extends Controller
 
             try {
                 // Link to frontend Vue app
-                $frontendUrl = env('FRONTEND_URL', 'http://localhost:5173');
+                $frontendUrl = config('app.frontend_url', 'http://localhost:5173');
                 $resetLink = $frontendUrl . '/reset-password?token=' . $token . '&email=' . urlencode($request->email);
 
                 \Illuminate\Support\Facades\Mail::to($request->email)

@@ -77,6 +77,10 @@ class AlbumUploadController extends Controller
                 'privacy' => 'public', // Default to public so images show in gallery
             ]);
             $albumId = $album->id;
+        } else {
+            // 🛡️ SECURITY: Verify user has upload permission to this album
+            $album = \App\Models\Album::findOrFail($albumId);
+            $this->authorize('uploadPhoto', $album);
         }
 
         $file = $request->file('archive');
@@ -190,7 +194,6 @@ class AlbumUploadController extends Controller
 
         $albumId = $request->album_id;
 
-        // Create album if needed
         if (!$albumId) {
             $album = \App\Models\Album::create([
                 'user_id' => $user->id,
@@ -198,6 +201,10 @@ class AlbumUploadController extends Controller
                 'privacy' => 'public',
             ]);
             $albumId = $album->id;
+        } else {
+            // 🛡️ SECURITY: Verify user has upload permission to this album
+            $album = \App\Models\Album::findOrFail($albumId);
+            $this->authorize('uploadPhoto', $album);
         }
 
         $files = $request->file('images');
@@ -215,13 +222,17 @@ class AlbumUploadController extends Controller
 
         // Initialize Redis progress tracker
         $redisKey = 'opticvault:upload_progress:' . $jobId;
-        Redis::set($redisKey, json_encode([
-            'total_items'    => $totalFiles,
-            'processed_items' => 0,
-            'rejected_items'  => 0,
-            'failed_items'    => 0,
-            'status'          => 'uploading',
-        ]), 'EX', 86400);
+        try {
+            Redis::set($redisKey, json_encode([
+                'total_items'    => $totalFiles,
+                'processed_items' => 0,
+                'rejected_items'  => 0,
+                'failed_items'    => 0,
+                'status'          => 'uploading',
+            ]), 'EX', 86400);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::warning("Redis failure in uploadBatch init: " . $e->getMessage());
+        }
 
         $uploadedImages = [];
 
@@ -299,9 +310,15 @@ class AlbumUploadController extends Controller
         }
 
         // Update status to "processing" (files are uploaded, moderation is running)
-        $data = json_decode(Redis::get($redisKey), true);
-        $data['status'] = 'processing';
-        Redis::set($redisKey, json_encode($data), 'EX', 86400);
+        try {
+            $data = json_decode(Redis::get($redisKey), true);
+            if ($data) {
+                $data['status'] = 'processing';
+                Redis::set($redisKey, json_encode($data), 'EX', 86400);
+            }
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::warning("Redis failure in uploadBatch status update: " . $e->getMessage());
+        }
 
         // ── Immediate 200 Response (Fast Response Pattern) ──
         return response()->json([
@@ -324,6 +341,9 @@ class AlbumUploadController extends Controller
     public function getAlbumStatus($albumId)
     {
         $album = \App\Models\Album::findOrFail($albumId);
+
+        // 🛡️ SECURITY: Only owner/collaborators can see moderation status
+        $this->authorize('view', $album);
 
         $total     = $album->images()->withoutGlobalScopes()->count();
         $approved  = $album->images()->withoutGlobalScopes()

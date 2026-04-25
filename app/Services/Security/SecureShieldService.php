@@ -328,7 +328,7 @@ class SecureShieldService
      */
     private function analyzeImage(Image $image): array
     {
-        $apiKey = env('GOOGLE_CLOUD_VISION_KEY');
+        $apiKey = config('services.google.vision_api_key');
         if (empty($apiKey)) return ['text' => [], 'logos' => [], 'objects' => []];
 
         try {

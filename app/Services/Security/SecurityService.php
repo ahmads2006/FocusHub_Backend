@@ -102,7 +102,24 @@ class SecurityService
             $this->logAndThrow("Security Alert: Invalid SVG structure.");
         }
 
-        $maliciousPatterns = ['<script', 'javascript:', 'onclick', 'onerror', 'onmouseover'];
+        // 🛡️ Comprehensive XSS pattern list (expanded for defense-in-depth)
+        $maliciousPatterns = [
+            // Script injection
+            '<script', 'javascript:', 'vbscript:', 'data:text/html',
+            // Event handlers
+            'onclick', 'onerror', 'onmouseover', 'onload', 'onfocus',
+            'oninput', 'onanimationend', 'onbegin', 'onblur', 'onchange',
+            'ondblclick', 'ondrag', 'onkeydown', 'onkeypress', 'onkeyup',
+            'onmousedown', 'onmouseup', 'onsubmit', 'ontouchstart',
+            // Dangerous elements
+            '<foreignObject', '<use', '<embed', '<object', '<iframe',
+            '<meta', '<link', '<base',
+            // Dangerous attributes/URIs
+            'xlink:href', 'set-cookie', 'document.cookie', 'document.domain',
+            'window.location', 'eval(', 'expression(', 'url(data:',
+            'import(', 'fetch(', 'XMLHttpRequest',
+        ];
+
         foreach ($maliciousPatterns as $pattern) {
             if (stripos($content, $pattern) !== false) {
                 $this->logAndThrow("Security Alert: Malicious payload detected in SVG: $pattern");

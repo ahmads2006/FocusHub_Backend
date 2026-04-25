@@ -121,6 +121,7 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
         'watermark_logo',
         'watermark_mode',
         'notification_preferences',
+        'email_verified_at',
     ];  
     
     protected $with = ['userStatus', 'profile' ];

@@ -24,7 +24,12 @@ return Application::configure(basePath: dirname(__DIR__))
             \App\Http\Middleware\SetLocale::class,
             \App\Http\Middleware\TrackOnlineStatus::class,
         ]);
-        $middleware->trustProxies(at: '*');
+        $middleware->trustProxies(at: [
+            '127.0.0.1',
+            '10.0.0.0/8',       // DigitalOcean internal network
+            '10.19.0.0/16',     // DigitalOcean VPC
+            '172.16.0.0/12',    // Docker internal network
+        ]);
         $middleware->api(prepend: [
             \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
         ]);
