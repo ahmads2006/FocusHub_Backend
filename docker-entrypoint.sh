@@ -7,6 +7,17 @@ set -e
 # before Apache starts, regardless of volume mount state.
 # ──────────────────────────────────────────────────────
 
+# Configure New Relic License and App Name from Environment Variables
+if [ -f /usr/local/etc/php/conf.d/newrelic.ini ]; then
+    echo "[Entrypoint] Configuring New Relic..."
+    if [ -n "$NEW_RELIC_LICENSE_KEY" ]; then
+        sed -i "s/newrelic.license = \"REPLACE_WITH_REAL_KEY\"/newrelic.license = \"$NEW_RELIC_LICENSE_KEY\"/" /usr/local/etc/php/conf.d/newrelic.ini
+    fi
+    if [ -n "$NEW_RELIC_APP_NAME" ]; then
+        sed -i "s/newrelic.appname = \"PHP Application\"/newrelic.appname = \"$NEW_RELIC_APP_NAME\"/" /usr/local/etc/php/conf.d/newrelic.ini
+    fi
+fi
+
 echo "[Entrypoint] Ensuring storage directory structure..."
 
 # Create all required Laravel storage subdirectories
