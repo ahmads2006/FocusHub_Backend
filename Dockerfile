@@ -24,6 +24,11 @@ RUN apt-get update && apt-get install -y \
 # نسخ إعدادات OpCache الخاصة بنا
 COPY docker/php/opcache.ini /usr/local/etc/php/conf.d/opcache.ini
 
+# إخفاء إصدار PHP و Apache لزيادة الأمان
+RUN echo "expose_php = Off" > /usr/local/etc/php/conf.d/security.ini && \
+    echo "ServerTokens Prod\nServerSignature Off" >> /etc/apache2/conf-available/security.conf && \
+    a2enconf security
+
 # تثبيت وكيل New Relic (APM)
 RUN curl -L https://download.newrelic.com/php_agent/release/newrelic-php5-12.6.0.34-linux.tar.gz | tar -C /tmp -zx \
     && export NR_INSTALL_USE_CP_NOT_LN=1 \
