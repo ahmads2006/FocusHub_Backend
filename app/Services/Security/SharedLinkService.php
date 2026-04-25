@@ -15,6 +15,7 @@ class SharedLinkService
      */
     public function generate(Model $model, ?Carbon $expiry = null, ?string $password = null, ?int $maxAccess = null, string $permission = 'view', bool $autoRotate = true, ?bool $requireWatermark = null, ?string $label = null): SharedLink
     {
+        // Generate a random token (simple and clean)
         $token = Str::random(64);
         $tokenHash = hash('sha256', $token);
 
@@ -49,6 +50,7 @@ class SharedLinkService
 
         return SharedLink::create($data);
     }
+
 
     /**
      * Get the full access URL for a shared link.

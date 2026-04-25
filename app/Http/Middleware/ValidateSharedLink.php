@@ -65,7 +65,20 @@ class ValidateSharedLink
             } else {
                 // Secondary visits: verify session matches
                 if ($link->session_id !== $sessionId) {
-                    abort(403, 'هذا الرابط مخصص لجلسة أخرى غير مصرح لك بفتحه.');
+                    // 🚨 LEAK DETECTED: Notification logic
+                    $metadata = [
+                        'ip'         => $request->ip(),
+                        'user_agent' => $request->userAgent(),
+                        'accessed_at'=> now()->toDateTimeString(),
+                        'type'       => 'Session Mismatch (Possible Leak)'
+                    ];
+                    
+                    $owner = $link->shareable?->user;
+                    if ($owner) {
+                        $owner->notify(new \App\Notifications\SharedLinkLeakDetected($link, $metadata));
+                    }
+
+                    abort(403, 'عذراً، هذا الرابط مخصص لجهاز آخر فقط. تم إبلاغ المصور بمحاولة الدخول هذه لحماية الخصوصية.');
                 }
             }
 

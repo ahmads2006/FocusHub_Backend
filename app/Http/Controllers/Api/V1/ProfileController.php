@@ -232,12 +232,20 @@ class ProfileController extends Controller
                     ->whereHas('moderation', fn($q) => $q->where('status', \App\Models\Image::STATUS_APPROVED));
             } elseif ($tab === 'saved' && $isOwner) {
                 $images = $user->bookmarkedImages()
+                    ->where(function ($q) use ($user) {
+                        $q->where('images.privacy', 'public')
+                          ->orWhere('images.user_id', $user->id);
+                    })
                     ->whereHas('moderation', fn($q) => $q->where('status', \App\Models\Image::STATUS_APPROVED))
                     ->with(['user', 'likes', 'labelData', 'storage', 'settings', 'aiMetadata'])
                     ->latest('bookmarks.created_at')
                     ->paginate(24);
             } elseif ($tab === 'liked' && $isOwner) {
                 $images = \App\Models\Image::whereHas('likes', fn($q) => $q->where('user_id', $user->id))
+                    ->where(function ($q) use ($user) {
+                        $q->where('images.privacy', 'public')
+                          ->orWhere('images.user_id', $user->id);
+                    })
                     ->whereHas('moderation', fn($q) => $q->where('status', \App\Models\Image::STATUS_APPROVED))
                     ->with(['user', 'likes', 'labelData', 'storage', 'settings', 'aiMetadata'])
                     ->latest()

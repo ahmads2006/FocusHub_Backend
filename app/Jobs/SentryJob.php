@@ -45,13 +45,20 @@ class SentryJob implements ShouldQueue
         $event->setExtra($this->data['extra'] ?? []);
         
         if (isset($this->data['user'])) {
-            $event->setUser(new \Sentry\UserDataBag(
-                $this->data['user']['id'] ?? null,
-                $this->data['user']['email'] ?? null,
-                $this->data['user']['ip_address'] ?? null,
-                $this->data['user']['username'] ?? null,
-                $this->data['user']['metadata'] ?? []
-            ));
+            $userData = new \Sentry\UserDataBag();
+            $userData->setId($this->data['user']['id'] ?? null);
+            $userData->setEmail($this->data['user']['email'] ?? null);
+            $userData->setIpAddress($this->data['user']['ip_address'] ?? null);
+            $userData->setUsername($this->data['user']['username'] ?? null);
+            
+            $metadata = $this->data['user']['metadata'] ?? [];
+            if (is_array($metadata)) {
+                foreach ($metadata as $key => $value) {
+                    $userData->setMetadata((string)$key, $value);
+                }
+            }
+            
+            $event->setUser($userData);
         }
 
         // Send the event via the Sentry Hub
