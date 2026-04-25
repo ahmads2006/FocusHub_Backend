@@ -36,6 +36,9 @@ RUN curl -L https://download.newrelic.com/php_agent/release/newrelic-php5-12.6.0
     && /tmp/newrelic-php5-*/newrelic-install install \
     && rm -rf /tmp/newrelic-php5-* /tmp/nrinstall*
 
+# إعدادات تسجيل اللوجات لـ New Relic
+COPY docker/php/newrelic.ini /usr/local/etc/php/conf.d/newrelic-logging.ini
+
 # تفعيل mod_rewrite الخاص بخادم Apache
 RUN a2enmod rewrite headers
 
