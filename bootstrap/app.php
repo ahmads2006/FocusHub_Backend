@@ -31,7 +31,7 @@ return Application::configure(basePath: dirname(__DIR__))
             '172.16.0.0/12',    // Docker internal network
         ]);
         $middleware->api(prepend: [
-            \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
+            // Removed EnsureFrontendRequestsAreStateful to rely solely on Bearer Tokens
         ]);
 
         $middleware->alias([
