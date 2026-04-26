@@ -46,6 +46,8 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
 
         $middleware->validateCsrfTokens(except: [
+            'api/*',
+            'api/v1/*',
             'api/v1/auth/forgot-password',
             'api/v1/auth/reset-password',
             'api/v1/auth/login',
