@@ -14,14 +14,13 @@ use App\Mail\WelcomeMail;
 
 class SocialAuthController extends Controller
 {
-    /**
-     * Redirect the user to the provider authentication page.
-     */
-    public function redirectToProvider($provider)
+    public function redirectToProvider(Request $request, $provider)
     {
         try {
+            $state = $request->query('local') ? 'local' : 'prod';
+            
             return Socialite::driver($provider)
-                ->with(['prompt' => 'select_account'])
+                ->with(['prompt' => 'select_account', 'state' => $state])
                 ->stateless()
                 ->redirect();
         } catch (\Exception $e) {
@@ -33,7 +32,7 @@ class SocialAuthController extends Controller
     /**
      * Obtain the user information from the provider.
      */
-    public function handleProviderCallback($provider)
+    public function handleProviderCallback(Request $request, $provider)
     {
         try {
             $socialUser = Socialite::driver($provider)->stateless()->user();
@@ -86,14 +85,28 @@ class SocialAuthController extends Controller
             }
 
             $token = $user->createToken("{$provider}_login_token")->plainTextToken;
+            Log::info("Social Login Successful for user: {$user->email} via {$provider}");
+
+            // Check if login originated from local dev environment
+            $isLocal = $request->query('state') === 'local';
 
             // Redirect back to frontend with token
-            $frontendUrl = config('app.frontend_url', 'https://www.opalshot.studio') . '/auth/callback?token=' . $token;
+            $frontendBase = $isLocal 
+                ? 'http://localhost:5173' 
+                : config('app.frontend_url', 'https://www.opalshot.studio');
+                
+            $frontendUrl = $frontendBase . '/auth/callback?token=' . urlencode($token);
             return redirect()->away($frontendUrl);
 
         } catch (\Exception $e) {
             Log::error("Social Login Callback Failed ({$provider}): " . $e->getMessage());
-            $errorUrl = config('app.frontend_url', 'https://www.opalshot.studio') . '/login?error=auth_failed';
+            
+            $isLocal = $request->query('state') === 'local';
+            $frontendBase = $isLocal 
+                ? 'http://localhost:5173' 
+                : config('app.frontend_url', 'https://www.opalshot.studio');
+                
+            $errorUrl = $frontendBase . '/login?error=auth_failed';
             return redirect()->away($errorUrl);
         }
     }
