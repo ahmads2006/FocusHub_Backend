@@ -283,12 +283,44 @@ Route::prefix('v1')->group(function () {
 
         // ─── 👁️ Public Photographer Profile ─────
         Route::get('/photographers/{user}', [App\Http\Controllers\Api\V1\ProfileController::class, 'showPhotographer']);
+
+        // ─── ✅ Tasks (Photographer Workflow) ────
+        Route::prefix('tasks')->group(function () {
+            Route::get('/', [App\Http\Controllers\Api\V1\TaskController::class, 'index']);
+            Route::post('/', [App\Http\Controllers\Api\V1\TaskController::class, 'store']);
+            Route::get('/{task}', [App\Http\Controllers\Api\V1\TaskController::class, 'show']);
+            Route::put('/{task}', [App\Http\Controllers\Api\V1\TaskController::class, 'update']);
+            Route::patch('/{task}/status', [App\Http\Controllers\Api\V1\TaskController::class, 'updateStatus']);
+            Route::patch('/{task}/log-time', [App\Http\Controllers\Api\V1\TaskController::class, 'logTime']);
+            Route::delete('/{task}', [App\Http\Controllers\Api\V1\TaskController::class, 'destroy']);
+        });
+
+        // ─── 📊 Dashboard Stats ─────────────────
+        Route::get('/stats', [App\Http\Controllers\Api\V1\DashboardController::class, 'stats']);
+        Route::get('/activity-log', [App\Http\Controllers\Api\V1\DashboardController::class, 'activityLog']);
+        Route::get('/albums/summary', [App\Http\Controllers\Api\V1\DashboardController::class, 'albumSummary']);
+
+        // ─── ⚙️ Settings ────────────────────────
+        Route::prefix('settings')->group(function () {
+            Route::get('/watermark', [App\Http\Controllers\Api\V1\SettingsController::class, 'getWatermark']);
+            Route::post('/watermark', [App\Http\Controllers\Api\V1\SettingsController::class, 'updateWatermark']);
+        });
     });
 
     // ══════════════════════════════════════════
     // 3. 🛡️ ADMIN API (V1)
     // ══════════════════════════════════════════
     Route::prefix('admin')->middleware(['auth:sanctum', 'check.banned', 'role:super-admin'])->group(function () {
+
+        // Dashboard Stats
+        Route::get('/stats', function () {
+            return response()->json([
+                'totalUsers'         => \App\Models\User::count(),
+                'totalPhotographers' => \App\Models\User::role('photographer')->count(),
+                'totalAlbums'        => \App\Models\Album::count(),
+                'totalImages'        => \App\Models\Image::count(),
+            ]);
+        });
 
         // Moderation
         Route::get('/moderation', [App\Http\Controllers\Api\V1\ModerationController::class, 'index']);

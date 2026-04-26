@@ -17,7 +17,9 @@ class SocialAuthController extends Controller
     public function redirectToProvider(Request $request, $provider)
     {
         try {
-            $state = $request->query('local') ? 'local' : 'prod';
+            // Save the origin in state so we know where to redirect back to dynamically
+            $origin = $request->query('origin');
+            $state = $origin ? $origin : 'prod';
             
             return Socialite::driver($provider)
                 ->with(['prompt' => 'select_account', 'state' => $state])
@@ -87,13 +89,15 @@ class SocialAuthController extends Controller
             $token = $user->createToken("{$provider}_login_token")->plainTextToken;
             Log::info("Social Login Successful for user: {$user->email} via {$provider}");
 
-            // Check if login originated from local dev environment
-            $isLocal = $request->query('state') === 'local';
-
-            // Redirect back to frontend with token
-            $frontendBase = $isLocal 
-                ? 'http://localhost:5173' 
-                : config('app.frontend_url', 'https://www.opalshot.studio');
+            $state = $request->query('state');
+            
+            // Check if state is a valid URL (the origin passed from the frontend)
+            if ($state && filter_var($state, FILTER_VALIDATE_URL)) {
+                $frontendBase = rtrim($state, '/');
+            } else {
+                // Fallback for older setups
+                $frontendBase = config('app.frontend_url', 'https://www.opalshot.studio');
+            }
                 
             $frontendUrl = $frontendBase . '/auth/callback?token=' . urlencode($token);
             return redirect()->away($frontendUrl);

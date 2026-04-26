@@ -66,9 +66,10 @@ class AuthController extends Controller
         $request->validate([
             'email' => 'required|email',
             'password' => 'required|string',
+            'remember' => 'nullable|boolean',
         ]);
 
-        if (!Auth::attempt($request->only('email', 'password'))) {
+        if (!Auth::attempt($request->only('email', 'password'), $request->boolean('remember'))) {
             return response()->json([
                 'success' => false,
                 'message' => __('messages.invalid_credentials'),
@@ -106,7 +107,8 @@ class AuthController extends Controller
         // If not verified at all, send verification code
         if (!$user->is_verified) {
             $user->sendVerificationEmail();
-            $token = $user->createToken('api-token')->plainTextToken;
+            $expiresAt = $request->boolean('remember') ? now()->addDays(30) : now()->addHours(24);
+            $token = $user->createToken('api-token', ['*'], $expiresAt)->plainTextToken;
 
             return response()->json([
                 'success' => true,
@@ -119,7 +121,8 @@ class AuthController extends Controller
             ]);
         }
 
-        $token = $user->createToken('api-token')->plainTextToken;
+        $expiresAt = $request->boolean('remember') ? now()->addDays(30) : now()->addHours(24);
+        $token = $user->createToken('api-token', ['*'], $expiresAt)->plainTextToken;
 
         return response()->json([
             'success' => true,
