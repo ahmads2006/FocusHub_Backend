@@ -86,7 +86,7 @@ class Image extends Model
         'is_visible' => 'boolean',
     ];
 
-    protected $appends = ['can_edit', 'can_delete', 'can_download'];
+    protected $appends = ['can_edit', 'can_delete', 'can_download', 'url', 'original_url'];
 
 
 
@@ -288,7 +288,7 @@ class Image extends Model
     /**
      * Get a secure URL for the original high-res file.
      */
-    public function getOriginalUrl(): string
+    public function getOriginalUrlAttribute(): string
     {
         return $this->getUrl('original');
     }
