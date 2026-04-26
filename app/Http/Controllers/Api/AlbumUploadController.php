@@ -260,7 +260,7 @@ class AlbumUploadController extends Controller
             $dynamicPath = "photos/{$year}/{$month}/{$userId}". $albumId ."/". $filename;
 
             // ── Store to S3/LocalStack (immediate) using putFileAs ──
-            $s3Path = \Illuminate\Support\Facades\Storage::disk('s3')->putFileAs($dynamicPath, $file, $newFilename);
+            $s3Path = \Illuminate\Support\Facades\Storage::disk('s3')->putFileAs($dynamicPath, $file, $newFilename, 'public');
 
             // ── Create DB record with "pending" moderation ──
             $album = \App\Models\Album::find($albumId);
