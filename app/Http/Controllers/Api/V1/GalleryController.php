@@ -72,6 +72,13 @@ class GalleryController extends Controller
                     $placeholders = implode(',', array_fill(0, count($slicedIds), '?'));
                     $models = Image::whereIn('id', $slicedIds)
                         ->where('privacy', 'public')
+                        ->where(function($q) use ($user) {
+                            $q->where('moderation_status', 'approved')
+                              ->orWhere(function($sq) use ($user) {
+                                  $sq->where('user_id', $user->id)
+                                     ->where('moderation_status', '!=', 'rejected');
+                              });
+                        })
                         ->with(['settings', 'user', 'labelData', 'aiMetadata', 'storage'])
                         ->withCount('likes')
                         ->orderByRaw("FIELD(id, {$placeholders})", $slicedIds)
@@ -120,26 +127,45 @@ class GalleryController extends Controller
     public function popularTags(): JsonResponse
     {
         // Cache the result in Redis for 6 hours (21600 seconds)
-        $popularTags = Cache::store('redis')->remember('gallery:popular_tags', 21600, function () {
-            // Query Spatie tags table joined with taggables to count occurrences
-            return DB::table('tags')
-                ->join('taggables', 'tags.id', '=', 'taggables.tag_id')
-                ->select('tags.name', DB::raw('COUNT(taggables.tag_id) as usage_count'))
-                ->groupBy('tags.id', 'tags.name')
-                ->orderBy('usage_count', 'desc')
-                ->limit(20)
-                ->get()
-                ->map(function ($tag) {
-                    // Handle Spatie's JSON translatable names (fallback to extracting string if needed)
-                    $decodedName = json_decode($tag->name, true);
-                    $finalName = is_array($decodedName) ? ($decodedName['en'] ?? current($decodedName)) : $tag->name;
-                    
-                    return [
-                        'name' => $finalName,
-                        'count' => $tag->usage_count
-                    ];
-                });
-        });
+        try {
+            $popularTags = Cache::store('redis')->remember('gallery:popular_tags', 21600, function () {
+                // Query Spatie tags table joined with taggables to count occurrences
+                return DB::table('tags')
+                    ->join('taggables', 'tags.id', '=', 'taggables.tag_id')
+                    ->select('tags.name', DB::raw('COUNT(taggables.tag_id) as usage_count'))
+                    ->groupBy('tags.id', 'tags.name')
+                    ->orderBy('usage_count', 'desc')
+                    ->limit(20)
+                    ->get()
+                    ->map(function ($tag) {
+                        // Handle Spatie's JSON translatable names (fallback to extracting string if needed)
+                        $decodedName = json_decode($tag->name, true);
+                        $finalName = is_array($decodedName) ? ($decodedName['en'] ?? current($decodedName)) : $tag->name;
+                        
+                        return [
+                            'name' => $finalName,
+                            'count' => $tag->usage_count
+                        ];
+                    });
+            });
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::warning("Redis connection failed in popularTags: " . $e->getMessage());
+            // Fallback to default cache or direct query if Redis is dead
+            $popularTags = Cache::remember('gallery:popular_tags_fallback', 3600, function () {
+                return DB::table('tags')
+                    ->join('taggables', 'tags.id', '=', 'taggables.tag_id')
+                    ->select('tags.name', DB::raw('COUNT(taggables.tag_id) as usage_count'))
+                    ->groupBy('tags.id', 'tags.name')
+                    ->orderBy('usage_count', 'desc')
+                    ->limit(20)
+                    ->get()
+                    ->map(function ($tag) {
+                        $decodedName = json_decode($tag->name, true);
+                        $finalName = is_array($decodedName) ? ($decodedName['en'] ?? current($decodedName)) : $tag->name;
+                        return ['name' => $finalName, 'count' => $tag->usage_count];
+                    });
+            });
+        }
 
         return response()->json([
             'success' => true,

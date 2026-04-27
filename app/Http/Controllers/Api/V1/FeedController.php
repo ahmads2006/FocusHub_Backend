@@ -57,8 +57,8 @@ class FeedController extends Controller
                     }
                     // Retain only the most recent 2000 items (Memory Cap)
                     $pipe->zremrangebyrank($redisKey, 0, -2001);
-                    // Expire in 7 days (604800 seconds)
-                    $pipe->expire($redisKey, 604800);
+                    // Expire in 14 days (1209600 seconds)
+                    $pipe->expire($redisKey, 1209600);
                 });
             } catch (\Exception $e) {
                 \Illuminate\Support\Facades\Log::warning("Could not record seen images for user {$user->id}: " . $e->getMessage());
