@@ -99,7 +99,7 @@ class AssetDeliveryService
         return URL::temporarySignedRoute(
             'assets.original',
             now()->addMinutes(5),
-            ['image' => $image->id, 'v' => $image->updated_at->timestamp]
+            ['image' => $image->id, 'v' => optional($image->updated_at)->timestamp ?? time()]
         );
     }
 
@@ -112,7 +112,7 @@ class AssetDeliveryService
         return URL::temporarySignedRoute(
             'assets.preview',
             now()->addMinutes(10),  // Shorter TTL for better security
-            ['image' => $image->id, 'v' => $image->updated_at->timestamp]
+            ['image' => $image->id, 'v' => optional($image->updated_at)->timestamp ?? time()]
         );
     }
 
