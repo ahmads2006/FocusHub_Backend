@@ -19,7 +19,7 @@ return Application::configure(basePath: dirname(__DIR__))
             abort(response()->json(['message' => 'Unauthenticated.'], 401));
         });
 
-        $middleware->append(\App\Http\Middleware\SecurityHeaders::class);
+         $middleware->append(\App\Http\Middleware\SecurityHeaders::class);
         $middleware->web(append: [
             \App\Http\Middleware\SetLocale::class,
             \App\Http\Middleware\TrackOnlineStatus::class,

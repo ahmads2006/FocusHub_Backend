@@ -61,8 +61,12 @@ class GalleryController extends Controller
             // Personalized For You for authenticated users
             $user = Auth::user();
             if ($user) {
-                $recommendationEngine = app(RecommendationEngine::class);
-                $feedIds = $recommendationEngine->getForYouFeedIds($user, 500, true);
+                try {
+                    $recommendationEngine = app(RecommendationEngine::class);
+                    $feedIds = $recommendationEngine->getForYouFeedIds($user, 500, true);
+                } catch (\Exception $e) {
+                    $feedIds = [];
+                }
 
                 $page       = \Illuminate\Pagination\Paginator::resolveCurrentPage() ?: 1;
                 $totalCount = count($feedIds);
