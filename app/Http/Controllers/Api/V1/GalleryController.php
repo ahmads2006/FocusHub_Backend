@@ -31,7 +31,7 @@ class GalleryController extends Controller
         $perPage     = min($request->query('per_page', 20), 50);
 
         $query = Image::where('privacy', 'public')
-            ->with(['settings', 'user', 'labelData', 'aiMetadata', 'storage', 'album', 'album.collaborators'])
+            ->with(['settings', 'user.profile', 'labelData', 'aiMetadata', 'storage', 'album', 'album.collaborators'])
             ->withCount('likes');
 
         // ── AI-Powered Smart Search ──
@@ -79,12 +79,14 @@ class GalleryController extends Controller
                                      ->where('moderation_status', '!=', 'rejected');
                               });
                         })
-                        ->with(['settings', 'user', 'labelData', 'aiMetadata', 'storage', 'album', 'album.collaborators'])
+                        ->with(['settings', 'user.profile', 'labelData', 'aiMetadata', 'storage', 'album', 'album.collaborators'])
                         ->withCount('likes')
                         ->orderByRaw("FIELD(id, {$placeholders})", $slicedIds)
                         ->get();
                 } else {
-                    $models = collect();
+                    // Fallback to latest images if no personalized feed
+                    $models = $query->latest()->paginate($perPage)->getCollection();
+                    $totalCount = $query->count();
                 }
 
                 $images = new \Illuminate\Pagination\LengthAwarePaginator(
