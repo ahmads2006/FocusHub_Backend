@@ -20,36 +20,41 @@ class DashboardController extends Controller
     {
         $userId = Auth::id();
 
-        $totalPhotos = Image::where('user_id', $userId)->count();
-        $views = Image::where('user_id', $userId)->sum('views_count');
-        $publicAlbums = Album::where('user_id', $userId)->where('privacy', 'public')->count();
-        $privateAlbums = Album::where('user_id', $userId)->where('privacy', 'private')->count();
+        // 🚀 OPTIMIZATION: Combine into one query using aggregation if possible, 
+        // or at least optimize individual counts.
+        $stats = DB::table('images')
+            ->where('user_id', $userId)
+            ->selectRaw('count(*) as totalPhotos, sum(views_count) as views')
+            ->first();
+
+        $albumStats = DB::table('albums')
+            ->where('user_id', $userId)
+            ->selectRaw("count(case when privacy = 'public' then 1 end) as publicAlbums")
+            ->selectRaw("count(case when privacy = 'private' then 1 end) as privateAlbums")
+            ->first();
 
         return response()->json([
             'success' => true,
             'data' => [
-                'totalPhotos'   => $totalPhotos,
-                'views'         => (int) $views,
-                'publicAlbums'  => $publicAlbums,
-                'privateAlbums' => $privateAlbums,
+                'totalPhotos'   => (int) ($stats->totalPhotos ?? 0),
+                'views'         => (int) ($stats->views ?? 0),
+                'publicAlbums'  => (int) ($albumStats->publicAlbums ?? 0),
+                'privateAlbums' => (int) ($albumStats->privateAlbums ?? 0),
             ],
         ]);
     }
 
     /**
      * GET /api/v1/activity-log
-     * Get recent activity log for the authenticated user.
      */
     public function activityLog()
     {
         $userId = Auth::id();
 
-        // Use Spatie Activity Log if available, otherwise build from images/albums
-        $activities = collect();
-
-        // Recent uploads
+        // Optimized activity fetching
         $recentUploads = Image::where('user_id', $userId)
-            ->orderBy('created_at', 'desc')
+            ->select('id', 'title', 'created_at')
+            ->latest()
             ->limit(5)
             ->get()
             ->map(fn($img) => [
@@ -59,11 +64,9 @@ class DashboardController extends Controller
                 'timestamp' => $img->created_at->toISOString(),
             ]);
 
-        $activities = $activities->merge($recentUploads);
-
-        // Recent album creations
         $recentAlbums = Album::where('user_id', $userId)
-            ->orderBy('created_at', 'desc')
+            ->select('id', 'title', 'created_at')
+            ->latest()
             ->limit(3)
             ->get()
             ->map(fn($album) => [
@@ -73,10 +76,10 @@ class DashboardController extends Controller
                 'timestamp' => $album->created_at->toISOString(),
             ]);
 
-        $activities = $activities->merge($recentAlbums);
-
-        // Sort by timestamp descending
-        $sorted = $activities->sortByDesc('timestamp')->values()->take(10);
+        $sorted = $recentUploads->merge($recentAlbums)
+            ->sortByDesc('timestamp')
+            ->values()
+            ->take(10);
 
         return response()->json([
             'success' => true,
@@ -86,33 +89,39 @@ class DashboardController extends Controller
 
     /**
      * GET /api/v1/albums/summary
-     * Get album summary with 7-day upload activity chart data.
      */
     public function albumSummary()
     {
         $userId = Auth::id();
+        $sevenDaysAgo = Carbon::now()->subDays(6)->startOfDay();
 
-        // Build 7-day upload activity
+        // 🚀 OPTIMIZATION: One query for 7 days of data using groupBy
+        $countsByDay = Image::where('user_id', $userId)
+            ->where('created_at', '>=', $sevenDaysAgo)
+            ->select(DB::raw('DATE(created_at) as date'), DB::raw('count(*) as count'))
+            ->groupBy('date')
+            ->pluck('count', 'date');
+
         $uploadActivity = [];
         for ($i = 6; $i >= 0; $i--) {
-            $date = Carbon::now()->subDays($i);
-            $count = Image::where('user_id', $userId)
-                ->whereDate('created_at', $date->toDateString())
-                ->count();
-
+            $date = Carbon::now()->subDays($i)->toDateString();
+            $formattedDate = Carbon::parse($date)->format('D');
             $uploadActivity[] = [
-                'day'   => $date->format('D'),
-                'count' => $count,
+                'day'   => $formattedDate,
+                'count' => $countsByDay[$date] ?? 0,
             ];
         }
 
-        $totalAlbums = Album::where('user_id', $userId)->count();
-        $totalPhotos = Image::where('user_id', $userId)->count();
+        $summary = DB::table('images')
+            ->where('user_id', $userId)
+            ->selectRaw('count(*) as totalPhotos')
+            ->addSelect(DB::raw('(SELECT count(*) FROM albums WHERE user_id = ' . (int)$userId . ') as totalAlbums'))
+            ->first();
 
         return response()->json([
             'success' => true,
-            'totalAlbums'    => $totalAlbums,
-            'totalPhotos'    => $totalPhotos,
+            'totalAlbums'    => (int) ($summary->totalAlbums ?? 0),
+            'totalPhotos'    => (int) ($summary->totalPhotos ?? 0),
             'uploadActivity' => $uploadActivity,
         ]);
     }

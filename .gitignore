@@ -36,6 +36,8 @@ storage/app/public/images/*
 storage/app/public/uploads/*
 storage/app/private/secure_uploads/*
 storage/app/private/quarantine/*
+/scratch
+
 
 
 # OS Files

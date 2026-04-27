@@ -180,7 +180,7 @@ class AssetAccessController extends Controller
     /**
      * Helper to stream a file from the appropriate storage disk.
      */
-    protected function streamImageFile(Image $image, string $disposition = 'attachment'): \Symfony\Component\HttpFoundation\StreamedResponse
+    protected function streamImageFile(Image $image, string $disposition = 'attachment'): \Symfony\Component\HttpFoundation\Response
     {
         \Illuminate\Support\Facades\Log::info("AssetAccess: streamImageFile called for ID {$image->id}. Path: {$image->path}, Disposition: {$disposition}");
 
@@ -198,12 +198,28 @@ class AssetAccessController extends Controller
 
         // 3. Try s3 disk (Cloud individual uploads)
         try {
-            if (Storage::disk('s3')->exists($image->path)) {
-                \Illuminate\Support\Facades\Log::info("AssetAccess: Found on s3 disk.");
-                return $this->streamFromDisk('s3', $image->path, $image->filename, $disposition);
+            // 🚀 PERFORMANCE FIX 1: Release session lock early to allow parallel image loading
+            if (session_id()) {
+                session_write_close();
             }
+
+            // 🚀 PERFORMANCE FIX 2: Skip 'exists()' check. It's a blocking network call to AWS.
+            // If the record is in our DB, we trust it's on S3. If not, S3 will return 404 anyway.
+            \Illuminate\Support\Facades\Log::info("AssetAccess: Redirecting to signed S3 URL for image {$image->id}.");
+            
+            return redirect()->away(
+                Storage::disk('s3')->temporaryUrl(
+                    $image->path, 
+                    now()->addMinutes(15), // Increased to 15m for better caching
+                    [
+                        'ResponseContentDisposition' => $disposition === 'inline' 
+                            ? 'inline; filename="' . $image->filename . '"' 
+                            : 'attachment; filename="' . $image->filename . '"'
+                    ]
+                )
+            );
         } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::warning("AssetAccess: S3 check failed for image {$image->id}: " . $e->getMessage());
+            \Illuminate\Support\Facades\Log::warning("AssetAccess: S3 URL generation failed for image {$image->id}: " . $e->getMessage());
         }
 
         \Illuminate\Support\Facades\Log::error("AssetAccess: File not found on any disk for image {$image->id} at path: {$image->path}");

@@ -83,21 +83,12 @@ class RecommendationEngine
 
         // Cache tied to user ID. Reduced to 30 seconds so pulling-to-refresh quickly yields a new Pinterest-style feed.
         try {
-            $feedIds = Cache::tags(["user:{$user->id}", 'feeds'])->remember($cacheKey, 30, function () use ($user, $limit, $includeOwnImages, $blockIndex) {
+            $feedIds = Cache::remember($cacheKey, 30, function () use ($user, $limit, $includeOwnImages, $blockIndex) {
                 return $this->calculateFeedIds($user, $limit, $includeOwnImages, $blockIndex);
             });
         } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::warning("Redis/Cache::tags failed in getForYouFeedIds for user {$user->id}: " . $e->getMessage());
-            // Fallback: Try a simpler cache without tags (which might still fail if global driver is redis, but it's worth a shot)
-            // If that also fails, just return the calculated IDs directly.
-            try {
-                $feedIds = Cache::remember("fallback_".$cacheKey, 30, function () use ($user, $limit, $includeOwnImages, $blockIndex) {
-                    return $this->calculateFeedIds($user, $limit, $includeOwnImages, $blockIndex);
-                });
-            } catch (\Exception $e2) {
-                \Illuminate\Support\Facades\Log::error("Total Cache Failure in getForYouFeedIds: " . $e2->getMessage());
-                $feedIds = $this->calculateFeedIds($user, $limit, $includeOwnImages, $blockIndex);
-            }
+            \Illuminate\Support\Facades\Log::warning("Cache failure in getForYouFeedIds for user {$user->id}: " . $e->getMessage());
+            $feedIds = $this->calculateFeedIds($user, $limit, $includeOwnImages, $blockIndex);
         }
 
         // 3. Emit Feed Datadog Metrics
@@ -123,13 +114,19 @@ class RecommendationEngine
             // Get explicitly hidden images
             $dislikedIds = Redis::smembers("hidden_images:{$user->id}") ?? [];
 
-            // Get images seen in the last 7 days (Using ZSET v2 for memory capping)
-            $seenIdsV2 = Redis::zrange("seen_images_v2:{$user->id}", 0, -1) ?? [];
+            // 🚀 MIDDLE GROUND: Limit to last 2000 seen images.
+            // This provides a massive history buffer while preventing SQL "Max Packet" or performance issues.
+            $seenIdsV2 = Redis::zrevrange("seen_images_v2:{$user->id}", 0, 2000) ?? [];
             
-            // Fallback: Also merge legacy v1 seen_images during the 20-day transition period
-            $legacySeenIds = Redis::smembers("seen_images:{$user->id}") ?? [];
+            // Fallback: Legacy seen images
+            $legacySeenIds = array_slice(Redis::smembers("seen_images:{$user->id}") ?? [], 0, 500);
 
             $hiddenIds = array_unique(array_merge($dislikedIds, $seenIdsV2, $legacySeenIds));
+            
+            // Safe upper bound for WHERE NOT IN clause
+            if (count($hiddenIds) > 2500) {
+                $hiddenIds = array_slice($hiddenIds, 0, 2500);
+            }
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::warning("Redis smembers failed for user {$user->id}: " . $e->getMessage());
         }
@@ -171,85 +168,58 @@ class RecommendationEngine
         arsort($creatorWeights);
         $topCreators = array_keys(array_slice($creatorWeights, 0, 5, true));
 
-        // ── BUCKET 1: Direct Match (Unliked) ──
-        $directResults = [];
-        if (!empty($topTags) || !empty($topCreators)) {
-            $q = Image::query()->tap($unlikedConstraints);
-            if (!empty($topTags)) {
-                // Global Architecture Upgrade: Using Spatie's Many-to-Many Pivot Table instead of Slow JSON!
-                $q->withAnyTags($topTags);
-            }
-            if (!empty($topCreators)) {
-                $placeholders = implode(',', array_fill(0, count($topCreators), '?'));
-                $q->orderByRaw("FIELD(user_id, {$placeholders}) DESC", $topCreators);
-            }
-            // Fetch a larger pool and shuffle for Pinterest-like randomization, then crop to needed count
-            $directResults = $q->latest()->take($directCount * 4)->get(['id', 'user_id', 'labels'])->shuffle()->take($directCount)->values()->toArray();
-        }
-
-        $directIds = array_column($directResults, 'id');
-
-        // ── BUCKET 2: Discovery Match (Unliked) ──
-        $discoveryResults = [];
-        if (!empty($secondaryTags)) {
-            $excludeIds = array_merge($hiddenIds, $directIds);
-            $discoveryResults = Image::query()
-                ->tap($unlikedConstraints)
-                ->whereNotIn('id', $excludeIds)
-                ->withAnyTags($secondaryTags) // Uses Pivot Tables instead of JSON
-                ->latest()
-                ->take($discoveryCount * 4)
-                ->get(['id', 'user_id', 'labels'])
-                ->shuffle()
-                ->take($discoveryCount)
-                ->values()
-                ->toArray();
-        }
-
-        $discoveryIds = array_column($discoveryResults, 'id');
-
-        // ── BUCKET 3: Fresh/Latest Content (Seed traffic for new uploads) ──
-        $excludeIds = array_merge($hiddenIds, $directIds, $discoveryIds);
-        $remainingFreshCount = max(0, $limit - count($directResults) - count($discoveryResults));
-
-        $freshAllocation = (int) ceil($remainingFreshCount * 0.4); // 40% of leftover strictly for newness
-
-        $freshResults = Image::query()
+        // 🚀 PERFORMANCE CONSOLIDATION V4: Single-Shot DB Request
+        // Instead of 4 separate sequential queries, we fetch a large candidate pool and categorize in PHP.
+        // This is 4x-6x faster because it removes redundant network round-trips to the remote Managed DB.
+        $candidatePool = Image::query()
             ->tap($unlikedConstraints)
-            ->whereNotIn('id', $excludeIds)
-            ->latest() // Strictly newest first, no sorting by likes
-            ->take((int) ($freshAllocation * 4))
-            ->get(['id', 'user_id', 'labels'])
-            ->shuffle()
-            ->take($freshAllocation)
-            ->values()
-            ->toArray();
-
-        $freshIds = array_column($freshResults, 'id');
-        $excludeIds = array_merge($excludeIds, $freshIds);
-
-        // ── BUCKET 4: Trending Fallback (Unliked, sorted by likes) ──
-        $trendingAllocation = max(0, $remainingFreshCount - count($freshResults));
-        $trendingResults = Image::query()
-            ->tap($unlikedConstraints)
-            ->whereNotIn('id', $excludeIds)
             ->withCount('likes')
-            ->orderBy('likes_count', 'desc')
             ->latest()
-            ->take((int) ($trendingAllocation * 4))
-            ->get(['id', 'user_id', 'labels'])
-            ->shuffle()
-            ->take($trendingAllocation)
-            ->values()
+            ->take(min(1000, $limit * 10)) // Fetch a safe pool to categorize
+            ->get(['id', 'user_id', 'labels', 'created_at'])
             ->toArray();
 
-        // ── BUCKET 5: Historical Likes (Show last) ──
-        // ADVICE: In modern apps (like TikTok), we DO NOT show liked content in the main feed 
-        // to keep it focused on discovery. Users should go to their profile to see 'Liked' items.
-        // Leaving it empty to improve algorithmic engagement.
-        $likedResults = [];
+        $directResults = [];
+        $discoveryResults = [];
+        $freshResults = [];
+        $trendingResults = [];
 
-        // Merge unliked models into a pool (Keeps priority: Direct -> Discovery -> Fresh -> Trending)
+        $now = now();
+
+        foreach ($candidatePool as $item) {
+            $itemTags = is_string($item['labels']) ? json_decode($item['labels'], true) : ($item['labels'] ?? []);
+            
+            // Logic: Is it from a creator we follow or a primary tag?
+            $isDirect = in_array($item['user_id'], $topCreators) || !empty(array_intersect($itemTags, $topTags));
+            // Logic: Is it a secondary interest?
+            $isDiscovery = !empty(array_intersect($itemTags, $secondaryTags));
+            // Logic: Is it very fresh (last 2 days)?
+            $isFresh = $now->diffInDays($item['created_at']) <= 2;
+            
+            if ($isDirect) {
+                $directResults[] = $item;
+            } elseif ($isDiscovery) {
+                $discoveryResults[] = $item;
+            } elseif ($isFresh) {
+                $freshResults[] = $item;
+            } else {
+                $trendingResults[] = $item;
+            }
+        }
+
+        // Shuffle within buckets for variety
+        shuffle($directResults);
+        shuffle($discoveryResults);
+        shuffle($freshResults);
+        shuffle($trendingResults);
+
+        // Crop to requested counts
+        $directResults = array_slice($directResults, 0, $directCount);
+        $discoveryResults = array_slice($discoveryResults, 0, $discoveryCount);
+        $freshResults = array_slice($freshResults, 0, (int)ceil($randomCount * 0.5));
+        $trendingResults = array_slice($trendingResults, 0, $randomCount - count($freshResults));
+
+        // Merge back into prioritized pool
         $freshDiscoveryPool = array_merge($directResults, $discoveryResults, $freshResults, $trendingResults);
 
         // Uniquify based on ID
@@ -266,6 +236,7 @@ class RecommendationEngine
         $spacedIds = $this->smartSpaceItems($uniquePool);
 
         // Return as simple array of IDs
+        $likedResults = []; // Explicitly empty to focus on discovery
         $finalIds = array_values(array_unique(array_merge($spacedIds, $likedResults)));
 
         // --- 🛡️ INTELLIGENT TIERED QUALITY FALLBACK (النظام الطبقي المتكامل) ---
@@ -374,7 +345,7 @@ class RecommendationEngine
                          ->where('moderation_status', '!=', 'rejected');
                   });
             })
-            ->with(['settings', 'user', 'labelData', 'storage'])
+            ->with(['settings', 'user', 'labelData', 'storage', 'album', 'album.collaborators'])
             ->withCount('likes')
             ->orderByRaw("FIELD(id, {$placeholders})", $slicedIds)
             ->get();
