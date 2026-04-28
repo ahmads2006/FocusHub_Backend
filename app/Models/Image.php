@@ -92,7 +92,10 @@ class Image extends Model
 
     public function getDisplayTitleAttribute(): string
     {
-        if ($this->title && !preg_match('/^IMG_\d+$/i', $this->title)) {
+        $genericNames = ['download', 'images', 'image', 'photo', 'picture', 'screenshot', 'untitled'];
+        $isGeneric = in_array(strtolower($this->title), $genericNames) || preg_match('/^IMG_\d+$/i', $this->title);
+
+        if ($this->title && !$isGeneric) {
             return $this->title;
         }
         
