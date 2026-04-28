@@ -102,6 +102,12 @@ class ProcessImageModeration implements ShouldQueue
             $this->incrementProgress($progressType);
 
             Log::info("ProcessImageModeration: Image {$this->imageId} moderated as {$status}.");
+            
+            // ── Dispatch AI Intelligence Job (Tags & Caption) ────────────
+            if ($status === Image::STATUS_APPROVED) {
+                \App\Jobs\AnalyzeImageLabelsJob::dispatch($this->imageId);
+                Log::info("ProcessImageModeration: Dispatched AnalyzeImageLabelsJob for image {$this->imageId}.");
+            }
 
         } catch (\Exception $e) {
             Log::error("ProcessImageModeration failed for image {$this->imageId}: " . $e->getMessage(), [
