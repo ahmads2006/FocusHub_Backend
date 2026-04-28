@@ -86,9 +86,18 @@ class Image extends Model
         'is_visible' => 'boolean',
     ];
 
-    protected $appends = ['can_edit', 'can_delete', 'can_download', 'url', 'original_url', 'ai_caption', 'analyzer_name'];
+    protected $appends = ['can_edit', 'can_delete', 'can_download', 'url', 'original_url', 'ai_caption', 'analyzer_name', 'display_title'];
 
 
+
+    public function getDisplayTitleAttribute(): string
+    {
+        if ($this->title && !preg_match('/^IMG_\d+$/i', $this->title)) {
+            return $this->title;
+        }
+        
+        return $this->ai_caption ?: ($this->title ?: __('messages.untitled'));
+    }
 
     public function user(): BelongsTo
     {
