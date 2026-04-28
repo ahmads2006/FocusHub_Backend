@@ -86,7 +86,7 @@ class Image extends Model
         'is_visible' => 'boolean',
     ];
 
-    protected $appends = ['can_edit', 'can_delete', 'can_download', 'url', 'original_url'];
+    protected $appends = ['can_edit', 'can_delete', 'can_download', 'url', 'original_url', 'ai_caption', 'analyzer_name'];
 
 
 
