@@ -168,7 +168,7 @@ class AlbumUploadController extends Controller
             'album_id'   => 'nullable|exists:albums,id',
             'album_name' => 'nullable|string|max:255',
             'images'     => 'required|array|min:1|max:100',
-            'images.*'   => 'required|image|mimes:jpeg,png,jpg,webp,gif,heic,heif,tiff,tif,bmp,svg|max:10240', // 10MB each
+            'images.*'   => 'required|mimes:jpeg,png,jpg,webp,gif,heic,heif,tiff,tif,bmp,svg,jfif,pjpeg,pjp|max:25600', // 25MB each
         ]);
 
         $user = $request->user();

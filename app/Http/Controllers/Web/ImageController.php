@@ -52,7 +52,7 @@ class ImageController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'image' => 'required|image|mimes:jpeg,png,jpg,webp,gif,heic,heif|max:10240',
+            'image' => 'required|mimes:jpeg,png,jpg,webp,gif,heic,heif|max:10240',
             'privacy' => 'in:public,private',
             'album_id' => 'nullable|exists:albums,id',
             'title' => 'nullable|string|max:255',

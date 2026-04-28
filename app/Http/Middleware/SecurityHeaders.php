@@ -41,7 +41,7 @@ class SecurityHeaders
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net",
             "font-src 'self' https://fonts.gstatic.com",
             "img-src 'self' data: blob: https://ik.imagekit.io https://*.digitaloceanspaces.com https://*.opalshot.studio https://*.amazonaws.com https://images.unsplash.com",
-            "connect-src 'self' https://*.opalshot.studio wss://*.opalshot.studio https://ik.imagekit.io https://*.digitaloceanspaces.com",
+            "connect-src 'self' https://*.opalshot.studio wss://*.opalshot.studio https://api.opalshot.studio wss://api.opalshot.studio https://ik.imagekit.io https://*.digitaloceanspaces.com",
             "frame-ancestors 'self'",
             "upgrade-insecure-requests"
         ];

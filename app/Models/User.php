@@ -486,8 +486,7 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
      */
     public function hasEnoughStorage(int $bytesToAdd): bool
     {
-        // Super Admins have infinite space
-        if ($this->hasRole('super-admin') || $this->hasRole('super_admin') || !$this->storage_limit_bytes) {
+        if ($this->isAnyAdmin() || !$this->storage_limit_bytes) {
             return true;
         }
 
