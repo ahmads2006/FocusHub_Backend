@@ -82,7 +82,65 @@ class ImageController extends Controller
     public function show(Image $image)
     {
         $this->authorize('view', $image);
-        return response()->json($image);
+        
+        $image->load(['meta', 'user', 'tags', 'aiMetadata']);
+        
+        // Get related images based on tags
+        $tagNames = $image->tags->pluck('name')->toArray();
+        
+        $related = collect();
+        if (!empty($tagNames)) {
+            $related = Image::where('id', '!=', $image->id)
+                ->where('privacy', 'public')
+                ->withAnyTags($tagNames)
+                ->with(['tags'])
+                ->withCount('analytics')
+                ->get()
+                ->map(function($rel) use ($tagNames) {
+                    // Calculate match count
+                    $relTags = $rel->tags->pluck('name')->toArray();
+                    $rel->match_count = count(array_intersect($tagNames, $relTags));
+                    return $rel;
+                })
+                ->sort(function($a, $b) {
+                    // 1. Match count descending
+                    if ($a->match_count !== $b->match_count) {
+                        return $b->match_count <=> $a->match_count;
+                    }
+                    // 2. Popularity (analytics_count) descending
+                    if ($a->analytics_count !== $b->analytics_count) {
+                        return $b->analytics_count <=> $a->analytics_count;
+                    }
+                    // 3. Recency (created_at) descending
+                    return $b->created_at <=> $a->created_at;
+                })
+                ->take(12)
+                ->values();
+        }
+
+        $hasRelated = $related->isNotEmpty();
+
+        if (!$hasRelated) {
+            // Get random images if no related found
+            $related = Image::where('id', '!=', $image->id)
+                ->where('privacy', 'public')
+                ->withCount('analytics')
+                ->inRandomOrder()
+                ->take(12)
+                ->get();
+        }
+
+        // Add display URLs to related images
+        $related->each(function($img) {
+            $img->append(['url', 'original_url']);
+        });
+
+        return response()->json([
+            'image' => $image,
+            'related' => $related,
+            'has_related' => $hasRelated,
+            'match_base' => count($tagNames)
+        ]);
     }
 
     public function update(Request $request, Image $image)
