@@ -165,10 +165,13 @@ class AlbumUploadController extends Controller
     public function uploadBatch(Request $request)
     {
         $request->validate([
-            'album_id'   => 'nullable|exists:albums,id',
-            'album_name' => 'nullable|string|max:255',
-            'images'     => 'required|array|min:1|max:100',
-            'images.*'   => 'required|mimes:jpeg,png,jpg,webp,gif,heic,heif,tiff,tif,bmp,svg,jfif,pjpeg,pjp|max:25600', // 25MB each
+            'album_id'    => 'nullable|exists:albums,id',
+            'album_name'  => 'nullable|string|max:255',
+            'title'       => 'nullable|string|max:255',
+            'description' => 'nullable|string|max:1000',
+            'privacy'     => 'nullable|in:public,private',
+            'images'      => 'required|array|min:1|max:100',
+            'images.*'    => 'required|mimes:jpeg,png,jpg,webp,gif,heic,heif,tiff,tif,bmp,svg,jfif,pjpeg,pjp|max:25600',
         ]);
 
         $user = $request->user();
@@ -176,7 +179,7 @@ class AlbumUploadController extends Controller
             return response()->json(['message' => 'Unauthenticated.'], 401);
         }
 
-        // ── Rate Limiting: Max 20 Albums Uploads Per Hour ──
+        // ── Rate Limiting ──
         if (!$user->hasRole('super_admin') && !$user->hasRole('super-admin')) {
             $executed = \Illuminate\Support\Facades\RateLimiter::attempt(
                 'album-upload-limit:' . $user->id,
@@ -186,9 +189,7 @@ class AlbumUploadController extends Controller
             );
 
             if (!$executed) {
-                return response()->json([
-                    'message' => __('messages.upload_limit_batches')
-                ], 429);
+                return response()->json(['message' => __('messages.upload_limit_batches')], 429);
             }
         }
 
@@ -198,11 +199,10 @@ class AlbumUploadController extends Controller
             $album = \App\Models\Album::create([
                 'user_id' => $user->id,
                 'title'   => $request->album_name ?: 'Batch Upload ' . date('Y-m-d H:i'),
-                'privacy' => 'public',
+                'privacy' => $request->privacy ?: 'public',
             ]);
             $albumId = $album->id;
         } else {
-            // 🛡️ SECURITY: Verify user has upload permission to this album
             $album = \App\Models\Album::findOrFail($albumId);
             $this->authorize('uploadPhoto', $album);
         }
@@ -210,15 +210,13 @@ class AlbumUploadController extends Controller
         $files = $request->file('images');
         $totalFiles = count($files);
 
-        // ── Storage Quota Check (5GB Drive System) ──
+        // ── Storage Quota Check ──
         $totalBatchSize = array_reduce($files, fn($carry, $f) => $carry + $f->getSize(), 0);
         if (!$user->hasEnoughStorage($totalBatchSize)) {
-            return response()->json([
-                'message' => __('messages.storage_limit_batch')
-            ], 403);
+            return response()->json(['message' => __('messages.storage_limit_batch')], 403);
         }
 
-        $jobId = Str::uuid()->toString();
+        $jobId = (string) Str::uuid();
 
         // Initialize Redis progress tracker
         $redisKey = 'opticvault:upload_progress:' . $jobId;
@@ -235,52 +233,41 @@ class AlbumUploadController extends Controller
         }
 
         $uploadedImages = [];
+        $batchTitle = $request->title;
+        $batchDescription = $request->description;
+        $batchPrivacy = $request->privacy ?: ($album ? $album->privacy : 'public');
 
-        foreach ($files as $file) {
+        foreach ($files as $index => $file) {
             $filename = $file->getClientOriginalName();
-            $uid = Str::uuid()->toString();
+            $uid = (string) Str::uuid();
             $extension = $file->getClientOriginalExtension() ?: strtolower(pathinfo($filename, PATHINFO_EXTENSION));
-            $newFilename = $uid . '_' . $filename; // or $uid . '.' . $extension
+            $newFilename = $uid . '_' . $filename;
 
-            // ── Dynamic S3 Folder Structure ──
             $year = date('Y');
             $month = date('m');
-            $userId = $user->id;
-            $uploadedImages[] = [
-            'file' => $file,
-            'filename' => $filename,
-            'uid' => $uid,
-            'extension' => $extension,
-            'newFilename' => $newFilename,
-            'year' => $year,
-            'month' => $month,
-            'userId' => $userId,
-          ];
-            // ── Dynamic S3 Folder Structure ──
-            $year = date('Y');
-            $month = date('m');
-            $userId = $user->id;
-            
-            // Correct path: photos/YYYY/MM/userId/albumId/
-            $dynamicPath = "photos/{$year}/{$month}/{$userId}/{$albumId}";
+            $dynamicPath = "photos/{$year}/{$month}/{$user->id}/{$albumId}";
 
-            // ── Store to S3 (immediate) using putFileAs with CORRECT visibility ──
+            // ── Store to S3 ──
             $s3Path = \Illuminate\Support\Facades\Storage::disk('s3')->putFileAs($dynamicPath, $file, $newFilename, ['visibility' => 'public']);
 
-            // ── Create DB record with "pending" moderation ──
-            $album = \App\Models\Album::find($albumId);
-            $inheritedPrivacy = $album ? $album->privacy : 'private';
-
             try {
-                $image = \Illuminate\Support\Facades\DB::transaction(function () use ($albumId, $user, $filename, $extension, $file, $inheritedPrivacy, $s3Path, $jobId) {
+                $image = \Illuminate\Support\Facades\DB::transaction(function () use ($albumId, $user, $filename, $extension, $file, $batchPrivacy, $s3Path, $batchTitle, $batchDescription, $totalFiles, $index) {
+                    
+                    // Logic for unique titles in batch
+                    $finalTitle = $batchTitle ?: pathinfo($filename, PATHINFO_FILENAME);
+                    if ($totalFiles > 1 && $batchTitle) {
+                        $finalTitle .= " (" . ($index + 1) . ")";
+                    }
+
                     $image = \App\Models\Image::create([
-                        'album_id'   => $albumId,
-                        'user_id'    => $user->id,
-                        'title'      => pathinfo($filename, PATHINFO_FILENAME),
-                        'filename'   => $filename,
-                        'file_type'  => $extension,
-                        'size'       => $file->getSize(),
-                        'privacy'    => $inheritedPrivacy,
+                        'album_id'    => $albumId,
+                        'user_id'     => $user->id,
+                        'title'       => $finalTitle,
+                        'description' => $batchDescription,
+                        'filename'    => $filename,
+                        'file_type'   => $extension,
+                        'size'        => $file->getSize(),
+                        'privacy'     => $batchPrivacy,
                     ]);
 
                     $image->storage()->updateOrCreate(['image_id' => $image->id], [
@@ -299,18 +286,17 @@ class AlbumUploadController extends Controller
                     return $image;
                 });
 
-                // ── Dispatch background moderation job to Redis queue ──
+                // ── Dispatch background moderation job ──
                 \App\Jobs\ProcessImageModeration::dispatch($image->id, $jobId, $s3Path);
 
                 $uploadedImages[] = [
                     'id'       => $image->id,
                     'filename' => $filename,
+                    'title'    => $image->title,
                 ];
             } catch (\Exception $e) {
-                // If DB fails, securely delete the orphaned S3 file
                 \Illuminate\Support\Facades\Storage::disk('s3')->delete($s3Path);
-                \Illuminate\Support\Facades\Log::error("Batch upload failed inside DB, wiped S3 file: " . $e->getMessage());
-                // Skip adding to uploadedImages, continue with the next image in the batch
+                \Illuminate\Support\Facades\Log::error("Batch upload failed inside DB: " . $e->getMessage());
                 continue;
             }
         }
