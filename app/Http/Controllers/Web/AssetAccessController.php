@@ -82,16 +82,16 @@ class AssetAccessController extends Controller
             $imagekitPath = $image->imagekit_file_path ?? null;
             if ($imagekitPath) {
                 $imageKitService = app(\App\Services\Core\ImageKitService::class);
-                $url = $imageKitService->generateSignedUrl($imagekitPath, [], 60);
+                $url = $imageKitService->generateSignedUrl($imagekitPath, [['format' => 'webp', 'quality' => 'auto']], 60);
                 \Illuminate\Support\Facades\Log::info("AssetAccess: Redirecting to signed ImageKit URL for original image {$image->id}");
                 return redirect($url);
             }
-            return $this->streamImageFile($image);
+            return $this->streamImageFile($image, 'inline');
         }
 
         // 4b. Watermark via ImageKit CDN overlay (preferred — no file modification)
         $imagekitPath = $image->imagekit_file_path ?? null;
-        if ($imagekitPath && !app()->environment('local')) {
+        if ($imagekitPath) {
             $imageKitService = app(\App\Services\Core\ImageKitService::class);
             $watermarkText = $image->user->name ?? 'OpticVault';
             $watermarkedUrl = $imageKitService->getWatermarkedUrl($imagekitPath, $watermarkText);
@@ -168,7 +168,7 @@ class AssetAccessController extends Controller
         $imagekitPath = $image->imagekit_file_path ?? null;
 
         // Generate Signed preview URL for safe/owner views if it's in the cloud
-        if ($imagekitPath && !app()->environment('local')) {
+        if ($imagekitPath) {
             $imageKitService = app(\App\Services\Core\ImageKitService::class);
             $url = $imageKitService->generateSignedUrl($imagekitPath, [['format' => 'webp', 'quality' => 'auto']], 30);
             return redirect($url);
@@ -198,28 +198,37 @@ class AssetAccessController extends Controller
 
         // 3. Try s3 disk (Cloud individual uploads)
         try {
-            // 🚀 PERFORMANCE FIX 1: Release session lock early to allow parallel image loading
-            if (session_id()) {
-                session_write_close();
+            // 🚀 PERFORMANCE: Release session early
+            if (session_id()) session_write_close();
+
+            $disk = Storage::disk('s3');
+            
+            // Check if file exists before attempting to stream (optional but safer for debugging)
+            if (!$disk->exists($image->path)) {
+                 \Illuminate\Support\Facades\Log::error("AssetAccess: File NOT found on S3: {$image->path}");
+                 abort(404, 'Image source not found.');
             }
 
-            // 🚀 PERFORMANCE FIX 2: Skip 'exists()' check. It's a blocking network call to AWS.
-            // If the record is in our DB, we trust it's on S3. If not, S3 will return 404 anyway.
-            \Illuminate\Support\Facades\Log::info("AssetAccess: Redirecting to signed S3 URL for image {$image->id}.");
-            
-            return redirect()->away(
-                Storage::disk('s3')->temporaryUrl(
-                    $image->path, 
-                    now()->addMinutes(15), // Increased to 15m for better caching
-                    [
-                        'ResponseContentDisposition' => $disposition === 'inline' 
-                            ? 'inline; filename="' . $image->filename . '"' 
-                            : 'attachment; filename="' . $image->filename . '"'
-                    ]
-                )
+            $stream = $disk->readStream($image->path);
+            $mime = $disk->mimeType($image->path) ?? 'image/jpeg';
+            $size = $disk->size($image->path);
+
+            return response()->stream(
+                function () use ($stream) {
+                    fpassthru($stream);
+                    if (is_resource($stream)) fclose($stream);
+                },
+                200,
+                [
+                    'Content-Type' => $mime,
+                    'Content-Length' => $size,
+                    'Content-Disposition' => ($disposition === 'inline' ? 'inline' : 'attachment') . '; filename="' . $image->filename . '"',
+                    'Cache-Control' => 'public, max-age=31536000',
+                ]
             );
         } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::warning("AssetAccess: S3 URL generation failed for image {$image->id}: " . $e->getMessage());
+            \Illuminate\Support\Facades\Log::error("AssetAccess: Streaming failed for image {$image->id}: " . $e->getMessage());
+            abort(500, 'Error streaming image.');
         }
 
         \Illuminate\Support\Facades\Log::error("AssetAccess: File not found on any disk for image {$image->id} at path: {$image->path}");

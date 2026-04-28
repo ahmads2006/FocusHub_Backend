@@ -18,12 +18,17 @@ class AssetDeliveryService
     public function getUrl(Image $image, string $context = 'gallery'): string
     {
         // 🚀 SMART ROUTING (v5.1): Maximum Privacy for Private Assets.
-        $isInCloud = !empty($image->storage?->imagekit_file_id) || !empty($image->storage?->imagekit_file_path);
+        $isInCloud = !empty($image->storage?->imagekit_file_id) || 
+                     !empty($image->storage?->imagekit_file_path) || 
+                     ($image->storage?->disk === 'spaces' || $image->storage?->disk === 's3');
         $isPublic = $image->privacy === 'public' && (!$image->album || $image->album->privacy === 'public') && !$image->isRejected();
 
-        // 🛡️ SECURITY LAYER: If image is PRIVATE or on LOCAL, always use secure server-side routes.
-        // This ensures private images never pass through ImageKit (Third-party CDN).
-        if (!$isPublic || app()->environment('local') || !$isInCloud) {
+
+        // 🛡️ SECURITY LAYER: If image is PRIVATE or not in cloud, use secure server-side routes.
+        // Public cloud images go directly to ImageKit for WebP optimization.
+        $useImageKit = $isPublic && $isInCloud && !app()->environment('local');
+
+        if (!$useImageKit) {
             if ($this->canAccessOriginal($image) || $isPublic) {
                 if (in_array($context, ['gallery', 'preview', 'thumbnail', 'avatar', 'icon', 'square'])) {
                     return $this->generateSecurePreviewUrl($image);
@@ -37,14 +42,17 @@ class AssetDeliveryService
 
         // 🚀 PERFORMANCE LAYER: For PUBLIC CLOUD images, use ImageKit for CDN speed & WebP.
         $imageKit = app(\App\Services\Core\ImageKitService::class);
-        $path = $image->storage?->imagekit_file_path ?? $image->storage?->path;
+        $path = $image->storage?->imagekit_file_path ?? $image->storage?->path ?? $image->path;
 
         if ($path) {
             $path = ltrim($path, '/');
-            $folderPrefix = 'opticvault/';
-            if (str_starts_with(strtolower($path), $folderPrefix)) {
-                $path = substr($path, strlen($folderPrefix));
+            if (str_starts_with(strtolower($path), 'opticvault/')) {
+                $path = substr($path, strlen('opticvault/'));
             }
+        }
+
+        if (in_array($context, ['original', 'source'])) {
+            return $imageKit->getOptimizedUrl($path);
         }
 
         switch ($context) {
@@ -71,7 +79,9 @@ class AssetDeliveryService
 
             case 'original':
             case 'source':
-                return $this->generateSecureOriginalUrl($image);
+                // 🛡️ Even for original view, we prefer ImageKit optimized WebP for speed
+                // unless the user specifically needs the raw source file.
+                return $imageKit->getOptimizedUrl($path);
 
             case 'gallery_watermarked':
                 $transformations = [['width' => 800]];

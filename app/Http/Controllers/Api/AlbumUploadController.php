@@ -257,10 +257,15 @@ class AlbumUploadController extends Controller
             'userId' => $userId,
           ];
             // ── Dynamic S3 Folder Structure ──
-            $dynamicPath = "photos/{$year}/{$month}/{$userId}". $albumId ."/". $filename;
+            $year = date('Y');
+            $month = date('m');
+            $userId = $user->id;
+            
+            // Correct path: photos/YYYY/MM/userId/albumId/
+            $dynamicPath = "photos/{$year}/{$month}/{$userId}/{$albumId}";
 
-            // ── Store to S3/LocalStack (immediate) using putFileAs ──
-            $s3Path = \Illuminate\Support\Facades\Storage::disk('s3')->putFileAs($dynamicPath, $file, $newFilename, 'public');
+            // ── Store to S3 (immediate) using putFileAs with CORRECT visibility ──
+            $s3Path = \Illuminate\Support\Facades\Storage::disk('s3')->putFileAs($dynamicPath, $file, $newFilename, ['visibility' => 'public']);
 
             // ── Create DB record with "pending" moderation ──
             $album = \App\Models\Album::find($albumId);
@@ -281,6 +286,7 @@ class AlbumUploadController extends Controller
                     $image->storage()->updateOrCreate(['image_id' => $image->id], [
                         'original_path' => $s3Path,
                         'path'          => $s3Path,
+                        'imagekit_file_path' => $s3Path,
                         'md5_hash'      => md5_file($file->getRealPath()),
                     ]);
 

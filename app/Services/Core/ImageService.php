@@ -318,8 +318,10 @@ class ImageService
      */
     public function getDynamicUrl(Image $image, ?int $width = null): string
     {
-        if (!$image->imagekit_file_path) {
-            return asset($image->path);
+        $path = $image->storage?->imagekit_file_path ?? $image->storage?->path;
+        
+        if (!$path || !$image->storage?->imagekit_file_path) {
+            return asset($image->storage?->path ?? $image->path);
         }
 
         $options = [
@@ -440,7 +442,6 @@ class ImageService
         $stream = fopen($filePath, 'r');
         Storage::disk('s3')->put($relativePath, $stream, [
             'visibility' => 'public',
-            'ServerSideEncryption' => 'AES256',
         ]);
         if (is_resource($stream)) {
             fclose($stream);

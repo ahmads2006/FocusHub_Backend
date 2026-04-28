@@ -399,7 +399,10 @@ class RecommendationEngine
     public function invalidateUserFeedCache($userId): void
     {
         try {
-            Cache::tags(["user:{$userId}", 'feeds'])->flush();
+            // Replaced tags() with specific key clearing to prevent 500 errors
+            // if the cache driver fallback to file/database occurs.
+            Cache::forget("feed:for_you_ids:{$userId}:others:block:0:v11");
+            Cache::forget("feed:for_you_ids:{$userId}:all:block:0:v11");
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error("Failed to invalidate user feed cache for {$userId}: " . $e->getMessage());
         }

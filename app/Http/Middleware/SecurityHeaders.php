@@ -35,7 +35,17 @@ class SecurityHeaders
         $response->headers->set('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
 
         // 🛡️ Content Security Policy — restrict script/style sources to prevent XSS
-        $response->headers->set('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://fonts.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://ik.imagekit.io https://*.amazonaws.com; connect-src 'self' https://api.opalshot.studio wss://api.opalshot.studio; frame-ancestors 'self';");
+        $csp = [
+            "default-src 'self'",
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://fonts.googleapis.com",
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net",
+            "font-src 'self' https://fonts.gstatic.com",
+            "img-src 'self' data: blob: https://ik.imagekit.io https://*.digitaloceanspaces.com https://*.opalshot.studio https://*.amazonaws.com https://images.unsplash.com",
+            "connect-src 'self' https://*.opalshot.studio wss://*.opalshot.studio https://ik.imagekit.io https://*.digitaloceanspaces.com",
+            "frame-ancestors 'self'",
+            "upgrade-insecure-requests"
+        ];
+        $response->headers->set('Content-Security-Policy', implode('; ', $csp));
 
         // 🛡️ HTTP Strict Transport Security — force HTTPS for 1 year + subdomains
         if ($request->isSecure() || app()->environment('production')) {
