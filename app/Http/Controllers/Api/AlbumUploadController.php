@@ -40,9 +40,31 @@ class AlbumUploadController extends Controller
         $files = is_array($rawFiles) ? array_filter($rawFiles) : ($rawFiles ? [$rawFiles] : []);
 
         if (empty($files)) {
+            Log::warning('Upload attempt with no files.', ['request' => $request->all()]);
             return response()->json([
                 'message' => 'No images received.',
             ], 422);
+        }
+
+        // Validate that all files are actually valid uploads
+        foreach ($files as $file) {
+            if ($file instanceof \Illuminate\Http\UploadedFile) {
+                if (!$file->isValid()) {
+                    Log::error('Invalid file upload detected.', [
+                        'error' => $file->getErrorMessage(),
+                        'client_name' => $file->getClientOriginalName()
+                    ]);
+                    return response()->json(['message' => 'File upload error: ' . $file->getErrorMessage()], 422);
+                }
+                
+                if (!$file->getRealPath() || is_dir($file->getRealPath())) {
+                    Log::error('File path is invalid or a directory.', [
+                        'path' => $file->getRealPath(),
+                        'client_name' => $file->getClientOriginalName()
+                    ]);
+                    return response()->json(['message' => 'Invalid file path received.'], 422);
+                }
+            }
         }
 
         $user = $request->user();

@@ -31,6 +31,19 @@ class ContentSafetyService
     {
         Log::info("AI Safety: Starting failover check for " . $file->getClientOriginalName());
         $filePath = $file->getRealPath();
+        
+        if (!$filePath || !is_file($filePath)) {
+            Log::error("AI Safety: Invalid file path received for " . $file->getClientOriginalName(), [
+                'path' => $filePath,
+                'is_dir' => $filePath ? is_dir($filePath) : false
+            ]);
+            return [
+                'status' => 'pending_review',
+                'reason' => 'Invalid file path',
+                'metadata' => ['hash' => null, 'checks' => []]
+            ];
+        }
+
         $fileHash = hash_file('sha256', $filePath);
         $metadata = [
             'hash' => $fileHash,

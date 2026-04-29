@@ -79,6 +79,7 @@ class Image extends Model
         'labels',
         'is_visible',
         'moderation_status',
+        'ai_description',
     ];
 
     protected $casts = [
@@ -264,7 +265,7 @@ class Image extends Model
      */
     public function getAiCaptionAttribute(): ?string
     {
-        return $this->aiMetadata?->caption;
+        return $this->ai_description ?? $this->aiMetadata?->caption;
     }
 
     /**

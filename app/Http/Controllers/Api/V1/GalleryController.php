@@ -30,26 +30,27 @@ class GalleryController extends Controller
         $searchQuery = $request->query('q');
         $perPage     = min($request->query('per_page', 50), 100);
 
-        $query = Image::where('privacy', 'public')
-            ->with(['settings', 'user.profile', 'labelData', 'aiMetadata', 'storage', 'album', 'album.collaborators'])
+        // Optimized Base Query (v31.0 Performance)
+        $query = Image::select([
+                'images.id', 'images.user_id', 'images.album_id', 'images.title', 
+                'images.description', 'images.ai_description', 'images.filename', 
+                'images.size', 'images.privacy', 'images.created_at', 'images.moderation_status'
+            ])
+            ->where('privacy', 'public')
+            ->where('moderation_status', 'approved')
+            ->with(['user.profile:id,user_id,username,avatar', 'storage:id,image_id,path,imagekit_file_id', 'album:id,title'])
             ->withCount('likes');
 
-        // ── AI-Powered Smart Search ──
+        // ── AI-Powered Smart Search (Optimized with Full-Text) ──
         if ($searchQuery) {
             $search = trim($searchQuery);
             $query->where(function ($q) use ($search) {
-                $q->where('title', 'LIKE', "%{$search}%")
-                    ->orWhere('description', 'LIKE', "%{$search}%")
+                // Use Full-Text for title/description (Super Fast)
+                $q->whereFullText(['title', 'description'], $search)
                     ->orWhereRaw("JSON_SEARCH(labels, 'one', ?, NULL, '$[*]') IS NOT NULL", ["%{$search}%"])
                     ->orWhereHas('aiMetadata', function ($ai) use ($search) {
                         $ai->where('category', 'LIKE', "%{$search}%")
-                            ->orWhere('caption', 'LIKE', "%{$search}%")
-                            ->orWhereRaw("JSON_SEARCH(extracted_tags, 'one', ?, NULL, '$[*]') IS NOT NULL", ["%{$search}%"]);
-                    })
-                    ->orWhereHas('tags', function ($t) use ($search) {
-                        $t->where('name->en', 'LIKE', "%{$search}%")
-                            ->orWhere('name->ar', 'LIKE', "%{$search}%")
-                            ->orWhere('name', 'LIKE', "%{$search}%");
+                            ->orWhere('caption', 'LIKE', "%{$search}%");
                     });
             });
 
@@ -74,7 +75,12 @@ class GalleryController extends Controller
 
                 if (!empty($slicedIds)) {
                     $placeholders = implode(',', array_fill(0, count($slicedIds), '?'));
-                    $models = Image::whereIn('id', $slicedIds)
+                    $models = Image::select([
+                            'images.id', 'images.user_id', 'images.album_id', 'images.title', 
+                            'images.description', 'images.ai_description', 'images.filename', 
+                            'images.size', 'images.privacy', 'images.created_at', 'images.moderation_status'
+                        ])
+                        ->whereIn('id', $slicedIds)
                         ->where('privacy', 'public')
                         ->where(function($q) use ($user) {
                             $q->where('moderation_status', 'approved')
@@ -83,7 +89,7 @@ class GalleryController extends Controller
                                      ->where('moderation_status', '!=', 'rejected');
                               });
                         })
-                        ->with(['settings', 'user.profile', 'labelData', 'aiMetadata', 'storage', 'album', 'album.collaborators'])
+                        ->with(['user.profile:id,user_id,username,avatar', 'storage:id,image_id,path,imagekit_file_id', 'album:id,title'])
                         ->withCount('likes')
                         ->orderByRaw("FIELD(id, {$placeholders})", $slicedIds)
                         ->get();

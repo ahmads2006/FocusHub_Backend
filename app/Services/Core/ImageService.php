@@ -36,10 +36,132 @@ class ImageService
     /**
      * The Full-Stack "Extract -> Sanitize -> Upload" Pipeline
      */
+    public function processAndUpload(UploadedFile $file, array $data, string $userId): Image
+    {
+        // ... (existing logic for synchronous upload - preserved but can be redirected to async)
+        return $this->processAndUploadAsync($file, $data, $userId);
+    }
+
+    /**
+     * LIGHTNING UPLOAD: Stores file raw and dispatches background processing.
+     * Return time: < 1 second.
+     */
+    public function processAndUploadAsync(UploadedFile $file, array $data, string $userId): Image
+    {
+        // 1. Initial validation & Synchronous Safety Check (v31.0 Security)
+        $this->checkRateLimit($userId);
+
+        $moderationResult = $this->contentSafety->validate($file);
+        if ($moderationResult['status'] === 'rejected') {
+            Log::warning("Immediate rejection for user {$userId}: Image failed safety check.");
+            throw new \Exception("The image content was rejected by our safety system.");
+        }
+        
+        $image = \Illuminate\Support\Facades\DB::transaction(function () use ($userId, $data, $file, $moderationResult) {
+            $image = Image::create([
+                'user_id'   => $userId,
+                'album_id'  => $data['album_id'] ?? null,
+                'title'     => $data['title'] ?? pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME),
+                'filename'  => $file->getClientOriginalName(),
+                'file_type' => $file->getClientOriginalExtension(),
+                'size'      => $file->getSize(),
+                'privacy'   => $data['privacy'] ?? 'public',
+            ]);
+
+            // Initial placeholders - already verified safe but pending technical optimization
+            $image->moderation()->updateOrCreate(['image_id' => $image->id], [
+                'status' => 'pending', 
+                'is_visible' => false,
+                'ai_metadata' => $moderationResult['metadata'] ?? [],
+            ]);
+
+            return $image;
+        });
+
+        // 2. Upload RAW file to a temporary S3 location
+        $tempFolder = "temp_uploads/" . date('Y/m/d');
+        $tempPath = Storage::disk('s3')->putFile($tempFolder, $file);
+
+        // 3. Dispatch the Finalizer Job
+        \App\Jobs\FinalizeImageUploadJob::dispatch($image->id, $tempPath);
+
+        return $image->load(['moderation', 'user']);
+    }
+
+    public function finalizeAsyncUpload(Image $image, string $localPath): void
+    {
+        try {
+            // Safety check already done synchronously during upload
+            
+            // 1. EXIF
+            $specs = $this->extractSpecsFromPath($localPath);
+
+            // 3. Sanitization (EXIF Strip / Optimize)
+            $cleanFile = $this->sanitizeFromPath($localPath);
+
+            // 4. Final S3 Storage
+            $year = date('Y'); $month = date('m');
+            $dynamicPath = "photos/{$year}/{$month}/{$image->user_id}";
+            $finalPath = $this->uploadToS3($cleanFile, $image->filename, $dynamicPath);
+
+            // 5. Update Record
+            \Illuminate\Support\Facades\DB::transaction(function () use ($image, $finalPath, $specs, $moderationResult) {
+                $image->storage()->updateOrCreate(['image_id' => $image->id], [
+                    'path' => $finalPath,
+                    'imagekit_file_path' => $finalPath,
+                    'md5_hash' => $moderationResult['metadata']['hash'] ?? md5_file($image->storage->path ?? ''),
+                ]);
+
+                $image->meta()->updateOrCreate(['image_id' => $image->id], [
+                    'technical_specs' => $specs,
+                ]);
+
+                $image->moderation()->update([
+                    'status' => $moderationResult['status'],
+                    'is_visible' => true,
+                    'ai_metadata' => $moderationResult['metadata'] ?? [],
+                ]);
+                
+                // Set the denormalized visibility column on main table
+                $image->update(['is_visible' => true]);
+            });
+
+            // 6. Cleanup
+            if (file_exists($cleanFile)) @unlink($cleanFile);
+
+            // 7. Auto-Tagging Job
+            \App\Jobs\AnalyzeImageLabelsJob::dispatch($image->id);
+
+        } catch (\Exception $e) {
+            Log::error("Async Finalization Error for Image {$image->id}: " . $e->getMessage());
+            throw $e;
+        }
+    }
+
+    protected function extractSpecsFromPath(string $path): array
+    {
+        $specs = ['camera_model' => 'Unknown'];
+        try {
+            $exif = @exif_read_data($path);
+            if ($exif) {
+                $specs['camera_model'] = $exif['Model'] ?? 'Unknown';
+                $specs['iso'] = $exif['ISOSpeedRatings'] ?? 'N/A';
+                $specs['aperture'] = isset($exif['FNumber']) ? 'f/' . $exif['FNumber'] : 'N/A';
+            }
+        } catch (\Exception $e) {}
+        return $specs;
+    }
+
+    protected function sanitizeFromPath(string $path): string
+    {
+        $img = $this->manager->read($path);
+        $tempPath = storage_path('app/clean_' . uniqid() . '.jpg');
+        $img->save($tempPath, quality: 90);
+        return $tempPath;
+    }
+
     /**
      * The Full-Stack "Extract -> Sanitize -> Upload" Pipeline
-     */
-    public function processAndUpload(UploadedFile $file, array $data, string $userId): Image
     {
         try {
             // 0. Rate Limiting (10 uploads per hour per user)

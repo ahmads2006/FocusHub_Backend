@@ -117,10 +117,14 @@ class ImageIntelligenceService
             // 1a. Update Tags (Spatie Tags)
             $this->updateImageTags($image, $result->tags);
 
-            // 2. Automated AI Description: Populate description if empty
-            if (empty($image->description) && !empty($result->caption)) {
-                $image->update(['description' => $result->caption]);
-                Log::info("ImageIntelligence: Auto-populated description for {$image->id}");
+            // 2. Automated AI Description: Always populate ai_description
+            if (!empty($result->caption)) {
+                $image->update([
+                    'ai_description' => $result->caption,
+                    // Only update main description if it's still empty
+                    'description' => empty($image->description) ? $result->caption : $image->description
+                ]);
+                Log::info("ImageIntelligence: Updated AI description for {$image->id}");
             }
 
             // 2a. Store Labels in images.labels (new column)

@@ -23,6 +23,7 @@ RUN apt-get update && apt-get install -y \
 
 # نسخ إعدادات OpCache الخاصة بنا
 COPY docker/php/opcache.ini /usr/local/etc/php/conf.d/opcache.ini
+COPY docker/php/custom.ini /usr/local/etc/php/conf.d/custom.ini
 
 # إخفاء إصدار PHP و Apache لزيادة الأمان
 RUN echo "expose_php = Off" > /usr/local/etc/php/conf.d/security.ini && \
