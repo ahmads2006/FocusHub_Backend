@@ -14,7 +14,7 @@ use Intervention\Image\Facades\Image;
 
 class AlbumUploadController extends Controller
 {
-    public function batchUpload(Request $request)
+    public function uploadBatch(Request $request)
     {
         // Extremely flexible validation for debugging
         $request->validate([
