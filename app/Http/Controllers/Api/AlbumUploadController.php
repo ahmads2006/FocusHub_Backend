@@ -170,8 +170,7 @@ class AlbumUploadController extends Controller
             'title'       => 'nullable|string|max:255',
             'description' => 'nullable|string|max:1000',
             'privacy'     => 'nullable|in:public,private',
-            'images'      => 'required|array|min:1|max:100',
-            'images.*'    => 'required|mimes:jpeg,png,jpg,webp,gif,heic,heif,tiff,tif,bmp,svg,jfif,pjpeg,pjp|max:25600',
+            'images'      => 'required', 
         ]);
 
         $user = $request->user();
@@ -208,6 +207,9 @@ class AlbumUploadController extends Controller
         }
 
         $files = $request->file('images');
+        if (!is_array($files)) {
+            $files = [$files];
+        }
         $totalFiles = count($files);
 
         // ── Storage Quota Check ──
