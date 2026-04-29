@@ -164,14 +164,29 @@ class AlbumUploadController extends Controller
      */
     public function uploadBatch(Request $request)
     {
+        // Extremely flexible validation for debugging
         $request->validate([
             'album_id'    => 'nullable|exists:albums,id',
-            'album_name'  => 'nullable|string|max:255',
-            'title'       => 'nullable|string|max:255',
-            'description' => 'nullable|string|max:1000',
             'privacy'     => 'nullable|in:public,private',
-            'images'      => 'required', 
         ]);
+
+        // Try to find files in any possible key
+        $rawFiles = $request->file('images') ?: $request->file('images.0') ?: $request->file('images_0');
+        
+        if (!$rawFiles && $request->hasFile('images.0')) {
+             $rawFiles = $request->file('images.0');
+        }
+
+        // Normalize to array and filter nulls
+        $files = is_array($rawFiles) ? array_filter($rawFiles) : ($rawFiles ? [$rawFiles] : []);
+
+        \Illuminate\Support\Facades\Log::info('Upload Request Keys: ' . implode(', ', array_keys($request->allFiles())));
+        
+        if (empty($files)) {
+            return response()->json([
+                'message' => 'No images found in request. Received keys: ' . implode(', ', array_keys($request->allFiles())),
+            ], 422);
+        }
 
         $user = $request->user();
         if (!$user) {
@@ -206,14 +221,12 @@ class AlbumUploadController extends Controller
             $this->authorize('uploadPhoto', $album);
         }
 
-        $files = $request->file('images');
-        if (!is_array($files)) {
-            $files = [$files];
-        }
         $totalFiles = count($files);
 
         // ── Storage Quota Check ──
-        $totalBatchSize = array_reduce($files, fn($carry, $f) => $carry + $f->getSize(), 0);
+        $totalBatchSize = array_reduce($files, function($carry, $f) {
+            return $carry + ($f ? $f->getSize() : 0);
+        }, 0);
         if (!$user->hasEnoughStorage($totalBatchSize)) {
             return response()->json(['message' => __('messages.storage_limit_batch')], 403);
         }
