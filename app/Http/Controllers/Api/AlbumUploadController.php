@@ -173,18 +173,25 @@ class AlbumUploadController extends Controller
         // Try to find files in any possible key (Files or Regular Inputs)
         $rawFiles = $request->file('images') ?: $request->file('images.0') ?: $request->input('images') ?: $request->input('images.0');
         
+        \Illuminate\Support\Facades\Log::info('DEBUG UPLOAD:', [
+            'has_file_images' => $request->hasFile('images'),
+            'has_input_images' => $request->has('images'),
+            'input_images_type' => gettype($request->input('images')),
+            'all_keys' => array_keys($request->all()),
+            'files_keys' => array_keys($request->allFiles()),
+        ]);
+
         if (!$rawFiles && $request->hasFile('images.0')) {
              $rawFiles = $request->file('images.0');
         }
 
-        \Illuminate\Support\Facades\Log::info('All Request Keys: ' . implode(', ', array_keys($request->all())));
-        
         // Normalize to array and filter nulls
         $files = is_array($rawFiles) ? array_filter($rawFiles) : ($rawFiles ? [$rawFiles] : []);
 
         if (empty($files)) {
             return response()->json([
                 'message' => 'Still no images. File keys: ' . implode(', ', array_keys($request->allFiles())) . ' | Input keys: ' . implode(', ', array_keys($request->all())),
+                'debug_info' => 'Input images type: ' . gettype($request->input('images')),
             ], 422);
         }
 
