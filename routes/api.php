@@ -166,6 +166,7 @@ Route::prefix('v1')->group(function () {
 
         // ─── 📁 Albums ──────────────────────────
         Route::prefix('albums')->group(function () {
+            Route::post('/cleanup', [App\Http\Controllers\Api\V1\AlbumController::class, 'cleanup']);
             Route::get('/', [App\Http\Controllers\Api\V1\AlbumController::class, 'index']);
             Route::post('/', [App\Http\Controllers\Api\V1\AlbumController::class, 'store']);
             Route::get('/{album}', [App\Http\Controllers\Api\V1\AlbumController::class, 'show']);

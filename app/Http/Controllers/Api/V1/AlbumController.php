@@ -27,12 +27,21 @@ class AlbumController extends Controller
         $user = Auth::user();
 
         $ownedAlbums = $user->ownedAlbums()
+            ->whereHas('settings', function($q) {
+                $q->where('privacy', '!=', 'hidden');
+            })
+            ->with(['images' => function($q) {
+                $q->latest()->limit(5);
+            }])
             ->withCount('images')
             ->latest()
             ->get();
 
         $sharedAlbums = $user->collaborativeAlbums()
             ->wherePivot('status', 'accepted')
+            ->with(['images' => function($q) {
+                $q->latest()->limit(5);
+            }])
             ->withCount('images')
             ->latest()
             ->get();
@@ -43,6 +52,27 @@ class AlbumController extends Controller
                 'owned'  => $ownedAlbums,
                 'shared' => $sharedAlbums,
             ],
+        ]);
+    }
+
+    /**
+     * Remove empty "ghost" albums for the current user.
+     */
+    public function cleanup(): JsonResponse
+    {
+        $user = Auth::user();
+        $ghostTitles = ['Quick Uploads', 'General Uploads', ];
+
+        $deletedCount = \App\Models\Album::withoutGlobalScopes()
+            ->where('user_id', $user->id)
+            ->whereIn('title', $ghostTitles)
+            ->doesntHave('images')
+            ->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => "Successfully removed $deletedCount empty ghost albums.",
+            'deleted_count' => $deletedCount
         ]);
     }
 
@@ -145,17 +175,20 @@ class AlbumController extends Controller
     {
         $this->authorize('delete', $album);
 
-        $request->validate([
-            'otp' => 'required|string|size:6',
-        ]);
+        // Check if album is empty. If it has images, require OTP for safety.
+        if ($album->images()->count() > 0) {
+            $request->validate([
+                'otp' => 'required|string|size:6',
+            ]);
 
-        $otpCode = Cache::get("album_delete_otp_{$album->id}");
+            $otpCode = Cache::get("album_delete_otp_{$album->id}");
 
-        if (!$otpCode || !hash_equals((string) $otpCode, (string) $request->otp)) {
-            return response()->json([
-                'success' => false,
-                'message' => __('messages.invalid_verification'),
-            ], 422);
+            if (!$otpCode || !hash_equals((string) $otpCode, (string) $request->otp)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => __('messages.invalid_verification'),
+                ], 422);
+            }
         }
 
         $imageService = app(ImageService::class);

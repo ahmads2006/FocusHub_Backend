@@ -16,14 +16,36 @@ class AlbumUploadController extends Controller
 {
     public function batchUpload(Request $request)
     {
+        // Extremely flexible validation for debugging
         $request->validate([
-            'images'      => 'required|array',
-            'images.*'    => 'image|mimes:jpeg,png,jpg,gif,webp|max:20480', // 20MB max
-            'album_id'    => 'nullable|exists:albums,id',
+            'album_id'    => 'nullable',
             'album_name'  => 'nullable|string|max:255',
             'description' => 'nullable|string',
             'privacy'     => 'nullable|in:public,private',
         ]);
+
+        // Try to find files in any possible key (Files or Regular Inputs)
+        $rawFiles = $request->file('images') ?: $request->file('images.0') ?: $request->input('images') ?: $request->input('images.0');
+        
+        \Illuminate\Support\Facades\Log::info('DEEP DEBUG UPLOAD:', [
+            'input_images_type' => gettype($request->input('images')),
+            'first_element_type' => gettype($request->input('images.0')),
+            'first_element_sample' => substr(json_encode($request->input('images.0')), 0, 200),
+            'all_input' => $request->except(['images']),
+        ]);
+
+        if (!$rawFiles && $request->hasFile('images.0')) {
+             $rawFiles = $request->file('images.0');
+        }
+
+        // Normalize to array and filter nulls
+        $files = is_array($rawFiles) ? array_filter($rawFiles) : ($rawFiles ? [$rawFiles] : []);
+
+        if (empty($files)) {
+            return response()->json([
+                'message' => 'Still no images. Type: ' . gettype($request->input('images')) . ' | Sample: ' . substr(json_encode($request->input('images.0')), 0, 50),
+            ], 422);
+        }
 
         $user = $request->user();
         $album = null;
@@ -33,40 +55,55 @@ class AlbumUploadController extends Controller
 
             // 1. Determine the Album
             if ($request->album_id) {
-                $album = Album::where('user_id', $user->id)->findOrFail($request->album_id);
-            } elseif ($request->album_name) {
-                $album = Album::firstOrCreate([
-                    'user_id' => $user->id,
-                    'title'   => $request->album_name,
-                ], [
-                    'slug'        => Str::slug($request->album_name) . '-' . Str::random(5),
-                    'description' => $request->description,
-                    'is_public'   => ($request->privacy === 'public'),
-                ]);
-            } else {
-                // Default "Quick Uploads" album
-                $album = Album::firstOrCreate([
-                    'user_id' => $user->id,
-                    'title'   => 'Quick Uploads',
-                ], [
-                    'slug'      => 'quick-uploads-' . $user->id,
-                    'is_public' => true,
-                ]);
+                $album = Album::where('user_id', $user->id)->find($request->album_id);
+            } 
+            
+            if (!$album && $request->album_name) {
+                $normalizedTitle = trim($request->album_name);
+                $album = Album::where('user_id', $user->id)
+                    ->where('title', $normalizedTitle)
+                    ->first();
+
+                if (!$album) {
+                    $album = Album::create([
+                        'user_id'     => $user->id,
+                        'title'       => $normalizedTitle,
+                        'slug'        => Str::slug($normalizedTitle) . '-' . Str::random(5),
+                        'description' => $request->description,
+                        'is_public'   => ($request->privacy === 'public'),
+                    ]);
+                }
+            } 
+            
+            if (!$album) {
+                // Check for existing "Quick Uploads" or "General Uploads" to avoid duplicates
+                $album = Album::withoutGlobalScopes()
+                    ->where('user_id', $user->id)
+                    ->whereIn('title', ['Quick Uploads', 'General Uploads'])
+                    ->first();
+
+                if (!$album) {
+                    $album = Album::create([
+                        'user_id' => $user->id,
+                        'title'   => 'Quick Uploads',
+                        'slug'      => 'quick-uploads-' . $user->id . '-' . Str::random(5),
+                        'privacy'   => 'hidden',
+                    ]);
+                }
             }
 
             $uploadedPhotos = [];
-            $files = $request->file('images');
 
             foreach ($files as $file) {
-                // 2. Generate Paths
+                if (!$file instanceof \Illuminate\Http\UploadedFile) {
+                    continue;
+                }
+
                 $filename = Str::random(40) . '.' . $file->getClientOriginalExtension();
                 $path = "albums/{$album->id}/{$filename}";
 
-                // 3. Process & Upload Image (Using original for now, could add optimization here)
-                // In a real high-end app, we'd generate thumbnails here.
                 Storage::disk('public')->put($path, file_get_contents($file));
 
-                // 4. Create Database Record
                 $photo = Photo::create([
                     'user_id'      => $user->id,
                     'album_id'     => $album->id,
