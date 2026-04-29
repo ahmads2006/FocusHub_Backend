@@ -4,38 +4,31 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Album;
-use App\Models\Photo;
+use App\Models\Image as ImageModel;
+use App\Models\ImageStorage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use Intervention\Image\Facades\Image;
 
 class AlbumUploadController extends Controller
 {
     public function uploadBatch(Request $request)
     {
-        // Extremely flexible validation for debugging
         $request->validate([
             'album_id'    => 'nullable',
             'album_name'  => 'nullable|string|max:255',
+            'title'       => 'nullable|string|max:255',
             'description' => 'nullable|string',
             'privacy'     => 'nullable|in:public,private',
         ]);
 
-        // Try to find files in any possible key (Files or Regular Inputs)
-        $rawFiles = $request->file('images') ?: $request->file('images.0') ?: $request->input('images') ?: $request->input('images.0');
-        
-        \Illuminate\Support\Facades\Log::info('DEEP DEBUG UPLOAD:', [
-            'input_images_type' => gettype($request->input('images')),
-            'first_element_type' => gettype($request->input('images.0')),
-            'first_element_sample' => substr(json_encode($request->input('images.0')), 0, 200),
-            'all_input' => $request->except(['images']),
-        ]);
+        // Try to find files in any possible key
+        $rawFiles = $request->file('images') ?: $request->file('images.0');
 
         if (!$rawFiles && $request->hasFile('images.0')) {
-             $rawFiles = $request->file('images.0');
+            $rawFiles = $request->file('images.0');
         }
 
         // Normalize to array and filter nulls
@@ -43,7 +36,7 @@ class AlbumUploadController extends Controller
 
         if (empty($files)) {
             return response()->json([
-                'message' => 'Still no images. Type: ' . gettype($request->input('images')) . ' | Sample: ' . substr(json_encode($request->input('images.0')), 0, 50),
+                'message' => 'No images received.',
             ], 422);
         }
 
@@ -56,8 +49,8 @@ class AlbumUploadController extends Controller
             // 1. Determine the Album
             if ($request->album_id) {
                 $album = Album::where('user_id', $user->id)->find($request->album_id);
-            } 
-            
+            }
+
             if (!$album && $request->album_name) {
                 $normalizedTitle = trim($request->album_name);
                 $album = Album::where('user_id', $user->id)
@@ -73,10 +66,9 @@ class AlbumUploadController extends Controller
                         'is_public'   => ($request->privacy === 'public'),
                     ]);
                 }
-            } 
-            
+            }
+
             if (!$album) {
-                // Check for existing "Quick Uploads" or "General Uploads" to avoid duplicates
                 $album = Album::withoutGlobalScopes()
                     ->where('user_id', $user->id)
                     ->whereIn('title', ['Quick Uploads', 'General Uploads'])
@@ -84,15 +76,15 @@ class AlbumUploadController extends Controller
 
                 if (!$album) {
                     $album = Album::create([
-                        'user_id' => $user->id,
-                        'title'   => 'Quick Uploads',
+                        'user_id'   => $user->id,
+                        'title'     => 'Quick Uploads',
                         'slug'      => 'quick-uploads-' . $user->id . '-' . Str::random(5),
                         'privacy'   => 'hidden',
                     ]);
                 }
             }
 
-            $uploadedPhotos = [];
+            $uploadedImages = [];
 
             foreach ($files as $file) {
                 if (!$file instanceof \Illuminate\Http\UploadedFile) {
@@ -102,33 +94,45 @@ class AlbumUploadController extends Controller
                 $filename = Str::random(40) . '.' . $file->getClientOriginalExtension();
                 $path = "albums/{$album->id}/{$filename}";
 
+                // Store the file
                 Storage::disk('public')->put($path, file_get_contents($file));
 
-                $photo = Photo::create([
+                // Determine the title
+                $imageTitle = $request->title ?: pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
+
+                // Create Image record (matches the actual Image model fillable fields)
+                $image = ImageModel::create([
                     'user_id'      => $user->id,
                     'album_id'     => $album->id,
-                    'title'        => $file->getClientOriginalName(),
-                    'file_path'    => $path,
-                    'storage_disk' => 'public',
-                    'file_size'    => $file->getSize(),
-                    'mime_type'    => $file->getMimeType(),
+                    'title'        => $imageTitle,
+                    'description'  => $request->description,
+                    'filename'     => $filename,
+                    'size'         => $file->getSize(),
+                    'privacy'      => $request->privacy ?: 'public',
                 ]);
 
-                $uploadedPhotos[] = $photo;
+                // Create ImageStorage record for file path tracking
+                ImageStorage::create([
+                    'image_id'      => $image->id,
+                    'path'          => $path,
+                    'original_path' => $path,
+                ]);
+
+                $uploadedImages[] = $image;
             }
 
             DB::commit();
 
             return response()->json([
-                'message' => 'Successfully uploaded ' . count($uploadedPhotos) . ' photos',
+                'message' => 'Successfully uploaded ' . count($uploadedImages) . ' image(s)',
                 'album'   => $album,
-                'photos'  => $uploadedPhotos,
+                'images'  => $uploadedImages,
             ], 201);
 
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Batch upload failed: ' . $e->getMessage());
-            return response()->json(['message' => 'Upload failed: ' . $e->getMessage()], 500);
+            Log::error('Batch upload failed: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
+            return response()->json(['message' => $e->getMessage()], 500);
         }
     }
 }
