@@ -56,12 +56,7 @@ class ImageService
                 
                 // Privacy-Aware Status Override (v24.0)
                 $privacy = $data['privacy'] ?? 'public';
-                if ($privacy === 'public') {
-                    // Public content always needs admin review before it goes live, even if AI says safe.
-                    if ($moderationResult['status'] === Image::STATUS_APPROVED) {
-                        $moderationResult['status'] = Image::STATUS_PENDING_REVIEW;
-                    }
-                } else {
+                if ($privacy !== 'public') {
                     // Private/Shared content is auto-approved unless AI flagged it as REJECTED.
                     if ($moderationResult['status'] === Image::STATUS_PENDING_REVIEW) {
                         $moderationResult['status'] = Image::STATUS_APPROVED;
@@ -100,21 +95,10 @@ class ImageService
             $shortName = $truncatedBase . '.' . $extension;
 
             if ($moderationResult['status'] === 'rejected') {
-                if (!$isPublicAlbum) {
-                    // BLOCKED: Red content in private/hidden albums is not allowed
-                    throw \Illuminate\Validation\ValidationException::withMessages([
-                        'image' => 'عذراً، لا يمكن رفع محتوى غير لائق في الألبومات الخاصة أو المشتركة. تم حجب العملية بالكامل.'
-                    ]);
-                }
-
-                // RED LOGIC: Secure Private Quarantine, No Cloud Upload (Public context)
-                $fileName = uniqid('rejected_') . '_' . $shortName;
-                $relativePath = "quarantine/{$year}/{$month}/{$userId}/" . $fileName;
-                Storage::disk('local')->put($relativePath, file_get_contents($cleanFile));
-                $path = $relativePath;
-                $originalPath = $relativePath;
-                Log::warning("OpticVault Quarantined (Red) - Private Album: {$relativePath}");
-
+                // BLOCKED: Red content is completely banned from the platform
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'image' => 'عذراً، لا يمكن رفع محتوى غير لائق. تم حجب العملية بالكامل.'
+                ]);
             } else {
                 if ($moderationResult['is_sensitive'] ?? false) {
                     // YELLOW LOGIC: Dual-Storage Strategy
@@ -318,10 +302,8 @@ class ImageService
      */
     public function getDynamicUrl(Image $image, ?int $width = null): string
     {
-        $path = $image->storage?->imagekit_file_path ?? $image->storage?->path;
-        
-        if (!$path || !$image->storage?->imagekit_file_path) {
-            return asset($image->storage?->path ?? $image->path);
+        if (!$image->imagekit_file_path) {
+            return asset($image->path);
         }
 
         $options = [
@@ -442,6 +424,7 @@ class ImageService
         $stream = fopen($filePath, 'r');
         Storage::disk('s3')->put($relativePath, $stream, [
             'visibility' => 'public',
+            'ServerSideEncryption' => 'AES256',
         ]);
         if (is_resource($stream)) {
             fclose($stream);
