@@ -33,7 +33,9 @@ class FinalizeImageUploadJob implements ShouldQueue
      */
     public function handle(ImageService $imageService): void
     {
-        $image = Image::find($this->imageId);
+        // Bypass global visibility scope to find pending records
+        $image = Image::withoutGlobalScopes()->find($this->imageId);
+        
         if (!$image) {
             Log::error("FinalizeImageUploadJob: Image not found {$this->imageId}");
             return;
