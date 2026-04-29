@@ -170,21 +170,21 @@ class AlbumUploadController extends Controller
             'privacy'     => 'nullable|in:public,private',
         ]);
 
-        // Try to find files in any possible key
-        $rawFiles = $request->file('images') ?: $request->file('images.0') ?: $request->file('images_0');
+        // Try to find files in any possible key (Files or Regular Inputs)
+        $rawFiles = $request->file('images') ?: $request->file('images.0') ?: $request->input('images') ?: $request->input('images.0');
         
         if (!$rawFiles && $request->hasFile('images.0')) {
              $rawFiles = $request->file('images.0');
         }
 
+        \Illuminate\Support\Facades\Log::info('All Request Keys: ' . implode(', ', array_keys($request->all())));
+        
         // Normalize to array and filter nulls
         $files = is_array($rawFiles) ? array_filter($rawFiles) : ($rawFiles ? [$rawFiles] : []);
 
-        \Illuminate\Support\Facades\Log::info('Upload Request Keys: ' . implode(', ', array_keys($request->allFiles())));
-        
         if (empty($files)) {
             return response()->json([
-                'message' => 'No images found in request. Received keys: ' . implode(', ', array_keys($request->allFiles())),
+                'message' => 'Still no images. File keys: ' . implode(', ', array_keys($request->allFiles())) . ' | Input keys: ' . implode(', ', array_keys($request->all())),
             ], 422);
         }
 
