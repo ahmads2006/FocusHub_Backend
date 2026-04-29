@@ -28,7 +28,7 @@ class GalleryController extends Controller
     {
         $selectedTag = $request->query('tag');
         $searchQuery = $request->query('q');
-        $perPage     = min($request->query('per_page', 20), 50);
+        $perPage     = min($request->query('per_page', 50), 100);
 
         $query = Image::where('privacy', 'public')
             ->with(['settings', 'user.profile', 'labelData', 'aiMetadata', 'storage', 'album', 'album.collaborators'])
