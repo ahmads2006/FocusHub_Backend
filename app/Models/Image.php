@@ -86,7 +86,18 @@ class Image extends Model
         'is_visible' => 'boolean',
     ];
 
-    protected $appends = ['can_edit', 'can_delete', 'can_download', 'url', 'original_url', 'ai_caption', 'analyzer_name', 'display_title'];
+    protected $appends = [
+        'can_edit', 
+        'can_delete', 
+        'can_download', 
+        'url', 
+        'url_thumbnail',
+        'url_tiny',
+        'original_url', 
+        'ai_caption', 
+        'analyzer_name', 
+        'display_title'
+    ];
 
 
 
@@ -290,11 +301,27 @@ class Image extends Model
     }
 
     /**
-     * Accessor for the image display URL.
+     * Accessor for the image display URL (800px).
      */
     public function getUrlAttribute(): string
     {
         return $this->getUrl('gallery');
+    }
+
+    /**
+     * Optimized thumbnail URL (400px).
+     */
+    public function getUrlThumbnailAttribute(): string
+    {
+        return $this->getUrl('thumbnail');
+    }
+
+    /**
+     * Tiny placeholder URL (20px) for blur loading.
+     */
+    public function getUrlTinyAttribute(): string
+    {
+        return $this->getUrl('placeholder');
     }
 
     /**
