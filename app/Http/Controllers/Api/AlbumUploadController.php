@@ -4,16 +4,21 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Album;
-use App\Models\Image as ImageModel;
-use App\Models\ImageStorage;
+use App\Services\Core\ImageService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class AlbumUploadController extends Controller
 {
+    protected ImageService $imageService;
+
+    public function __construct(ImageService $imageService)
+    {
+        $this->imageService = $imageService;
+    }
+
     public function uploadBatch(Request $request)
     {
         $request->validate([
@@ -44,8 +49,6 @@ class AlbumUploadController extends Controller
         $album = null;
 
         try {
-            DB::beginTransaction();
-
             // 1. Determine the Album
             if ($request->album_id) {
                 $album = Album::where('user_id', $user->id)->find($request->album_id);
@@ -84,6 +87,7 @@ class AlbumUploadController extends Controller
                 }
             }
 
+            // 2. Process each file through the full ImageService pipeline (S3 + DB + AI)
             $uploadedImages = [];
 
             foreach ($files as $file) {
@@ -91,37 +95,20 @@ class AlbumUploadController extends Controller
                     continue;
                 }
 
-                $filename = Str::random(40) . '.' . $file->getClientOriginalExtension();
-                $path = "albums/{$album->id}/{$filename}";
+                $data = [
+                    'album_id'    => $album->id,
+                    'title'       => $request->title ?: pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME),
+                    'description' => $request->description,
+                    'privacy'     => $request->privacy ?: 'public',
+                ];
 
-                // Store the file
-                Storage::disk('public')->put($path, file_get_contents($file));
+                if ($request->has('allow_download')) {
+                    $data['allow_download'] = true;
+                }
 
-                // Determine the title
-                $imageTitle = $request->title ?: pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
-
-                // Create Image record (matches the actual Image model fillable fields)
-                $image = ImageModel::create([
-                    'user_id'      => $user->id,
-                    'album_id'     => $album->id,
-                    'title'        => $imageTitle,
-                    'description'  => $request->description,
-                    'filename'     => $filename,
-                    'size'         => $file->getSize(),
-                    'privacy'      => $request->privacy ?: 'public',
-                ]);
-
-                // Create ImageStorage record for file path tracking
-                ImageStorage::create([
-                    'image_id'      => $image->id,
-                    'path'          => $path,
-                    'original_path' => $path,
-                ]);
-
+                $image = $this->imageService->processAndUpload($file, $data, $user->id);
                 $uploadedImages[] = $image;
             }
-
-            DB::commit();
 
             return response()->json([
                 'message' => 'Successfully uploaded ' . count($uploadedImages) . ' image(s)',
@@ -129,8 +116,9 @@ class AlbumUploadController extends Controller
                 'images'  => $uploadedImages,
             ], 201);
 
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
         } catch (\Exception $e) {
-            DB::rollBack();
             Log::error('Batch upload failed: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
             return response()->json(['message' => $e->getMessage()], 500);
         }
