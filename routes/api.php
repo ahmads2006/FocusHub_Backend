@@ -166,6 +166,7 @@ Route::prefix('v1')->group(function () {
 
         // ─── 📁 Albums ──────────────────────────
         Route::prefix('albums')->group(function () {
+            Route::get('/summary', [App\Http\Controllers\Api\V1\DashboardController::class, 'albumSummary']);
             Route::post('/cleanup', [App\Http\Controllers\Api\V1\AlbumController::class, 'cleanup']);
             Route::get('/', [App\Http\Controllers\Api\V1\AlbumController::class, 'index']);
             Route::post('/', [App\Http\Controllers\Api\V1\AlbumController::class, 'store']);
@@ -299,7 +300,6 @@ Route::prefix('v1')->group(function () {
         // ─── 📊 Dashboard Stats ─────────────────
         Route::get('/stats', [App\Http\Controllers\Api\V1\DashboardController::class, 'stats']);
         Route::get('/activity-log', [App\Http\Controllers\Api\V1\DashboardController::class, 'activityLog']);
-        Route::get('/albums/summary', [App\Http\Controllers\Api\V1\DashboardController::class, 'albumSummary']);
         Route::get('/top-photos', [App\Http\Controllers\Api\V1\DashboardController::class, 'topPhotos']);
 
         // ─── ⚙️ Settings ────────────────────────

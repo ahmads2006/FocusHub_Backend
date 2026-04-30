@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
+
 class DashboardController extends Controller
 {
     /**
@@ -29,7 +30,7 @@ class DashboardController extends Controller
         $photosTrend = $photosLastMonth > 0 ? round((($totalPhotos - $photosLastMonth) / $photosLastMonth) * 100, 1) : 100;
 
         // ── KPI 2: Total Views & Trend ──
-        $totalViews = \App\Models\ImageSetting::whereIn('image_id', function($query) use ($userId) {
+        $totalViews = \App\Models\ImageSettings::whereIn('image_id', function($query) use ($userId) {
             $query->select('id')->from('images')->where('user_id', $userId);
         })->sum('views_count');
         // Simplified trend for views
@@ -47,6 +48,11 @@ class DashboardController extends Controller
         $activeAlbumsCount = Album::where('user_id', $userId)
             ->whereHas('images')
             ->count();
+
+        $publicAlbums = Album::where('user_id', $userId)->public()->count();
+        $privateAlbums = Album::where('user_id', $userId)->whereHas('settings', function($q) {
+            $q->where('privacy', 'private');
+        })->count();
 
         // ── Distribution & Top Photos ──
         $albumsDist = Album::where('user_id', $userId)
@@ -86,28 +92,40 @@ class DashboardController extends Controller
                 ];
             });
 
+        $kpis = [
+            'totalPhotos' => [
+                'value' => (int)$totalPhotos,
+                'trend' => $photosTrend
+            ],
+            'totalViews' => [
+                'value' => (int)$totalViews,
+                'trend' => $viewsTrend
+            ],
+            'weeklyUploads' => [
+                'value' => (int)$thisWeekUploads,
+                'trend' => $uploadTrend
+            ],
+            'activeAlbums' => [
+                'value' => (int)$activeAlbumsCount,
+                'trend' => 0 // Stable
+            ]
+        ];
+
         return response()->json([
             'success' => true,
-            'kpis' => [
-                'totalPhotos' => [
-                    'value' => (int)$totalPhotos,
-                    'trend' => $photosTrend
-                ],
-                'totalViews' => [
-                    'value' => (int)$totalViews,
-                    'trend' => $viewsTrend
-                ],
-                'weeklyUploads' => [
-                    'value' => (int)$thisWeekUploads,
-                    'trend' => $uploadTrend
-                ],
-                'activeAlbums' => [
-                    'value' => (int)$activeAlbumsCount,
-                    'trend' => 0 // Stable
-                ]
-            ],
+            'kpis'               => $kpis,
             'albumsDistribution' => $albumsDist,
-            'mostViewedPhotos'   => $topViewed
+            'mostViewedPhotos'   => $topViewed,
+            'data' => [
+                'kpis'               => $kpis,
+                'totalPhotos'        => (int)$totalPhotos,
+                'photos_count'       => (int)$totalPhotos,
+                'views'              => (int)$totalViews,
+                'publicAlbums'       => (int)$publicAlbums,
+                'privateAlbums'      => (int)$privateAlbums,
+                'albumsDistribution' => $albumsDist,
+                'mostViewedPhotos'   => $topViewed
+            ]
         ]);
     }
 
@@ -182,6 +200,7 @@ class DashboardController extends Controller
      */
     public function albumSummary()
     {
+        \Log::info('Album Summary called for user: ' . Auth::id());
         $userId = Auth::id();
         $sevenDaysAgo = Carbon::now()->subDays(6)->startOfDay();
 
@@ -224,13 +243,13 @@ class DashboardController extends Controller
         // Primary sort: Likes, Secondary sort: Views, Tertiary: Latest
         $photos = Image::withoutGlobalScopes()
             ->where('user_id', $userId)
+            ->select('images.*')
             ->leftJoin('image_settings', 'images.id', '=', 'image_settings.image_id')
             ->with(['album'])
             ->withCount('likes')
             ->orderBy('likes_count', 'desc')
             ->orderBy('image_settings.views_count', 'desc')
             ->orderBy('images.created_at', 'desc')
-            ->select('images.*')
             ->limit(6)
             ->get()
             ->map(function($img) {
