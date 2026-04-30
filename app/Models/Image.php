@@ -11,6 +11,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use App\Models\ImageAppeal;
+use App\Helpers\FormatHelper;
+use App\Helpers\MediaHelper;
 use Spatie\Tags\HasTags;
 use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\Activitylog\LogOptions;
@@ -98,7 +100,9 @@ class Image extends Model
         'original_url', 
         'ai_caption', 
         'analyzer_name', 
-        'display_title'
+        'display_title',
+        'orientation',
+        'formatted_size'
     ];
 
     /**
@@ -355,5 +359,30 @@ class Image extends Model
 
         $path = $thumbnails[$size] ?? $this->path;
         return asset('storage/' . ltrim($path, '/'));
+    }
+
+    /**
+     * Get the human-readable file size.
+     */
+    public function getFormattedSizeAttribute(): string
+    {
+        return FormatHelper::bytes($this->size ?? 0);
+    }
+
+    /**
+     * Get the image orientation (landscape, portrait, square).
+     */
+    public function getOrientationAttribute(): string
+    {
+        // Try to get dimensions from meta
+        $specs = $this->meta?->technical_specs ?? $this->meta?->specs ?? [];
+        $width = $specs['width'] ?? 0;
+        $height = $specs['height'] ?? 0;
+
+        if ($width > 0 && $height > 0) {
+            return MediaHelper::getOrientation($width, $height);
+        }
+
+        return 'landscape'; // Default fallback
     }
 }
