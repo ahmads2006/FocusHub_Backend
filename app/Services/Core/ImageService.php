@@ -66,11 +66,11 @@ class ImageService
                 'file_type' => $file->getClientOriginalExtension(),
                 'size'      => $file->getSize(),
                 'privacy'   => $data['privacy'] ?? 'public',
+                'is_visible' => false,
             ]);
 
-            // Initial placeholders - already verified safe but pending technical optimization
             $image->moderation()->updateOrCreate(['image_id' => $image->id], [
-                'status' => 'pending', 
+                'status' => 'approved', 
                 'is_visible' => false,
                 'ai_metadata' => $moderationResult['metadata'] ?? [],
             ]);
@@ -78,64 +78,48 @@ class ImageService
             return $image;
         });
 
-        // 2. Upload RAW file to a temporary S3 location
-        $tempFolder = "temp_uploads/" . date('Y/m/d');
-        $tempPath = Storage::disk('s3')->putFile($tempFolder, $file);
-
-        // 3. Dispatch the Finalizer Job
-        \App\Jobs\FinalizeImageUploadJob::dispatch($image->id, $tempPath);
-
-        return $image->load(['moderation', 'user']);
-    }
-
-    public function finalizeAsyncUpload(Image $image, string $localPath): void
-    {
+        // --- Synchronous Execution (Removed background jobs per user request) ---
         try {
-            // Safety check already done synchronously during upload
-            
-            // 1. EXIF
-            $specs = $this->extractSpecsFromPath($localPath);
+            // 1. Technical Specs
+            $specs = $this->extractSpecsFromPath($file->getRealPath());
 
-            // 3. Sanitization (EXIF Strip / Optimize)
-            $cleanFile = $this->sanitizeFromPath($localPath);
+            // 2. Sanitization
+            $cleanFile = $this->sanitizeFromPath($file->getRealPath());
 
-            // 4. Final S3 Storage
+            // 3. Final Storage
             $year = date('Y'); $month = date('m');
             $dynamicPath = "photos/{$year}/{$month}/{$image->user_id}";
             $finalPath = $this->uploadToS3($cleanFile, $image->filename, $dynamicPath);
 
-            // 5. Update Record
+            // 4. Update Database
             \Illuminate\Support\Facades\DB::transaction(function () use ($image, $finalPath, $specs, $moderationResult) {
                 $image->storage()->updateOrCreate(['image_id' => $image->id], [
                     'path' => $finalPath,
                     'imagekit_file_path' => $finalPath,
-                    'md5_hash' => $moderationResult['metadata']['hash'] ?? md5_file($image->storage->path ?? ''),
+                    'md5_hash' => $moderationResult['metadata']['hash'] ?? md5_file($cleanFile),
                 ]);
 
                 $image->meta()->updateOrCreate(['image_id' => $image->id], [
                     'technical_specs' => $specs,
                 ]);
 
-                $image->moderation()->update([
-                    'status' => $moderationResult['status'],
-                    'is_visible' => true,
-                    'ai_metadata' => $moderationResult['metadata'] ?? [],
-                ]);
-                
-                // Set the denormalized visibility column on main table
                 $image->update(['is_visible' => true]);
+                $image->moderation()->update(['is_visible' => true]);
             });
 
-            // 6. Cleanup
+            // 5. Cleanup
             if (file_exists($cleanFile)) @unlink($cleanFile);
 
-            // 7. Auto-Tagging Job
+            // 6. Labels (Keep labels job if needed, or run sync)
             \App\Jobs\AnalyzeImageLabelsJob::dispatch($image->id);
 
         } catch (\Exception $e) {
-            Log::error("Async Finalization Error for Image {$image->id}: " . $e->getMessage());
+            Log::error("Direct Image Processing Failed: " . $e->getMessage());
+            $image->delete();
             throw $e;
         }
+
+        return $image->load(['moderation', 'user', 'storage']);
     }
 
     protected function extractSpecsFromPath(string $path): array
