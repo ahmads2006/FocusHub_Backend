@@ -15,13 +15,20 @@ class NotificationController extends Controller
     public function index(): JsonResponse
     {
         $user          = Auth::user();
-        $notifications = $user->notifications()->latest()->take(30)->get();
+        
+        $notifications = $user->notifications()->latest()->paginate(30);
         $unreadCount   = $user->unreadNotifications()->count();
 
         return response()->json([
             'success' => true,
             'data'    => [
-                'notifications' => $notifications,
+                'notifications' => $notifications->items(),
+                'meta' => [
+                    'current_page' => $notifications->currentPage(),
+                    'last_page'    => $notifications->lastPage(),
+                    'total'        => $notifications->total(),
+                    'has_more'     => $notifications->hasMorePages(),
+                ],
                 'unread_count'  => $unreadCount,
             ],
         ]);
