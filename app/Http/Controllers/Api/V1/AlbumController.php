@@ -233,6 +233,14 @@ class AlbumController extends Controller
         }
 
         $album->collaborators()->attach($userToAdd->id, ['role' => $validated['role']]);
+        
+        // Log Activity manually since pivot attach doesn't trigger model events
+        activity()
+            ->performedOn($album)
+            ->causedBy(Auth::user())
+            ->withProperty('collaborator_id', $userToAdd->id)
+            ->log("Added {$userToAdd->name} as a collaborator to the album");
+
         $userToAdd->notify(new AlbumInvitationNotification($album, Auth::user()));
 
         Message::create([
@@ -444,6 +452,18 @@ class AlbumController extends Controller
             'join_note' => $request->note, // 📝 Save the intro note
         ]);
 
+        // Log Activity
+        activity()
+            ->performedOn($album)
+            ->causedBy($user)
+            ->log("Requested to join the album via invitation code");
+
+        // Log Activity
+        activity()
+            ->performedOn($album)
+            ->causedBy($user)
+            ->log("Requested to join the album via invitation code");
+
         // Increment usage count
         $invitation->increment('uses');
 
@@ -527,6 +547,13 @@ class AlbumController extends Controller
         $album->collaborators()->updateExistingPivot($user->id, [
             'status' => 'accepted',
         ]);
+
+        // Log Activity
+        activity()
+            ->performedOn($album)
+            ->causedBy($currentUser)
+            ->withProperty('member_id', $user->id)
+            ->log("Approved {$user->name}'s join request for the album");
 
         // Sync group conversation
         $this->syncGroupConversation($album);

@@ -26,10 +26,21 @@ class DashboardController extends Controller
 
         // Using Eloquent models to respect UUIDs and any potential model-level logic.
         $totalPhotos = Image::withoutGlobalScopes()->where('user_id', $userId)->count();
-        $totalViews = Image::withoutGlobalScopes()->where('user_id', $userId)->sum('views_count');
         
-        $publicAlbums = Album::where('user_id', $userId)->where('privacy', 'public')->count();
-        $privateAlbums = Album::where('user_id', $userId)->where('privacy', 'private')->count();
+        // views_count was moved to image_settings table in v22.0
+        $totalViews = DB::table('images')
+            ->join('image_settings', 'images.id', '=', 'image_settings.image_id')
+            ->where('images.user_id', $userId)
+            ->sum('image_settings.views_count');
+        
+        // Privacy is stored in album_settings
+        $publicAlbums = Album::where('user_id', $userId)
+            ->whereHas('settings', fn($q) => $q->where('privacy', 'public'))
+            ->count();
+            
+        $privateAlbums = Album::where('user_id', $userId)
+            ->whereHas('settings', fn($q) => $q->where('privacy', 'private'))
+            ->count();
 
         return response()->json([
             'success' => true,
@@ -50,58 +61,62 @@ class DashboardController extends Controller
     {
         $userId = Auth::id();
 
-        // 1. Recent Image Uploads
-        $recentUploads = Image::withoutGlobalScopes()
-            ->where('user_id', $userId)
-            ->select('id', 'title', 'created_at')
+        // Using Spatie ActivityLog for comprehensive activity tracking
+        $activities = \Spatie\Activitylog\Models\Activity::where(function($q) use ($userId) {
+                $q->where('causer_id', $userId)
+                  ->orWhere(function($sq) use ($userId) {
+                      // Also include activities where the user is the subject (e.g. someone liked their photo)
+                      $sq->where('subject_type', Image::class)
+                         ->whereIn('subject_id', function($sub) use ($userId) {
+                             $sub->select('id')->from('images')->where('user_id', $userId);
+                         });
+                  });
+            })
             ->latest()
-            ->limit(5)
+            ->limit(20)
             ->get()
-            ->map(fn($img) => [
-                'id'        => 'up_' . $img->id,
-                'type'      => 'upload',
-                'title'     => 'Uploaded: ' . ($img->title ?? 'New Photo'),
-                'timestamp' => $img->created_at->toISOString(),
-            ]);
+            ->map(function($act) {
+                $type = 'upload';
+                $color = 'accent';
+                $title = $act->description;
 
-        // 2. Recent Albums
-        $recentAlbums = Album::where('user_id', $userId)
-            ->select('id', 'title', 'created_at')
-            ->latest()
-            ->limit(3)
-            ->get()
-            ->map(fn($album) => [
-                'id'        => 'al_' . $album->id,
-                'type'      => 'album',
-                'title'     => 'Created Album: ' . $album->title,
-                'timestamp' => $album->created_at->toISOString(),
-            ]);
+                // Map Spatie events to UI types and descriptive titles
+                if ($act->subject_type === Image::class) {
+                    if ($act->event === 'created') {
+                        $title = "Uploaded a new photo";
+                    } elseif ($act->event === 'deleted') {
+                        $type = 'security';
+                        $color = 'red';
+                        $title = "Deleted a photo";
+                    }
+                } elseif ($act->subject_type === Album::class) {
+                    $type = 'album';
+                    $color = 'purple';
+                    if ($act->event === 'created') {
+                        $title = "Created a new album";
+                    } elseif ($act->event === 'updated' && str_contains($act->description, 'collaborator')) {
+                        $title = "Added a member to album";
+                    }
+                }
 
-        // 3. Recent Likes on user's photos (Social Activity)
-        $recentLikes = DB::table('image_likes')
-            ->join('images', 'image_likes.image_id', '=', 'images.id')
-            ->join('users', 'image_likes.user_id', '=', 'users.id')
-            ->where('images.user_id', $userId)
-            ->where('image_likes.user_id', '!=', $userId) // Only others' likes
-            ->select('image_likes.created_at', 'users.name as fan_name', 'images.title as img_title')
-            ->latest('image_likes.created_at')
-            ->limit(5)
-            ->get()
-            ->map(fn($like) => [
-                'id'        => 'lk_' . md5($like->created_at),
-                'type'      => 'share', // Using blue color for likes in UI
-                'title'     => "{$like->fan_name} liked your photo \"{$like->img_title}\"",
-                'timestamp' => Carbon::parse($like->created_at)->toISOString(),
-            ]);
+                // Social activity
+                if (str_contains($act->description, 'liked')) {
+                    $type = 'share';
+                    $color = 'blue';
+                }
 
-        $sorted = $recentUploads->merge($recentAlbums)->merge($recentLikes)
-            ->sortByDesc('timestamp')
-            ->values()
-            ->take(10);
+                return [
+                    'id'        => $act->id,
+                    'type'      => $type,
+                    'title'     => $title,
+                    'timestamp' => $act->created_at->toISOString(),
+                    'color'     => $color
+                ];
+            });
 
         return response()->json([
             'success' => true,
-            'data' => $sorted,
+            'data' => $activities,
         ]);
     }
 
@@ -141,3 +156,4 @@ class DashboardController extends Controller
         ]);
     }
 }
+
