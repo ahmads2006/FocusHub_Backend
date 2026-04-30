@@ -74,6 +74,13 @@ class AssetDeliveryService
             case 'preview':
                 return $imageKit->getOptimizedUrl($path, 800);
 
+            case 'srcset':
+                // Generate a responsive srcset for 400w, 800w, and 1200w
+                $w400 = $imageKit->getOptimizedUrl($path, 400);
+                $w800 = $imageKit->getOptimizedUrl($path, 800);
+                $w1200 = $imageKit->getOptimizedUrl($path, 1200);
+                return "{$w400} 400w, {$w800} 800w, {$w1200} 1200w";
+
             case 'placeholder':
                 return $imageKit->getOptimizedUrl($path, 20, 20);
 

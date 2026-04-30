@@ -94,11 +94,20 @@ class Image extends Model
         'url', 
         'url_thumbnail',
         'url_tiny',
+        'srcset',
         'original_url', 
         'ai_caption', 
         'analyzer_name', 
         'display_title'
     ];
+
+    /**
+     * Get a responsive srcset for the image.
+     */
+    public function getSrcsetAttribute(): string
+    {
+        return $this->getUrl('srcset');
+    }
 
 
 
