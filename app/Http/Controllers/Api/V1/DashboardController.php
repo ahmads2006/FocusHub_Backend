@@ -16,10 +16,6 @@ class DashboardController extends Controller
      * GET /api/v1/stats
      * Get photographer dashboard statistics.
      */
-    /**
-     * GET /api/v1/stats
-     * Get photographer dashboard statistics.
-     */
     public function stats()
     {
         $userId = Auth::id();
@@ -155,5 +151,36 @@ class DashboardController extends Controller
             'uploadActivity' => $uploadActivity,
         ]);
     }
-}
 
+    /**
+     * GET /api/v1/top-photos
+     */
+    public function topPhotos()
+    {
+        $userId = Auth::id();
+
+        // Fetch top 6 photos sorted by likes_count
+        $photos = Image::withoutGlobalScopes()
+            ->where('user_id', $userId)
+            ->with(['album', 'settings'])
+            ->withCount('likes')
+            ->orderBy('likes_count', 'desc')
+            ->limit(6)
+            ->get()
+            ->map(function($img) {
+                return [
+                    'id'    => $img->id,
+                    'title' => $img->title ?: 'Untitled',
+                    'album' => $img->album ? $img->album->title : 'Universal',
+                    'likes' => $img->likes_count,
+                    'views' => $img->settings ? $img->settings->views_count : 0,
+                    'url'   => $img->url
+                ];
+            });
+
+        return response()->json([
+            'success' => true,
+            'data'    => $photos,
+        ]);
+    }
+}

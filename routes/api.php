@@ -300,6 +300,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/stats', [App\Http\Controllers\Api\V1\DashboardController::class, 'stats']);
         Route::get('/activity-log', [App\Http\Controllers\Api\V1\DashboardController::class, 'activityLog']);
         Route::get('/albums/summary', [App\Http\Controllers\Api\V1\DashboardController::class, 'albumSummary']);
+        Route::get('/top-photos', [App\Http\Controllers\Api\V1\DashboardController::class, 'topPhotos']);
 
         // ─── ⚙️ Settings ────────────────────────
         Route::prefix('settings')->group(function () {
