@@ -159,12 +159,17 @@ class DashboardController extends Controller
     {
         $userId = Auth::id();
 
-        // Fetch top 6 photos sorted by likes_count
+        // Fetch top 6 photos
+        // Primary sort: Likes, Secondary sort: Views, Tertiary: Latest
         $photos = Image::withoutGlobalScopes()
             ->where('user_id', $userId)
-            ->with(['album', 'settings'])
+            ->leftJoin('image_settings', 'images.id', '=', 'image_settings.image_id')
+            ->with(['album'])
             ->withCount('likes')
             ->orderBy('likes_count', 'desc')
+            ->orderBy('image_settings.views_count', 'desc')
+            ->orderBy('images.created_at', 'desc')
+            ->select('images.*')
             ->limit(6)
             ->get()
             ->map(function($img) {
