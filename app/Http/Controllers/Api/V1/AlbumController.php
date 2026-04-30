@@ -458,12 +458,6 @@ class AlbumController extends Controller
             ->causedBy($user)
             ->log("Requested to join the album via invitation code");
 
-        // Log Activity
-        activity()
-            ->performedOn($album)
-            ->causedBy($user)
-            ->log("Requested to join the album via invitation code");
-
         // Increment usage count
         $invitation->increment('uses');
 
