@@ -3,6 +3,7 @@
 namespace App\Services\Core;
 
 use App\Models\Image;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\Auth;
 
@@ -108,11 +109,54 @@ class AssetDeliveryService
     }
 
     /**
-     * Generate a masked, temporary secure URL for the original high-res file (download).
+     * Resolve the storage disk and file path for an image.
+     * Returns [disk_name, file_path] or null if unresolvable.
+     */
+    protected function resolveStorageLocation(Image $image): ?array
+    {
+        $disk = $image->storage?->disk;
+        $path = $image->storage?->path ?? $image->path;
+
+        if (!$path) {
+            return null;
+        }
+
+        // Normalize: accept 'spaces' as an alias for the 's3' disk config
+        if ($disk === 'spaces') {
+            $disk = 's3';
+        }
+
+        // Default to 's3' if image is known to be in cloud
+        if (!$disk || !in_array($disk, ['s3', 'local', 'public'])) {
+            $disk = 's3';
+        }
+
+        return [$disk, $path];
+    }
+
+    /**
+     * Generate a pre-signed temporary URL for the original high-res file (download).
+     * TTL: 5 minutes. For cloud disks, the URL points directly to S3/Spaces
+     * with an embedded signature — no backend proxy needed.
      */
     protected function generateSecureOriginalUrl(Image $image): string
     {
-        // Cache-busting via updated_at for fresh restoration/transition results
+        $location = $this->resolveStorageLocation($image);
+
+        if ($location) {
+            [$disk, $path] = $location;
+
+            // ☁️ Cloud disk: generate a pre-signed URL directly from S3/Spaces
+            if ($disk === 's3') {
+                try {
+                    return Storage::disk($disk)->temporaryUrl($path, now()->addMinutes(5));
+                } catch (\RuntimeException $e) {
+                    // Driver doesn't support temporaryUrl (e.g. local), fall through
+                }
+            }
+        }
+
+        // 📁 Fallback: internal signed route for local/public disk
         return URL::temporarySignedRoute(
             'assets.original',
             now()->addMinutes(5),
@@ -121,14 +165,31 @@ class AssetDeliveryService
     }
 
     /**
-     * Generate a masked, temporary secure URL for inline preview display in <img> tags.
-     * Uses the assets.preview route which serves with Content-Disposition: inline.
+     * Generate a pre-signed temporary URL for inline preview display in <img> tags.
+     * TTL: 10 minutes. For cloud disks, the URL points directly to S3/Spaces
+     * with an embedded signature — the browser loads from the CDN, not the backend.
      */
     protected function generateSecurePreviewUrl(Image $image): string
     {
+        $location = $this->resolveStorageLocation($image);
+
+        if ($location) {
+            [$disk, $path] = $location;
+
+            // ☁️ Cloud disk: generate a pre-signed URL directly from S3/Spaces
+            if ($disk === 's3') {
+                try {
+                    return Storage::disk($disk)->temporaryUrl($path, now()->addMinutes(10));
+                } catch (\RuntimeException $e) {
+                    // Driver doesn't support temporaryUrl (e.g. local), fall through
+                }
+            }
+        }
+
+        // 📁 Fallback: internal signed route for local/public disk
         return URL::temporarySignedRoute(
             'assets.preview',
-            now()->addMinutes(10),  // Shorter TTL for better security
+            now()->addMinutes(10),
             ['image' => $image->id, 'v' => optional($image->updated_at)->timestamp ?? time()]
         );
     }
