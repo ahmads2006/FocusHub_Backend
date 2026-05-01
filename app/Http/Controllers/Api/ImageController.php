@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Image;
+use App\Http\Resources\PhotoResource;
 use App\Services\Core\ImageService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -136,8 +137,8 @@ class ImageController extends Controller
         });
 
         return response()->json([
-            'image' => $image,
-            'related' => $related,
+            'image' => new PhotoResource($image),
+            'related' => PhotoResource::collection($related)->resolve(),
             'has_related' => $hasRelated,
             'match_base' => count($tagNames)
         ]);
