@@ -14,6 +14,7 @@ class PhotoResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
+        $canDownload = $request->user()?->can('download', $this->resource) ?? false;
         $labels = is_array($this->labels) ? $this->labels : [];
 
         $tags = $this->relationLoaded('tags')
@@ -40,10 +41,10 @@ class PhotoResource extends JsonResource
 
             // Signed/secure URLs used by frontend modal and download flows.
             'url' => $this->url,
-            'url_high' => $this->original_url ?: $this->url,
+            'url_high' => $canDownload ? ($this->original_url ?: $this->url) : $this->url,
             'url_thumbnail' => $this->url_thumbnail,
             'url_tiny' => $this->url_tiny,
-            'original_url' => $this->original_url,
+            'original_url' => $canDownload ? $this->original_url : null,
             'srcset' => $this->srcset,
 
             'created_at' => optional($this->created_at)->toIso8601String(),
@@ -52,6 +53,7 @@ class PhotoResource extends JsonResource
             'labels' => array_values($labels),
             'tags' => $tags,
             'comments' => $comments,
+            'can_download' => $canDownload,
 
             'settings' => $this->whenLoaded('settings'),
             'meta' => $this->whenLoaded('meta'),

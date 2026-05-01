@@ -84,7 +84,7 @@ class ImageController extends Controller
     {
         $this->authorize('view', $image);
         
-        $image->load(['meta', 'user', 'tags', 'aiMetadata']);
+        $image->load(['meta', 'user', 'tags', 'aiMetadata', 'settings']);
         
         // Get related images based on tags
         $tagNames = $image->tags->pluck('name')->toArray();
@@ -94,7 +94,7 @@ class ImageController extends Controller
             $related = Image::where('id', '!=', $image->id)
                 ->where('privacy', 'public')
                 ->withAnyTags($tagNames)
-                ->with(['tags'])
+                ->with(['tags', 'settings'])
                 ->withCount('analytics')
                 ->get()
                 ->map(function($rel) use ($tagNames) {
@@ -125,6 +125,7 @@ class ImageController extends Controller
             // Get random images if no related found
             $related = Image::where('id', '!=', $image->id)
                 ->where('privacy', 'public')
+                ->with(['settings'])
                 ->withCount('analytics')
                 ->inRandomOrder()
                 ->take(12)
