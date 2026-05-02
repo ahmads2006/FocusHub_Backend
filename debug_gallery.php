@@ -6,8 +6,19 @@ $kernel->bootstrap();
 
 use Illuminate\Support\Facades\DB;
 
-// 1. Check recent public images and their storage records
-echo "=== RECENT PUBLIC IMAGES ===\n";
+echo "=== ALBUMS TABLE COLUMNS ===\n";
+$cols = DB::select("SHOW COLUMNS FROM albums");
+foreach ($cols as $c) {
+    echo $c->Field . " (" . $c->Type . ")\n";
+}
+
+echo "\n=== IMAGE_STORAGE TABLE COLUMNS ===\n";
+$cols2 = DB::select("SHOW COLUMNS FROM image_storage");
+foreach ($cols2 as $c) {
+    echo $c->Field . " (" . $c->Type . ")\n";
+}
+
+echo "\n=== RECENT PUBLIC IMAGES WITH STORAGE ===\n";
 $imgs = DB::table('images')
     ->where('privacy', 'public')
     ->where('is_visible', 1)
@@ -16,52 +27,40 @@ $imgs = DB::table('images')
     ->get(['id', 'album_id', 'privacy', 'title', 'moderation_status']);
 
 foreach ($imgs as $i) {
-    $storage = DB::table('image_storages')->where('image_id', $i->id)->first();
+    $storage = DB::table('image_storage')->where('image_id', $i->id)->first();
     $albumTitle = 'NO ALBUM';
-    $albumPrivacy = 'N/A';
     if ($i->album_id) {
-        $album = DB::table('albums')->where('id', $i->album_id)->first(['title', 'privacy']);
-        if ($album) {
-            $albumTitle = $album->title;
-            $albumPrivacy = $album->privacy;
-        } else {
-            $albumTitle = 'DELETED_ALBUM';
-        }
+        $album = DB::table('albums')->where('id', $i->album_id)->first();
+        $albumTitle = $album->title ?? 'DELETED';
     }
 
-    $disk = $storage->disk ?? 'NO_STORAGE';
-    $path = $storage->path ?? 'NO_PATH';
-    $ikPath = $storage->imagekit_file_path ?? 'NO_IK_PATH';
-    $ikId = $storage->imagekit_file_id ?? 'NO_IK_ID';
-
-    echo "ID: {$i->id}\n";
-    echo "  Title: {$i->title}\n";
-    echo "  Album: {$albumTitle} (privacy: {$albumPrivacy})\n";
-    echo "  Moderation: {$i->moderation_status}\n";
-    echo "  Disk: {$disk}\n";
-    echo "  Path: {$path}\n";
-    echo "  IK Path: {$ikPath}\n";
-    echo "  IK ID: {$ikId}\n";
+    echo "ID: {$i->id} | {$i->title} | Album: {$albumTitle} | Mod: {$i->moderation_status}\n";
+    if ($storage) {
+        echo "  disk=" . ($storage->disk ?? 'NULL') . " | path=" . ($storage->path ?? 'NULL') . " | ik_path=" . ($storage->imagekit_file_path ?? 'NULL') . " | ik_id=" . ($storage->imagekit_file_id ?? 'NULL') . "\n";
+    } else {
+        echo "  *** NO STORAGE RECORD ***\n";
+    }
     echo "---\n";
 }
 
-// 2. Count totals
+// Summary counts
 $total = DB::table('images')->where('privacy', 'public')->where('is_visible', 1)->count();
-$noStorage = DB::table('images')
-    ->where('privacy', 'public')
-    ->where('is_visible', 1)
-    ->whereNotExists(function ($q) {
-        $q->select(DB::raw(1))->from('image_storages')->whereColumn('image_storages.image_id', 'images.id');
-    })
+$withStorage = DB::table('images')
+    ->where('images.privacy', 'public')
+    ->where('images.is_visible', 1)
+    ->join('image_storage', 'image_storage.image_id', '=', 'images.id')
     ->count();
-$noIk = DB::table('images')
-    ->where('privacy', 'public')
-    ->where('is_visible', 1)
-    ->join('image_storages', 'image_storages.image_id', '=', 'images.id')
-    ->whereNull('image_storages.imagekit_file_path')
+$withIK = DB::table('images')
+    ->where('images.privacy', 'public')
+    ->where('images.is_visible', 1)
+    ->join('image_storage', 'image_storage.image_id', '=', 'images.id')
+    ->whereNotNull('image_storage.imagekit_file_path')
+    ->where('image_storage.imagekit_file_path', '!=', '')
     ->count();
 
 echo "\n=== SUMMARY ===\n";
-echo "Total public visible images: {$total}\n";
-echo "Images WITHOUT storage record: {$noStorage}\n";
-echo "Images WITHOUT ImageKit path: {$noIk}\n";
+echo "Total public visible: {$total}\n";
+echo "With storage record: {$withStorage}\n";
+echo "With ImageKit path: {$withIK}\n";
+echo "Missing storage: " . ($total - $withStorage) . "\n";
+echo "Missing ImageKit: " . ($withStorage - $withIK) . "\n";
