@@ -53,6 +53,15 @@ class GalleryController extends Controller
                     });
             });
 
+            // 🚀 SMART LOADING: Load only what's needed for the gallery view
+            // 'storage' is CRITICAL for AssetDeliveryService to generate ImageKit URLs.
+            // 'user' is needed for the photographer's name/avatar.
+            $query->with([
+                'user:id,name,username,avatar',
+                'storage:id,image_id,disk,path,imagekit_file_id,imagekit_file_path',
+                'meta:id,image_id,technical_specs'
+            ]);
+
             $images = $query->latest()->paginate($perPage);
         } elseif ($selectedTag) {
             $query->whereRaw('JSON_CONTAINS(labels, ?)', [json_encode($selectedTag)]);
@@ -102,12 +111,9 @@ class GalleryController extends Controller
             }
         }
 
-        // ⚡ PERFORMANCE: setAppends REPLACES the appends list entirely.
-        // Unlike makeHidden (which still computes all accessors then hides output),
-        // setAppends prevents unused accessors from running AT ALL.
-        // This cuts per-image computation from 13 accessors to 6.
+        // ⚡ PERFORMANCE: Hide heavy computed appends that are not needed for gallery cards
         $images->each(function ($image) {
-            $image->setAppends(['url', 'url_thumbnail', 'can_download', 'display_title', 'orientation', 'formatted_size']);
+            $image->makeHidden(['srcset', 'original_url', 'ai_caption', 'analyzer_name', 'can_edit', 'can_delete']);
         });
 
         // Interaction state for current user

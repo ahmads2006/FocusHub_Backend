@@ -22,8 +22,9 @@ class AssetDeliveryService
         $isInCloud = !empty($image->storage?->imagekit_file_id) || 
                      !empty($image->storage?->imagekit_file_path) || 
                      ($image->storage?->disk === 'spaces' || $image->storage?->disk === 's3');
-        $isPublic = $image->privacy === 'public' && (!$image->album || $image->album->privacy === 'public') && !$image->isRejected();
-
+        $isPublic = $image->privacy === 'public' && 
+                    (!$image->album || in_array($image->album->privacy, ['public', 'hidden'])) && 
+                    !$image->isRejected();
 
         // 🛡️ SECURITY LAYER: If image is PRIVATE or not in cloud, use secure server-side routes.
         // Public cloud images go directly to ImageKit for WebP optimization.
