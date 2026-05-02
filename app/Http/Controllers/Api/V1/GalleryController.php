@@ -31,7 +31,7 @@ class GalleryController extends Controller
         $perPage     = min($request->query('per_page', 50), 100);
 
         $query = Image::where('privacy', 'public')
-            ->with(['settings', 'user.profile', 'labelData', 'aiMetadata', 'storage', 'album', 'album.collaborators'])
+            ->with(['settings', 'user.profile', 'storage', 'meta', 'album'])
             ->withCount('likes');
 
         // ── AI-Powered Smart Search ──
@@ -83,7 +83,7 @@ class GalleryController extends Controller
                                      ->where('moderation_status', '!=', 'rejected');
                               });
                         })
-                        ->with(['settings', 'user.profile', 'labelData', 'aiMetadata', 'storage', 'album', 'album.collaborators'])
+                        ->with(['settings', 'user.profile', 'storage', 'meta', 'album'])
                         ->withCount('likes')
                         ->orderByRaw("FIELD(id, {$placeholders})", $slicedIds)
                         ->get();
@@ -101,6 +101,11 @@ class GalleryController extends Controller
                 $images = $query->latest()->paginate($perPage);
             }
         }
+
+        // ⚡ PERFORMANCE: Hide heavy computed appends that are not needed for gallery cards
+        $images->each(function ($image) {
+            $image->makeHidden(['srcset', 'original_url', 'url_tiny', 'ai_caption', 'analyzer_name', 'can_edit', 'can_delete']);
+        });
 
         // Interaction state for current user
         $likedImageIds     = [];
