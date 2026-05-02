@@ -27,7 +27,7 @@ class AlbumController extends Controller
         $user = Auth::user();
 
         $ownedAlbums = $user->ownedAlbums()
-            ->where('privacy', '!=', 'hidden')
+            ->where('title', '!=', 'Quick Uploads')
             ->with(['images' => function($q) {
                 $q->latest()->limit(5);
             }])
@@ -36,7 +36,7 @@ class AlbumController extends Controller
             ->get();
 
         $sharedAlbums = $user->collaborativeAlbums()
-            ->where('privacy', '!=', 'hidden')
+            ->where('title', '!=', 'Quick Uploads')
             ->wherePivot('status', 'accepted')
             ->with(['images' => function($q) {
                 $q->latest()->limit(5);

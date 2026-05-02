@@ -18,13 +18,14 @@ class AssetDeliveryService
      */
     public function getUrl(Image $image, string $context = 'gallery'): string
     {
-        // 🚀 SMART ROUTING (v5.1): Maximum Privacy for Private Assets.
+        // 🚀 SMART ROUTING (v6.0): Detect cloud presence by ImageKit path OR storage path.
+        // NOTE: disk column is often NULL in DB, so we can't rely on it alone.
         $isInCloud = !empty($image->storage?->imagekit_file_id) || 
                      !empty($image->storage?->imagekit_file_path) || 
-                     ($image->storage?->disk === 'spaces' || $image->storage?->disk === 's3');
-        $isPublic = $image->privacy === 'public' && 
-                    (!$image->album || in_array($image->album->privacy, ['public', 'hidden'])) && 
-                    !$image->isRejected();
+                     !empty($image->storage?->path) ||
+                     in_array($image->storage?->disk, ['spaces', 's3']);
+        // NOTE: albums table has NO privacy column — don't reference album->privacy.
+        $isPublic = $image->privacy === 'public' && !$image->isRejected();
 
         // 🛡️ SECURITY LAYER: If image is PRIVATE or not in cloud, use secure server-side routes.
         // Public cloud images go directly to ImageKit for WebP optimization.

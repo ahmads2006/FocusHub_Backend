@@ -103,8 +103,6 @@ class AlbumUploadController extends Controller
                     $album = Album::create([
                         'user_id'   => $user->id,
                         'title'     => 'Quick Uploads',
-                        'slug'      => 'quick-uploads-' . $user->id . '-' . Str::random(5),
-                        'privacy'   => 'hidden',
                     ]);
                 }
             }
