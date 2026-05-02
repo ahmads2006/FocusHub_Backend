@@ -102,9 +102,12 @@ class GalleryController extends Controller
             }
         }
 
-        // ⚡ PERFORMANCE: Hide heavy computed appends that are not needed for gallery cards
+        // ⚡ PERFORMANCE: setAppends REPLACES the appends list entirely.
+        // Unlike makeHidden (which still computes all accessors then hides output),
+        // setAppends prevents unused accessors from running AT ALL.
+        // This cuts per-image computation from 13 accessors to 6.
         $images->each(function ($image) {
-            $image->makeHidden(['srcset', 'original_url', 'url_tiny', 'ai_caption', 'analyzer_name', 'can_edit', 'can_delete']);
+            $image->setAppends(['url', 'url_thumbnail', 'can_download', 'display_title', 'orientation', 'formatted_size']);
         });
 
         // Interaction state for current user
