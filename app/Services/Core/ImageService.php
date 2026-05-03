@@ -97,7 +97,7 @@ class ImageService
             $finalPath = $this->uploadToS3($cleanFile, $image->filename, $dynamicPath);
 
             // 4. Update Database
-            \Illuminate\Support\Facades\DB::transaction(function () use ($image, $finalPath, $specs, $moderationResult) {
+            \Illuminate\Support\Facades\DB::transaction(function () use ($image, $finalPath, $specs, $moderationResult, $cleanFile) {
                 $image->storage()->updateOrCreate(['image_id' => $image->id], [
                     'path' => $finalPath,
                     'imagekit_file_path' => $finalPath,
