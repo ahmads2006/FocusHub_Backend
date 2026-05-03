@@ -44,7 +44,7 @@ class PhotoResource extends JsonResource
             'url_high' => $this->url,
             'url_thumbnail' => $this->url_thumbnail,
             'url_tiny' => $this->url_tiny,
-            'original_url' => $canDownload ? $this->original_url : null,
+            'original_url' => $canDownload ? $this->resource->original_url : null,
             'srcset' => $this->srcset,
 
             'created_at' => optional($this->created_at)->toIso8601String(),
@@ -53,13 +53,14 @@ class PhotoResource extends JsonResource
             'labels' => array_values($labels),
             'tags' => $tags,
             'comments' => $comments,
-            'can_download' => $canDownload,
+            'can_download' => $this->allow_download && $canDownload,
             'allow_download' => $this->allow_download,
 
             'settings' => $this->whenLoaded('settings'),
             'meta' => $this->whenLoaded('meta'),
             'user' => $this->whenLoaded('user'),
             'match_count' => $this->when(isset($this->match_count), $this->match_count),
+            '_t' => time(),
         ];
     }
 }

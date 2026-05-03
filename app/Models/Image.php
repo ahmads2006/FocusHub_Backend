@@ -296,6 +296,15 @@ class Image extends Model
 
     public function getCanDownloadAttribute(): bool
     {
+        // 🛡️ Owner's restriction is absolute — checked BEFORE Gate (which auto-allows super_admin)
+        $ownerAllowed = (bool) ($this->settings?->allow_download ?? false);
+        
+        // If owner disabled downloads, nobody except the owner themselves can download
+        $currentUser = auth()->user();
+        if (!$ownerAllowed && (!$currentUser || $currentUser->id !== $this->user_id)) {
+            return false;
+        }
+
         return \Illuminate\Support\Facades\Gate::allows('download', $this);
     }
 

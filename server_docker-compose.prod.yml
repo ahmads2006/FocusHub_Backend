@@ -1,0 +1,123 @@
+networks:
+  opticvault_default:
+    name: opticvault_default
+  opticvault_network:
+    driver: bridge
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      redis:
+        condition: service_healthy
+    env_file:
+    - .env
+    environment:
+      APP_ENV: production
+    image: opticvault_app:prod
+    networks:
+    - opticvault_network
+    - opticvault_default
+    ports:
+    - 127.0.0.1:${APP_PORT:-80}:80
+    restart: unless-stopped
+    volumes:
+    - ./storage:/var/www/html/storage
+    - ./.env:/var/www/html/.env
+    - ./app.php:/var/www/html/bootstrap/app.php
+    - ./filesystems.php:/var/www/html/config/filesystems.php
+    - ./app/Services/Core/AssetDeliveryService.php:/var/www/html/app/Services/Core/AssetDeliveryService.php
+  php-scheduler:
+    command:
+    - php
+    - artisan
+    - schedule:work
+    depends_on:
+      redis:
+        condition: service_healthy
+    env_file:
+    - .env
+    image: opticvault_app:prod
+    networks:
+    - opticvault_network
+    - opticvault_default
+    restart: unless-stopped
+    volumes:
+    - ./storage:/var/www/html/storage
+    - ./.env:/var/www/html/.env
+    - ./app.php:/var/www/html/bootstrap/app.php
+    - ./filesystems.php:/var/www/html/config/filesystems.php
+    - ./app/Services/Core/AssetDeliveryService.php:/var/www/html/app/Services/Core/AssetDeliveryService.php
+  php-worker:
+    command:
+    - php
+    - artisan
+    - queue:work
+    - redis
+    - --queue=default
+    - --sleep=3
+    - --tries=3
+    - --timeout=300
+    depends_on:
+      redis:
+        condition: service_healthy
+    env_file:
+    - .env
+    image: opticvault_app:prod
+    networks:
+    - opticvault_network
+    - opticvault_default
+    restart: unless-stopped
+    volumes:
+    - ./storage:/var/www/html/storage
+    - ./.env:/var/www/html/.env
+    - ./app.php:/var/www/html/bootstrap/app.php
+    - ./filesystems.php:/var/www/html/config/filesystems.php
+    - ./app/Services/Core/AssetDeliveryService.php:/var/www/html/app/Services/Core/AssetDeliveryService.php
+  redis:
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      retries: 3
+      test:
+      - CMD
+      - redis-cli
+      - ping
+      timeout: 5s
+    image: redis:alpine
+    networks:
+    - opticvault_network
+    - opticvault_default
+    ports:
+    - 127.0.0.1:${FORWARD_REDIS_PORT:-6379}:6379
+    restart: unless-stopped
+    volumes:
+    - redis-data:/data
+  reverb:
+    command:
+    - php
+    - artisan
+    - reverb:start
+    - --host=0.0.0.0
+    - --port=8080
+    depends_on:
+      redis:
+        condition: service_healthy
+    env_file:
+    - .env
+    image: opticvault_app:prod
+    networks:
+    - opticvault_network
+    - opticvault_default
+    ports:
+    - 8080:8080
+    restart: unless-stopped
+    volumes:
+    - ./storage:/var/www/html/storage
+    - ./.env:/var/www/html/.env
+    - ./app.php:/var/www/html/bootstrap/app.php
+    - ./filesystems.php:/var/www/html/config/filesystems.php
+    - ./app/Services/Core/AssetDeliveryService.php:/var/www/html/app/Services/Core/AssetDeliveryService.php
+volumes:
+  redis-data:
+    driver: local

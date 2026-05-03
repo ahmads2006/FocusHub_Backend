@@ -123,7 +123,7 @@ class AlbumUploadController extends Controller
                 ];
 
                 if ($request->has('allow_download')) {
-                    $data['allow_download'] = true;
+                    $data['allow_download'] = filter_var($request->allow_download, FILTER_VALIDATE_BOOLEAN);
                 }
 
                 $image = $this->imageService->processAndUpload($file, $data, $user->id);

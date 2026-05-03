@@ -88,8 +88,9 @@ class ImageService
             // 1. Technical Specs
             $specs = $this->extractSpecsFromPath($file->getRealPath());
 
-            // 2. Sanitization
-            $cleanFile = $this->sanitizeFromPath($file->getRealPath());
+            // 2. Sanitization (v40.0: Strict MIME detection for Animations)
+            $isGif = $file->getMimeType() === 'image/gif';
+            $cleanFile = $this->sanitizeFromPath($file->getRealPath(), $isGif);
 
             // 3. Final Storage
             $year = date('Y'); $month = date('m');
@@ -141,8 +142,16 @@ class ImageService
         return $specs;
     }
 
-    protected function sanitizeFromPath(string $path): string
+    protected function sanitizeFromPath(string $path, bool $isGif = false): string
     {
+        // 🎞️ ANIMATION SHIELD (Deep Fix): 
+        // We now receive a explicit $isGif flag based on the original UploadedFile MimeType.
+        if ($isGif) {
+            $tempPath = storage_path('app/clean_' . uniqid() . '.gif');
+            copy($path, $tempPath);
+            return $tempPath;
+        }
+
         $img = $this->manager->read($path);
         $tempPath = storage_path('app/clean_' . uniqid() . '.jpg');
         $img->save($tempPath, quality: 90);

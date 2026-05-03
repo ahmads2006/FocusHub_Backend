@@ -44,16 +44,20 @@ class AssetDeliveryService
                 }
             }
 
-            // Define base transformations for optimization
-            $baseTransformations = [['format' => 'auto', 'quality' => 'auto', 'progressive' => 'true']];
+            $isGif = strtolower(pathinfo($path, PATHINFO_EXTENSION)) === 'gif';
 
             // Define base transformations for optimization
-            $baseTransformations = [['format' => 'auto', 'quality' => 'auto', 'progressive' => 'true']];
+            // 🎞️ GIF PROTECTOR: If it's a GIF, we MUST NOT use 'format: auto' as it often flattens the animation.
+            $baseTransformations = $isGif 
+                ? [['quality' => 'auto']] // Keep original format for GIFs
+                : [['format' => 'auto', 'quality' => 'auto', 'progressive' => 'true']];
 
             if (in_array($context, ['original', 'source'])) {
+                // 💎 RAW FILE ACCESS: Bypass ImageKit to get the literal raw file from DigitalOcean/S3.
+                $disk = $image->storage?->disk ?: 's3';
                 return $shouldSign 
-                    ? $imageKit->generateSignedUrl($path, $baseTransformations)
-                    : $imageKit->getOptimizedUrl($path);
+                    ? Storage::disk($disk)->temporaryUrl($image->storage?->path ?? $image->path, now()->addMinutes(30))
+                    : Storage::disk($disk)->url($image->storage?->path ?? $image->path);
             }
 
             $width = null;
