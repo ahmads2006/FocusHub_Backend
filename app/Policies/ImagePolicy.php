@@ -46,6 +46,14 @@ class ImagePolicy
             return \Illuminate\Auth\Access\Response::allow();
         }
 
+        // 🛡️ Enforcement: If the owner disabled downloading, nobody else can download (even admins)
+        // Check general setting: allow_download
+        $canGlobalDownload = (bool)($image->settings?->allow_download ?? false);
+        
+        if (!$canGlobalDownload) {
+             return \Illuminate\Auth\Access\Response::deny('Download is restricted for this image by the owner.');
+        }
+
         // Check for shared link temporary session access with download permission
         if (session("shared_link_access_{$image->id}") === 'download') {
             return \Illuminate\Auth\Access\Response::allow();
@@ -53,9 +61,7 @@ class ImagePolicy
 
         // Public download is allowed only if the owner enabled it in general settings
         if ($image->privacy === 'public') {
-            return ($image->settings && $image->settings->allow_download)
-                ? \Illuminate\Auth\Access\Response::allow()
-                : \Illuminate\Auth\Access\Response::deny('Download is restricted for this image.');
+            return \Illuminate\Auth\Access\Response::allow();
         }
 
         return \Illuminate\Auth\Access\Response::deny('Download is restricted for this image.');
