@@ -51,9 +51,11 @@ class ImagePolicy
             return \Illuminate\Auth\Access\Response::allow();
         }
 
-        // Public download is allowed only if the owner enabled it general settings
-        if ($image->privacy === 'public' && $image->allow_download) {
-            return \Illuminate\Auth\Access\Response::allow();
+        // Public download is allowed only if the owner enabled it in general settings
+        if ($image->privacy === 'public') {
+            return ($image->settings && $image->settings->allow_download)
+                ? \Illuminate\Auth\Access\Response::allow()
+                : \Illuminate\Auth\Access\Response::deny('Download is restricted for this image.');
         }
 
         return \Illuminate\Auth\Access\Response::deny('Download is restricted for this image.');

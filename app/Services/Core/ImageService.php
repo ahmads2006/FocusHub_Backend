@@ -62,6 +62,7 @@ class ImageService
                 'user_id'   => $userId,
                 'album_id'  => $data['album_id'] ?? null,
                 'title'     => $data['title'] ?? pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME),
+                'description' => $data['description'] ?? null,
                 'filename'  => $file->getClientOriginalName(),
                 'file_type' => $file->getClientOriginalExtension(),
                 'size'      => $file->getSize(),
@@ -73,6 +74,10 @@ class ImageService
                 'status' => 'approved', 
                 'is_visible' => false,
                 'ai_metadata' => $moderationResult['metadata'] ?? [],
+            ]);
+
+            $image->settings()->updateOrCreate(['image_id' => $image->id], [
+                'allow_download' => isset($data['allow_download']) ? filter_var($data['allow_download'], FILTER_VALIDATE_BOOLEAN) : true,
             ]);
 
             return $image;
@@ -111,7 +116,7 @@ class ImageService
             if (file_exists($cleanFile)) @unlink($cleanFile);
 
             // 6. Labels (Keep labels job if needed, or run sync)
-            \App\Jobs\AnalyzeImageLabelsJob::dispatch($image->id);
+            \App\Jobs\AnalyzeImageLabelsJob::dispatchSync($image->id);
 
         } catch (\Exception $e) {
             Log::error("Direct Image Processing Failed: " . $e->getMessage());

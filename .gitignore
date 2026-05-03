@@ -37,7 +37,8 @@ storage/app/public/uploads/*
 storage/app/private/secure_uploads/*
 storage/app/private/quarantine/*
 /scratch
-
+.server_docker-compose.prod.yml
+.server_docker-compose.dev.yml
 
 
 # OS Files

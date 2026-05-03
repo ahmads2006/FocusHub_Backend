@@ -27,87 +27,101 @@ class AssetDeliveryService
         // NOTE: albums table has NO privacy column — don't reference album->privacy.
         $isPublic = $image->privacy === 'public' && !$image->isRejected();
 
-        // 🛡️ SECURITY LAYER: If image is PRIVATE or not in cloud, use secure server-side routes.
-        // Public cloud images go directly to ImageKit for WebP optimization.
-        $useImageKit = $isPublic && $isInCloud && !app()->environment('local');
+        // 🛡️ SECURITY LAYER: Determine if we should sign the URL.
+        // Private images MUST be signed to prevent unauthorized access.
+        $shouldSign = !$isPublic;
 
-        if (!$useImageKit) {
-            if ($this->canAccessOriginal($image) || $isPublic) {
-                if (in_array($context, ['gallery', 'preview', 'thumbnail', 'avatar', 'icon', 'square'])) {
-                    return $this->generateSecurePreviewUrl($image);
-                }
-                if (in_array($context, ['original', 'source'])) {
-                    return $this->generateSecureOriginalUrl($image);
+        // 🚀 PERFORMANCE LAYER: Use ImageKit for ALL cloud images to benefit from CDN & Optimization.
+        // NOTE: We only use ImageKit if the image is actually in the cloud and we're not in local env.
+        if ($isInCloud && !app()->environment('local')) {
+            $imageKit = app(\App\Services\Core\ImageKitService::class);
+            $path = $image->storage?->imagekit_file_path ?? $image->storage?->path ?? $image->path;
+
+            if ($path) {
+                $path = ltrim($path, '/');
+                if (str_starts_with(strtolower($path), 'opticvault/')) {
+                    $path = substr($path, strlen('opticvault/'));
                 }
             }
-            return asset('images/locked.png');
+
+            // Define base transformations for optimization
+            $baseTransformations = [['format' => 'auto', 'quality' => 'auto', 'progressive' => 'true']];
+
+            // Define base transformations for optimization
+            $baseTransformations = [['format' => 'auto', 'quality' => 'auto', 'progressive' => 'true']];
+
+            if (in_array($context, ['original', 'source'])) {
+                return $shouldSign 
+                    ? $imageKit->generateSignedUrl($path, $baseTransformations)
+                    : $imageKit->getOptimizedUrl($path);
+            }
+
+            $width = null;
+            $height = null;
+
+            switch ($context) {
+                case 'avatar':
+                case 'icon':
+                    $width = 150;
+                    $height = 150;
+                    break;
+
+                case 'thumbnail':
+                case 'square':
+                    $width = 400;
+                    $height = 400;
+                    break;
+
+                case 'card':
+                    $width = 400;
+                    $height = 300;
+                    break;
+
+                case 'list':
+                    $width = 200;
+                    $height = 150;
+                    break;
+
+                case 'gallery':
+                case 'preview':
+                    $width = 800;
+                    break;
+
+                case 'srcset':
+                    // For simplicity in srcset, we might return the default optimized URL or a specific size
+                    return $imageKit->getOptimizedUrl($path, 800);
+
+                case 'placeholder':
+                    $width = 20;
+                    $height = 20;
+                    break;
+
+                default:
+                    $width = 800;
+                    break;
+            }
+
+            if ($shouldSign) {
+                $transformations = array_merge($baseTransformations, [
+                    array_filter(['width' => (string)$width, 'height' => (string)$height, 'crop' => 'at_max'])
+                ]);
+                return $imageKit->generateSignedUrl($path, $transformations);
+            }
+
+            return $imageKit->getOptimizedUrl($path, $width, $height);
         }
 
-        // 🚀 PERFORMANCE LAYER: For PUBLIC CLOUD images, use ImageKit for CDN speed & WebP.
-        $imageKit = app(\App\Services\Core\ImageKitService::class);
-        $path = $image->storage?->imagekit_file_path ?? $image->storage?->path ?? $image->path;
-
-        if ($path) {
-            $path = ltrim($path, '/');
-            if (str_starts_with(strtolower($path), 'opticvault/')) {
-                $path = substr($path, strlen('opticvault/'));
+        // 📁 FALLBACK: If not in cloud or in local env, use secure server-side routes or local path.
+        if ($this->canAccessOriginal($image) || $isPublic) {
+            if (in_array($context, ['gallery', 'preview', 'thumbnail', 'avatar', 'icon', 'square'])) {
+                return $this->generateSecurePreviewUrl($image);
+            }
+            if (in_array($context, ['original', 'source'])) {
+                return $this->generateSecureOriginalUrl($image);
             }
         }
 
-        if (in_array($context, ['original', 'source'])) {
-            return $imageKit->getOptimizedUrl($path);
-        }
-
-        switch ($context) {
-            case 'avatar':
-            case 'icon':
-                return $imageKit->getOptimizedUrl($path, 150, 150);
-
-            case 'thumbnail':
-            case 'square':
-                return $imageKit->getOptimizedUrl($path, 400, 400);
-
-            case 'card':
-                return $imageKit->getOptimizedUrl($path, 400, 300);
-
-            case 'list':
-                return $imageKit->getOptimizedUrl($path, 200, 150);
-
-            case 'gallery':
-            case 'preview':
-                return $imageKit->getOptimizedUrl($path, 800);
-
-            case 'srcset':
-                // Generate a responsive srcset for 400w, 800w, and 1200w
-                $w400 = $imageKit->getOptimizedUrl($path, 400);
-                $w800 = $imageKit->getOptimizedUrl($path, 800);
-                $w1200 = $imageKit->getOptimizedUrl($path, 1200);
-                return "{$w400} 400w, {$w800} 800w, {$w1200} 1200w";
-
-            case 'placeholder':
-                return $imageKit->getOptimizedUrl($path, 20, 20);
-
-            case 'original':
-            case 'source':
-                // 🛡️ Even for original view, we prefer ImageKit optimized WebP for speed
-                // unless the user specifically needs the raw source file.
-                return $imageKit->getOptimizedUrl($path);
-
-            case 'gallery_watermarked':
-                $transformations = [['width' => 800]];
-                if (!Auth::check() || Auth::id() !== $image->user_id) {
-                    $transformations[] = [
-                        'overlayImage' => 'logo.png',
-                        'overlayFocus' => 'bottom_right',
-                        'overlayAlpha' => '40',
-                        'overlayWidth' => '150',
-                    ];
-                }
-                return $imageKit->getEnhancedUrl($path, $transformations);
-
-            default:
-                return $imageKit->getOptimizedUrl($path);
-        }
+        return asset('images/locked.png');
     }
 
     /**

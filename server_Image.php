@@ -255,7 +255,7 @@ class Image extends Model
     /** @deprecated Use $image->settings->allow_download */
     public function getAllowDownloadAttribute(): bool
     {
-        return (bool) ($this->settings?->allow_download ?? false);
+        return (bool) ($this->settings?->allow_download ?? true);
     }
 
     /** @deprecated Use $image->settings->watermark_on_download */
@@ -286,17 +286,17 @@ class Image extends Model
      */
     public function getCanEditAttribute(): bool
     {
-        return \Illuminate\Support\Facades\Gate::allows('update', $this);
+        return auth()->user() ? auth()->user()->can('update', $this) : false;
     }
 
     public function getCanDeleteAttribute(): bool
     {
-        return \Illuminate\Support\Facades\Gate::allows('delete', $this);
+        return auth()->user() ? auth()->user()->can('delete', $this) : false;
     }
 
     public function getCanDownloadAttribute(): bool
     {
-        return \Illuminate\Support\Facades\Gate::allows('download', $this);
+        return auth()->user() ? auth()->user()->can('download', $this) : false;
     }
 
     // ───────────────────────── Status Helpers ─────────────────────────

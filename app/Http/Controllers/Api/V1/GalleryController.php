@@ -31,7 +31,7 @@ class GalleryController extends Controller
         $perPage     = min($request->query('per_page', 50), 100);
 
         $query = Image::where('privacy', 'public')
-            ->with(['settings', 'user.profile', 'storage', 'meta', 'album'])
+            ->with(['settings', 'user.profile', 'storage', 'meta', 'album', 'tags'])
             ->withCount('likes');
 
         // ── AI-Powered Smart Search ──
@@ -59,7 +59,9 @@ class GalleryController extends Controller
             $query->with([
                 'user:id,name,username,avatar',
                 'storage:id,image_id,disk,path,imagekit_file_id,imagekit_file_path',
-                'meta:id,image_id,technical_specs'
+                'meta:id,image_id,technical_specs',
+                'settings',
+                'tags'
             ]);
 
             $images = $query->latest()->paginate($perPage);
