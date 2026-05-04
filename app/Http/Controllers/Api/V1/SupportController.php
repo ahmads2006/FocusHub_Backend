@@ -88,8 +88,27 @@ class SupportController extends Controller
             'body'            => $request->body,
         ]);
 
-        // Auto-reply + admin notification on first real message
-        if (!$conversation->isClaimed()) {
+        // Auto-reply logic for Quick Questions
+        $supportAutoReplies = [
+            'كيف يمكن الحصول على علامة توثيق؟' => 'يمكنك طلب علامة التوثيق من إعدادات الحساب > التوثيق، ثم رفع المستندات المطلوبة. بعد المراجعة سيتم إشعارك بحالة الطلب.',
+            'ما نظام الأمان في الموقع؟' => 'نظام الأمان في OpalShot يشمل تشفير الاتصال، حماية الروابط، إدارة صلاحيات الوصول، ومراقبة النشاط لحماية حسابك ومحتواك.',
+            'كيف أرفع صوري بجودة عالية بدون فقدان؟' => 'من صفحة الرفع، اختر الملفات الأصلية وتأكد من عدم تفعيل الضغط المحلي. النظام يحفظ النسخة الأصلية ويولد نسخ عرض منفصلة.',
+            'كيف أشارك ألبوم خاص مع العميل؟' => 'افتح الألبوم > مشاركة > إنشاء رابط خاص، ثم حدد الصلاحيات (مشاهدة/تحميل) ووقت الانتهاء إذا رغبت.',
+            'كيف أستعيد حسابي إذا نسيت كلمة المرور؟' => 'من صفحة تسجيل الدخول اختر "نسيت كلمة المرور"، ثم أدخل بريدك الإلكتروني واتبع رابط إعادة التعيين الذي يصلك.',
+            'تحدث مع الدعم' => 'تم تحويلك للدعم المباشر. اكتب مشكلتك بالتفصيل وسيرد عليك أحد أعضاء الفريق بأقرب وقت.'
+        ];
+
+        if (isset($supportAutoReplies[$request->body])) {
+            SupportMessage::create([
+                'conversation_id' => $conversation->id,
+                'sender_id'       => null,
+                'body'            => $supportAutoReplies[$request->body],
+                'is_system'       => true,
+            ]);
+        }
+
+        // Default Auto-reply + admin notification on first real message (if not a quick question)
+        if (!$conversation->isClaimed() && !isset($supportAutoReplies[$request->body])) {
             $hasAutoReply = $conversation->messages()
                 ->where('is_system', true)
                 ->where('body', 'like', '%شكراً لتواصلك%')
