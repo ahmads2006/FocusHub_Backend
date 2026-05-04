@@ -28,7 +28,7 @@ class AlbumController extends Controller
 
         $ownedAlbums = $user->ownedAlbums()
             ->where('title', '!=', 'Quick Uploads')
-            ->with(['images' => function($q) {
+            ->with(['settings', 'images' => function($q) {
                 $q->latest()->limit(5);
             }])
             ->withCount('images')
@@ -38,7 +38,7 @@ class AlbumController extends Controller
         $sharedAlbums = $user->collaborativeAlbums()
             ->where('title', '!=', 'Quick Uploads')
             ->wherePivot('status', 'accepted')
-            ->with(['images' => function($q) {
+            ->with(['settings', 'images' => function($q) {
                 $q->latest()->limit(5);
             }])
             ->withCount('images')
@@ -128,8 +128,8 @@ class AlbumController extends Controller
         $this->authorize('update', $album);
 
         $validated = $request->validate([
-            'title'   => 'required|string|max:255',
-            'privacy' => 'required|in:public,private,hidden',
+            'title'   => 'sometimes|required|string|max:255',
+            'privacy' => 'sometimes|required|in:public,private,hidden',
         ]);
 
         $album->update($validated);
