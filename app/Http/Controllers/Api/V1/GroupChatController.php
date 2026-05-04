@@ -76,11 +76,17 @@ class GroupChatController extends Controller
             'last_read_at' => now(),
         ]);
 
+        $limit  = request()->query('limit', 50);
+        $offset = request()->query('offset', 0);
+
         $messages = $conversation->messages()
             ->with(['sender', 'image.storage', 'image.settings'])
-            ->orderBy('created_at', 'asc')
-            ->take(100)
+            ->orderBy('created_at', 'desc')
+            ->skip($offset)
+            ->take($limit)
             ->get()
+            ->reverse()
+            ->values()
             ->map(fn($msg) => $this->formatMessage($msg, $userId));
 
         return response()->json([

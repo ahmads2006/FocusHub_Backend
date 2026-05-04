@@ -37,10 +37,17 @@ class SupportController extends Controller
             ]);
         }
 
+        $limit  = request()->query('limit', 50);
+        $offset = request()->query('offset', 0);
+
         $messages = $conversation->messages()
             ->with('sender:id')
-            ->orderBy('created_at', 'asc')
+            ->orderBy('created_at', 'desc')
+            ->skip($offset)
+            ->take($limit)
             ->get()
+            ->reverse()
+            ->values()
             ->map(fn($msg) => $this->formatMessage($msg, $userId));
 
         return response()->json([

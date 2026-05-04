@@ -68,7 +68,13 @@ class ChatController extends Controller
                 ],
                 'last_message_at' => $message->created_at->toISOString(),
                 'unread_count' => $unreadCount,
-                'is_online'    => (bool) Redis::exists('user:online:' . $row->partner_id),
+                'is_online'    => (function() use ($row) {
+                    try {
+                        return (bool) Redis::exists('user:online:' . $row->partner_id);
+                    } catch (\Exception $e) {
+                        return false;
+                    }
+                })(),
             ];
         }
 
@@ -117,7 +123,7 @@ class ChatController extends Controller
     /**
      * Get message history with a partner.
      */
-    public function messages(User $partner): JsonResponse
+    public function messages(Request $request, User $partner): JsonResponse
     {
         $userId = Auth::id();
 
@@ -131,11 +137,17 @@ class ChatController extends Controller
             ->where('is_read', false)
             ->update(['is_read' => true]);
 
+        $limit  = (int) $request->query('limit', 50);
+        $offset = (int) $request->query('offset', 0);
+
         $messages = Message::conversation($userId, $partner->id)
             ->with(['image.storage', 'image.settings'])
-            ->orderBy('created_at', 'asc')
-            ->take(50)
+            ->orderBy('created_at', 'desc')
+            ->skip($offset)
+            ->take($limit)
             ->get()
+            ->reverse()
+            ->values()
             ->map(fn($msg) => $this->formatMessage($msg, $userId));
 
         return response()->json([
@@ -287,6 +299,11 @@ class ChatController extends Controller
 
     private function formatMessage(Message $msg, string $userId): array
     {
+        $createdAt = $msg->created_at;
+        if (is_string($createdAt)) {
+            $createdAt = \Carbon\Carbon::parse($createdAt);
+        }
+
         return [
             'id'         => $msg->id,
             'body'       => $msg->body,
@@ -295,9 +312,9 @@ class ChatController extends Controller
             'image_url'  => $msg->image_id ? $msg->image?->url : null,
             'thumb_url'  => $msg->image_id ? app(AssetDeliveryService::class)->getUrl($msg->image, 'thumbnail') : null,
             'is_mine'    => $msg->sender_id === $userId,
-            'is_read'    => $msg->is_read,
-            'created_at' => $msg->created_at->format('H:i'),
-            'date'       => $msg->created_at->format('Y-m-d'),
+            'is_read'    => (bool) $msg->is_read,
+            'created_at' => $createdAt ? $createdAt->format('H:i') : '',
+            'date'       => $createdAt ? $createdAt->format('Y-m-d') : '',
         ];
     }
 
