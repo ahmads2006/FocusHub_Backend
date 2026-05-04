@@ -412,6 +412,42 @@ class GroupChatController extends Controller
 
     // ── Helpers ──────────────────────────────────────────────
 
+    /**
+     * Update a group message.
+     */
+    public function updateMessage(Request $request, Message $message): JsonResponse
+    {
+        $request->validate(['body' => 'required|string|max:2000']);
+        $userId = Auth::id();
+
+        if ($message->sender_id !== $userId) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
+        }
+
+        $message->update(['body' => $request->body]);
+
+        return response()->json([
+            'success' => true,
+            'data'    => $this->formatMessage($message, $userId),
+        ]);
+    }
+
+    /**
+     * Delete a group message.
+     */
+    public function deleteMessage(Message $message): JsonResponse
+    {
+        $userId = Auth::id();
+
+        if ($message->sender_id !== $userId && !Auth::user()->hasPermission('access-admin-panel')) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
+        }
+
+        $message->delete();
+
+        return response()->json(['success' => true, 'message' => 'Message deleted']);
+    }
+
     private function formatMessage(Message $msg, string $userId): array
     {
         return [

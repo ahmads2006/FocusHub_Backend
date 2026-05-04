@@ -371,6 +371,47 @@ class SupportController extends Controller
     // HELPERS
     // ═══════════════════════════════════════════
 
+    /**
+     * Update a message.
+     */
+    public function updateMessage(Request $request, SupportMessage $message): JsonResponse
+    {
+        $request->validate(['body' => 'required|string|max:2000']);
+        
+        if ($message->sender_id !== Auth::id()) {
+            return response()->json(['success' => false, 'message' => __('messages.unauthorized')], 403);
+        }
+
+        if ($message->is_system) {
+            return response()->json(['success' => false, 'message' => 'Cannot edit system messages'], 403);
+        }
+
+        $message->update(['body' => $request->body]);
+
+        return response()->json([
+            'success' => true,
+            'data'    => $this->formatMessage($message, Auth::id()),
+        ]);
+    }
+
+    /**
+     * Delete a message.
+     */
+    public function deleteMessage(SupportMessage $message): JsonResponse
+    {
+        if ($message->sender_id !== Auth::id() && !Auth::user()->hasPermission('access-admin-panel')) {
+            return response()->json(['success' => false, 'message' => __('messages.unauthorized')], 403);
+        }
+
+        if ($message->is_system && !Auth::user()->hasPermission('access-admin-panel')) {
+            return response()->json(['success' => false, 'message' => 'Cannot delete system messages'], 403);
+        }
+
+        $message->delete();
+
+        return response()->json(['success' => true, 'message' => 'Message deleted']);
+    }
+
     private function formatMessage(SupportMessage $msg, string $viewerId): array
     {
         return [

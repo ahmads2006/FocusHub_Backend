@@ -344,6 +344,56 @@ class MongoChatController extends Controller
 
     // ── Helpers ──
 
+    /**
+     * Update a message.
+     */
+    public function update(Request $request, string $id): JsonResponse
+    {
+        $request->validate(['body' => 'required|string|max:2000']);
+        $userId = Auth::id();
+
+        $message = MongoMessage::find($id);
+        if (!$message) {
+            return response()->json(['success' => false, 'message' => 'Message not found'], 404);
+        }
+
+        if ($message->sender_id != $userId) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
+        }
+
+        $message->update([
+            'body'       => $request->body,
+            'is_edited'  => true,
+            'updated_at' => now()->toISOString()
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'data'    => $this->formatMessage($message, $userId),
+        ]);
+    }
+
+    /**
+     * Delete a message.
+     */
+    public function destroy(string $id): JsonResponse
+    {
+        $userId = Auth::id();
+        $message = MongoMessage::find($id);
+
+        if (!$message) {
+            return response()->json(['success' => false, 'message' => 'Message not found'], 404);
+        }
+
+        if ($message->sender_id != $userId) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
+        }
+
+        $message->delete();
+
+        return response()->json(['success' => true, 'message' => 'Message deleted']);
+    }
+
     private function formatMessage($msg, string $userId): array
     {
         // Safety check if $msg is somehow an array or stdClass (linter defense)

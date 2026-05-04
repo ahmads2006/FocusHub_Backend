@@ -239,6 +239,8 @@ Route::prefix('v1')->group(function () {
             Route::get('/unread-count', [App\Http\Controllers\Api\V1\MongoChatController::class, 'unreadCount']);
             Route::get('/my-images', [App\Http\Controllers\Api\V1\MongoChatController::class, 'myImages']);
             Route::get('/connections', [App\Http\Controllers\Api\V1\MongoChatController::class, 'connections']);
+            Route::patch('/messages/{id}', [App\Http\Controllers\Api\V1\MongoChatController::class, 'update']);
+            Route::delete('/messages/{id}', [App\Http\Controllers\Api\V1\MongoChatController::class, 'destroy']);
 
             // ─── 👥 Group Chat ──────────────────────
             Route::prefix('groups')->group(function () {
@@ -250,6 +252,8 @@ Route::prefix('v1')->group(function () {
                 Route::post('/{conversation}/participants', [App\Http\Controllers\Api\V1\GroupChatController::class, 'addParticipant']);
                 Route::delete('/{conversation}/participants/{user}', [App\Http\Controllers\Api\V1\GroupChatController::class, 'removeParticipant']);
                 Route::patch('/{conversation}/rename', [App\Http\Controllers\Api\V1\GroupChatController::class, 'rename']);
+                Route::patch('/messages/{message}', [App\Http\Controllers\Api\V1\GroupChatController::class, 'updateMessage']);
+                Route::delete('/messages/{message}', [App\Http\Controllers\Api\V1\GroupChatController::class, 'deleteMessage']);
             });
         });
 
@@ -259,6 +263,8 @@ Route::prefix('v1')->group(function () {
             Route::get('/conversation', [App\Http\Controllers\Api\V1\SupportController::class, 'getOrCreateConversation']);
             Route::post('/send', [App\Http\Controllers\Api\V1\SupportController::class, 'sendMessage']);
             Route::get('/poll/{conversation}', [App\Http\Controllers\Api\V1\SupportController::class, 'pollMessages']);
+            Route::patch('/messages/{message}', [App\Http\Controllers\Api\V1\SupportController::class, 'updateMessage']);
+            Route::delete('/messages/{message}', [App\Http\Controllers\Api\V1\SupportController::class, 'deleteMessage']);
 
             // Admin endpoints
             Route::middleware('permission:access-admin-panel')->prefix('admin')->group(function () {
