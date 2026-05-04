@@ -57,7 +57,7 @@ class GalleryController extends Controller
             // 'storage' is CRITICAL for AssetDeliveryService to generate ImageKit URLs.
             // 'user' is needed for the photographer's name/avatar.
             $query->with([
-                'user:id,name,username,avatar',
+                'user.profile',
                 'storage:id,image_id,disk,path,imagekit_file_id,imagekit_file_path',
                 'meta:id,image_id,technical_specs',
                 'settings',

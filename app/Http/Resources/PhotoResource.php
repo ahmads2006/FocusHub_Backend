@@ -58,7 +58,14 @@ class PhotoResource extends JsonResource
 
             'settings' => $this->whenLoaded('settings'),
             'meta' => $this->whenLoaded('meta'),
-            'user' => $this->whenLoaded('user'),
+            'user' => $this->whenLoaded('user', function () {
+                return [
+                    'id' => $this->user->id,
+                    'name' => $this->user->name,
+                    'username' => $this->user->username,
+                    'avatar' => $this->user->avatar,
+                ];
+            }),
             'match_count' => $this->when(isset($this->match_count), $this->match_count),
             
             'is_liked' => \Illuminate\Support\Facades\Auth::check() ? \App\Models\Like::where('user_id', \Illuminate\Support\Facades\Auth::id())->where('image_id', $this->id)->exists() : false,
