@@ -73,7 +73,7 @@ class AlbumUploadController extends Controller
         try {
             // 1. Determine the Album
             if ($request->album_id) {
-                $album = Album::where('user_id', $user->id)->find($request->album_id);
+                $album = Album::with('settings')->where('user_id', $user->id)->find($request->album_id);
             }
 
             if (!$album && $request->album_name) {

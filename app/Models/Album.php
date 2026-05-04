@@ -68,7 +68,7 @@ class Album extends Model implements HasMedia
         'status',           // Kept for mass-assignment proxying
     ];
 
-    protected $appends = ['can_edit', 'can_delete', 'can_upload'];
+    protected $appends = ['can_edit', 'can_delete', 'can_upload', 'privacy'];
 
     protected $casts = [];
 
