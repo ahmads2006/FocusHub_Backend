@@ -31,6 +31,14 @@ class ValidateSharedLink
         }
 
         if (!$link || $link->isExpired() || $link->isRevoked() || $link->isLimitReached()) {
+            \Illuminate\Support\Facades\Log::warning("Shared link validation failed: ", [
+                'has_link' => (bool)$link,
+                'expired'  => $link ? $link->isExpired() : null,
+                'revoked'  => $link ? $link->isRevoked() : null,
+                'limit'    => $link ? $link->isLimitReached() : null,
+                'token'    => $token,
+                'hash'     => $tokenHash
+            ]);
             abort(404, 'Shared link is invalid or expired.');
         }
 
@@ -77,6 +85,12 @@ class ValidateSharedLink
                     if ($owner) {
                         $owner->notify(new \App\Notifications\SharedLinkLeakDetected($link, $metadata));
                     }
+
+                    \Illuminate\Support\Facades\Log::error("Shared link session mismatch: ", [
+                        'link_session' => $link->session_id,
+                        'current_session' => $sessionId,
+                        'token' => $token
+                    ]);
 
                     abort(403, 'عذراً، هذا الرابط مخصص لجهاز آخر فقط. تم إبلاغ المصور بمحاولة الدخول هذه لحماية الخصوصية.');
                 }

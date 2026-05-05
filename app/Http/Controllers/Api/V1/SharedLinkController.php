@@ -159,6 +159,11 @@ class SharedLinkController extends Controller
             ]);
         }
 
+        \Illuminate\Support\Facades\Log::warning("Shared content unsupported or shareable missing: ", [
+            'has_shareable' => (bool)$shareable,
+            'type' => $shareable ? get_class($shareable) : null,
+            'token' => $token
+        ]);
         return response()->json(['success' => false, 'message' => __('messages.unsupported_content')], 404);
     }
 
