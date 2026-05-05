@@ -129,6 +129,7 @@ class SharedLinkController extends Controller
                     'album'      => $shareable,
                     'permission' => $link->permission,
                     'link'       => [
+                        'token'        => $link->token,
                         'access_count' => $link->access_count,
                         'max_access'   => $link->max_access,
                         'expires_at'   => $link->expires_at,
@@ -149,6 +150,7 @@ class SharedLinkController extends Controller
                     'image'      => $shareable,
                     'permission' => $link->permission,
                     'link'       => [
+                        'token'        => $link->token,
                         'access_count' => $link->access_count,
                         'max_access'   => $link->max_access,
                         'expires_at'   => $link->expires_at,

@@ -363,7 +363,7 @@ Route::prefix('v1')->group(function () {
     // 4. 🔗 SHARED LINKS (Public with Token)
     // ══════════════════════════════════════════
     Route::middleware(\App\Http\Middleware\ValidateSharedLink::class)->group(function () {
-        Route::get('/share/{token}', [App\Http\Controllers\Api\V1\SharedLinkController::class, 'show']);
+        Route::get('/share/{token}', [App\Http\Controllers\Api\V1\SharedLinkController::class, 'show'])->name('shared_link.show');
         Route::post('/share/{token}/verify', [App\Http\Controllers\Api\V1\SharedLinkController::class, 'verifyPassword']);
         Route::get('/share/{token}/download', [App\Http\Controllers\Api\V1\SharedLinkController::class, 'downloadAlbum']);
     });
