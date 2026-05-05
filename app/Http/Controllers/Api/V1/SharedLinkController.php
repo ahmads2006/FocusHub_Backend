@@ -112,7 +112,11 @@ class SharedLinkController extends Controller
         $shareable = $link->shareable;
 
         if ($shareable instanceof Album) {
-            $shareable->load(['images.storage', 'images.settings', 'images.user']);
+            $shareable->load(['images' => function($query) {
+                $query->withoutGlobalScope(\App\Models\Scopes\ShadowPrivacyScope::class)
+                      ->with(['storage', 'settings', 'user']);
+            }]);
+
             return response()->json([
                 'success' => true,
                 'type'    => 'album',
