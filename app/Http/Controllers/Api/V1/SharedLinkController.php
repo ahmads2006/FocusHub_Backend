@@ -138,7 +138,10 @@ class SharedLinkController extends Controller
         }
 
         if ($shareable instanceof Image) {
-            $shareable->load(['storage', 'settings', 'user']);
+            // Re-fetch without global scopes to ensure visibility
+            $shareable = Image::withoutGlobalScopes()
+                ->with(['storage', 'settings', 'user'])
+                ->findOrFail($shareable->id);
             return response()->json([
                 'success' => true,
                 'type'    => 'image',
