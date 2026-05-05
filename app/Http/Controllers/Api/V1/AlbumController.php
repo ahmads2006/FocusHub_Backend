@@ -228,7 +228,7 @@ class AlbumController extends Controller
     public function members(Album $album): JsonResponse
     {
         // Authorization: Only owner or accepted admins can see the full member list (including pending)
-        $isOwner = Auth::id() === $album->user_id;
+        $isOwner = (string)Auth::id() === (string)$album->user_id;
         $isAdmin = $album->collaborators()
             ->where('user_id', Auth::id())
             ->wherePivot('role', 'admin')
