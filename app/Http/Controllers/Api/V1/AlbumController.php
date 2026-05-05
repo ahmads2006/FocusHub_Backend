@@ -229,21 +229,36 @@ class AlbumController extends Controller
     {
         // Authorization: Only owner or accepted admins can see the full member list (including pending)
         $isOwner = (string)Auth::id() === (string)$album->user_id;
-        $isAdmin = $album->collaborators()
-            ->where('user_id', Auth::id())
-            ->wherePivot('role', 'admin')
-            ->wherePivot('status', 'accepted')
-            ->exists();
-
-        if (!$isOwner && !$isAdmin) {
-            // Standard members or public users see only accepted collaborators
-            $members = $album->collaborators()
-                ->wherePivot('status', 'accepted')
-                ->get();
-        } else {
-            // Owner/Admin sees everyone
+        
+        // We use the model instance directly but reload collaborators to ensure we have pivot data
+        // and bypass any potential scoping issues
+        if ($isOwner) {
             $members = $album->collaborators()->withPivot('role', 'status')->get();
+        } else {
+            $isAdmin = $album->collaborators()
+                ->where('user_id', Auth::id())
+                ->wherePivot('role', 'admin')
+                ->wherePivot('status', 'accepted')
+                ->exists();
+
+            if ($isAdmin) {
+                $members = $album->collaborators()->withPivot('role', 'status')->get();
+            } else {
+                // Standard members or public users see only accepted collaborators
+                $members = $album->collaborators()
+                    ->wherePivot('status', 'accepted')
+                    ->withPivot('role', 'status')
+                    ->get();
+            }
         }
+
+        // Debug Log (Temporary)
+        \Log::info("Album Members Check V2", [
+            'album_id' => $album->id,
+            'user_id' => Auth::id(),
+            'is_owner' => $isOwner,
+            'count' => count($members)
+        ]);
 
         return response()->json([
             'success' => true,
