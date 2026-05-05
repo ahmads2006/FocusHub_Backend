@@ -31,7 +31,7 @@ class AlbumController extends Controller
             ->with(['settings', 'images' => function($q) {
                 $q->latest()->limit(5);
             }])
-            ->withCount('images')
+            ->withCount(['images', 'collaborators'])
             ->latest()
             ->get();
 
