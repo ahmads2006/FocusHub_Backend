@@ -176,12 +176,26 @@ class AlbumController extends Controller
 
         // Check if album is empty. If it has images, require OTP for safety.
         if ($album->images()->count() > 0) {
-            $request->validate([
-                'otp' => 'required|string|size:6',
-            ]);
+            if (!$request->otp) {
+                // Generate and send OTP automatically on first delete attempt
+                $code = random_int(100000, 999999);
+                Cache::put("album_delete_otp_{$album->id}", $code, now()->addMinutes(10));
 
+                try {
+                    Mail::to($request->user()->email)->queue(new \App\Mail\AlbumDeletionOTP($code, $album->title));
+                } catch (\Exception $e) {
+                    Log::error("Failed to send deletion OTP: " . $e->getMessage());
+                }
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Verification code required to delete non-empty album.',
+                    'type' => 'otp_required'
+                ], 422);
+            }
+
+            // Verify provided OTP
             $otpCode = Cache::get("album_delete_otp_{$album->id}");
-
             if (!$otpCode || !hash_equals((string) $otpCode, (string) $request->otp)) {
                 return response()->json([
                     'success' => false,

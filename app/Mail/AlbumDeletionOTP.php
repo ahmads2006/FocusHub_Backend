@@ -3,25 +3,24 @@
 namespace App\Mail;
 
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
 
-class AlbumDeletionOTP extends Mailable implements ShouldQueue
+class AlbumDeletionOTP extends Mailable
 {
     use Queueable, SerializesModels;
 
-    public $code;
+    public $otp;
     public $albumTitle;
 
     /**
      * Create a new message instance.
      */
-    public function __construct($code, $albumTitle)
+    public function __construct($otp, $albumTitle)
     {
-        $this->code = $code;
+        $this->otp = $otp;
         $this->albumTitle = $albumTitle;
     }
 
@@ -31,7 +30,7 @@ class AlbumDeletionOTP extends Mailable implements ShouldQueue
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'رمز التحقق لحذف الألبوم - OpticVault',
+            subject: 'Album Deletion Security Code',
         );
     }
 
@@ -41,14 +40,9 @@ class AlbumDeletionOTP extends Mailable implements ShouldQueue
     public function content(): Content
     {
         return new Content(
-            markdown: 'emails.albums.deletion-otp',
-            with: [
-                'code' => $this->code,
-                'albumTitle' => $this->albumTitle,
-            ],
+            view: 'emails.album-delete-otp',
         );
     }
-
 
     /**
      * Get the attachments for the message.
