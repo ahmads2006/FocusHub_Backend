@@ -223,6 +223,35 @@ class AlbumController extends Controller
     }
 
     /**
+     * Get all members (accepted and pending) of an album.
+     */
+    public function members(Album $album): JsonResponse
+    {
+        // Authorization: Only owner or accepted admins can see the full member list (including pending)
+        $isOwner = Auth::id() === $album->user_id;
+        $isAdmin = $album->collaborators()
+            ->where('user_id', Auth::id())
+            ->wherePivot('role', 'admin')
+            ->wherePivot('status', 'accepted')
+            ->exists();
+
+        if (!$isOwner && !$isAdmin) {
+            // Standard members or public users see only accepted collaborators
+            $members = $album->collaborators()
+                ->wherePivot('status', 'accepted')
+                ->get();
+        } else {
+            // Owner/Admin sees everyone
+            $members = $album->collaborators()->get();
+        }
+
+        return response()->json([
+            'success' => true,
+            'data'    => $members,
+        ]);
+    }
+
+    /**
      * Add a collaborator to the album.
      */
     public function addCollaborator(Request $request, Album $album): JsonResponse
@@ -458,8 +487,20 @@ class AlbumController extends Controller
             return response()->json(['success' => false, 'message' => __('messages.already_owner')], 400);
         }
 
-        if ($album->collaborators->contains($user->id)) {
-            return response()->json(['success' => false, 'message' => __('messages.already_member')], 409);
+        // Check if already a collaborator
+        $existing = $album->collaborators()->where('users.id', $user->id)->first();
+        if ($existing) {
+            if ($existing->pivot->status === 'pending') {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Your request is still pending approval.',
+                    'data'    => $album
+                ]);
+            }
+            return response()->json([
+                'success' => false, 
+                'message' => __('messages.already_member')
+            ], 409);
         }
 
         // Add user with the role defined in the invitation, but as PENDING

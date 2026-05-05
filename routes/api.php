@@ -176,6 +176,7 @@ Route::prefix('v1')->group(function () {
             Route::delete('/{album}', [App\Http\Controllers\Api\V1\AlbumController::class, 'destroy']);
 
             // Collaborators
+            Route::get('/{album}/members', [App\Http\Controllers\Api\V1\AlbumController::class, 'members']);
             Route::post('/{album}/collaborators', [App\Http\Controllers\Api\V1\AlbumController::class, 'addCollaborator']);
             Route::put('/{album}/collaborators/{user}', [App\Http\Controllers\Api\V1\AlbumController::class, 'updateCollaboratorRole']);
             Route::post('/{album}/collaborators/{user}/approve', [App\Http\Controllers\Api\V1\AlbumController::class, 'approveCollaborator']);
