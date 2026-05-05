@@ -242,7 +242,7 @@ class AlbumController extends Controller
                 ->get();
         } else {
             // Owner/Admin sees everyone
-            $members = $album->collaborators()->get();
+            $members = $album->collaborators()->withPivot('role', 'status')->get();
         }
 
         return response()->json([

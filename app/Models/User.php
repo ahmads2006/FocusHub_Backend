@@ -381,7 +381,7 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
     public function collaborativeAlbums(): BelongsToMany
     {
         return $this->belongsToMany(Album::class)
-                    ->withPivot('role')
+                    ->withPivot('role', 'status')
                     ->withTimestamps();
     }
 
