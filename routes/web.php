@@ -9,6 +9,11 @@ Route::get('/', function () {
     return redirect(config('app.frontend_url', 'https://www.opalshot.studio'));
 });
 
+// Redirect shared links to frontend
+Route::get('/s/{token}', function ($token) {
+    return redirect(config('app.frontend_url', 'https://www.opalshot.studio') . '/s/' . $token);
+});
+
 
 
 

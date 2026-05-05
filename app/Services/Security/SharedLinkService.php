@@ -57,6 +57,9 @@ class SharedLinkService
      */
     public function getFullUrl(SharedLink $link): string
     {
-        return url("/s/{$link->token}");
+        $frontendUrl = config('app.frontend_url', env('FRONTEND_URL', url('/')));
+        $frontendUrl = rtrim($frontendUrl, '/');
+        
+        return "{$frontendUrl}/s/{$link->token}";
     }
 }
