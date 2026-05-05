@@ -43,6 +43,7 @@ class SupportController extends Controller
         $messages = $conversation->messages()
             ->with('sender:id')
             ->orderBy('created_at', 'desc')
+            ->orderBy('id', 'desc')
             ->skip($offset)
             ->take($limit)
             ->get()
@@ -104,6 +105,7 @@ class SupportController extends Controller
                 'sender_id'       => null,
                 'body'            => $supportAutoReplies[$request->body],
                 'is_system'       => true,
+                'created_at'      => now()->addSecond(), // Ensure it's after the user question
             ]);
         }
 

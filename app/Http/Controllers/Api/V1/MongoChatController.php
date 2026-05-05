@@ -149,9 +149,12 @@ class MongoChatController extends Controller
         $messages = MongoMessage::whereIn('sender_id', [$userId, $partner->id])
             ->whereIn('receiver_id', [$userId, $partner->id])
             ->whereNull('conversation_id')
-            ->orderBy('created_at', 'asc')
+            ->orderBy('created_at', 'desc')
+            ->orderBy('_id', 'desc')
             ->take(50)
             ->get()
+            ->reverse()
+            ->values()
             ->map(function($msg) use ($userId) {
                 // Ensure $msg is treated as ChatMessage model for the linter and formatMessage
                 return $this->formatMessage($msg, $userId);

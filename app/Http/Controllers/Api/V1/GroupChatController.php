@@ -82,6 +82,7 @@ class GroupChatController extends Controller
         $messages = $conversation->messages()
             ->with(['sender', 'image.storage', 'image.settings'])
             ->orderBy('created_at', 'desc')
+            ->orderBy('id', 'desc')
             ->skip($offset)
             ->take($limit)
             ->get()
@@ -268,6 +269,7 @@ class GroupChatController extends Controller
             ->where('id', '>', $afterId)
             ->with(['sender', 'image.storage', 'image.settings'])
             ->orderBy('created_at', 'asc')
+            ->orderBy('id', 'asc')
             ->get()
             ->map(fn($msg) => $this->formatMessage($msg, $userId));
 
