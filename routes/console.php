@@ -20,6 +20,9 @@ Schedule::command('preferences:decay')->weekly();
 // Auto-close inactive support chats
 Schedule::command('support:autoclose')->everyMinute();
 
+// Prune old support messages weekly (30 days retention)
+Schedule::command('support:prune --days=30')->weekly();
+
 // Clean up temporary files and old quarantined files weekly (Sunday at 2:00 AM - Low Traffic)
 Schedule::command('opticvault:clean-garbage')->weeklyOn(0, '02:00');
 
