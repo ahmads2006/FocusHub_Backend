@@ -475,37 +475,49 @@ class AlbumController extends Controller
         $invitation->increment('uses');
 
         // 🔔 Trigger Notification for Owner and Admins
-        $notifiableUsers = collect([$album->owner])->concat(
-            $album->collaborators()
-                ->wherePivot('role', 'admin')
-                ->wherePivot('status', 'accepted')
-                ->get()
-        )->unique('id');
+        try {
+            $notifiableUsers = collect([$album->owner])->concat(
+                $album->collaborators()
+                    ->wherePivot('role', 'admin')
+                    ->wherePivot('status', 'accepted')
+                    ->get()
+            )->unique('id')->filter();
 
-        foreach ($notifiableUsers as $notifiable) {
-            $notifiable->notify(new AlbumJoinRequestNotification($album, $user, $invitation->role));
+            foreach ($notifiableUsers as $notifiable) {
+                $notifiable->notify(new AlbumJoinRequestNotification($album, $user, $invitation->role));
+            }
+        } catch (\Exception $e) {
+            \Log::error("Failed to send join notification: " . $e->getMessage());
         }
 
         // 🔄 AUTO-ROTATE: If it was a single-use link, generate a new replacement link automatically
         if ($invitation->max_uses === 1) {
-            do {
-                $newRandomPart = \Illuminate\Support\Str::random(8);
-                $newCode = "opalshot_{$newRandomPart}_{$invitation->role}";
-            } while (AlbumInvitation::where('code', $newCode)->exists());
+            try {
+                do {
+                    $newRandomPart = \Illuminate\Support\Str::random(8);
+                    $newCode = "opalshot_{$newRandomPart}_{$invitation->role}";
+                } while (AlbumInvitation::where('code', $newCode)->exists());
 
-            $album->invitations()->create([
-                'code'       => $newCode,
-                'role'       => $invitation->role,
-                'max_uses'   => 1,
-                'expires_at' => now()->addHour(),
-            ]);
+                $album->invitations()->create([
+                    'code'       => $newCode,
+                    'role'       => $invitation->role,
+                    'max_uses'   => 1,
+                    'expires_at' => now()->addHour(),
+                ]);
 
-            // Delete the used link to keep DB clean
-            $invitation->delete();
+                // Delete the used link to keep DB clean
+                $invitation->delete();
+            } catch (\Exception $e) {
+                \Log::error("Failed to auto-rotate invitation link: " . $e->getMessage());
+            }
         }
 
         // Sync group conversation if applicable
-        $this->syncGroupConversation($album);
+        try {
+            $this->syncGroupConversation($album);
+        } catch (\Exception $e) {
+            \Log::error("Failed to sync group conversation: " . $e->getMessage());
+        }
 
         return response()->json([
             'success' => true,
