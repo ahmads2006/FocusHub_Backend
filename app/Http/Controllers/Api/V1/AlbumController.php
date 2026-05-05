@@ -37,7 +37,6 @@ class AlbumController extends Controller
 
         $sharedAlbums = $user->collaborativeAlbums()
             ->where('title', '!=', 'Quick Uploads')
-            ->wherePivot('status', 'accepted')
             ->with(['settings', 'images' => function($q) {
                 $q->latest()->limit(5);
             }])
@@ -103,9 +102,14 @@ class AlbumController extends Controller
     public function show(Album $album): JsonResponse
     {
         // Authorization
+        $isCollaborator = $album->collaborators()
+            ->where('users.id', Auth::id())
+            ->wherePivot('status', 'accepted')
+            ->exists();
+
         if ($album->privacy !== 'public'
             && Auth::id() !== $album->user_id
-            && !$album->collaborators->contains(Auth::id())) {
+            && !$isCollaborator) {
             return response()->json([
                 'success' => false,
                 'message' => __('messages.album_unauthorized'),
