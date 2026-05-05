@@ -174,6 +174,7 @@ Route::prefix('v1')->group(function () {
             Route::put('/{album}', [App\Http\Controllers\Api\V1\AlbumController::class, 'update']);
             Route::post('/{album}/request-delete-otp', [App\Http\Controllers\Api\V1\AlbumController::class, 'requestDeleteOTP']);
             Route::delete('/{album}', [App\Http\Controllers\Api\V1\AlbumController::class, 'destroy']);
+            Route::get('/{album}/download', [App\Http\Controllers\Api\V1\AlbumController::class, 'download']);
 
             // Collaborators
             Route::get('/{album}/members', [App\Http\Controllers\Api\V1\AlbumController::class, 'members']);

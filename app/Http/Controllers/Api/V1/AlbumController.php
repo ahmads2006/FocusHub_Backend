@@ -643,6 +643,83 @@ class AlbumController extends Controller
         ]);
     }
 
+    /**
+     * Download the entire album as a ZIP archive.
+     */
+    public function download(Album $album)
+    {
+        // Authorization: Only owner or accepted collaborators with contributor/admin role
+        $isOwner = Auth::id() === $album->user_id;
+        $isCollaborator = $album->collaborators()
+            ->where('users.id', Auth::id())
+            ->wherePivot('status', 'accepted')
+            ->whereIn('role', ['admin', 'contributor'])
+            ->exists();
+
+        if (!$isOwner && !$isCollaborator) {
+            return response()->json([
+                'success' => false,
+                'message' => __('messages.album_unauthorized'),
+            ], 403);
+        }
+
+        $items = $album->images;
+        if ($items->isEmpty()) {
+            return response()->json([
+                'success' => false,
+                'message' => __('messages.album_empty'),
+            ], 404);
+        }
+
+        $zipFileName = 'Album_' . \Illuminate\Support\Str::slug($album->title) . '_' . time() . '.zip';
+        $tempDir = storage_path('app/temp');
+        if (!\Illuminate\Support\Facades\File::exists($tempDir)) {
+            \Illuminate\Support\Facades\File::makeDirectory($tempDir, 0755, true);
+        }
+        
+        $zipFilePath = $tempDir . '/' . $zipFileName;
+        $zip = new \ZipArchive();
+        
+        if ($zip->open($zipFilePath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) === true) {
+            $tempFiles = [];
+            
+            foreach ($items as $index => $image) {
+                $disk = $image->storage->disk ?? 'public';
+                $path = $image->storage->path ?? null;
+                
+                if ($path && \Illuminate\Support\Facades\Storage::disk($disk)->exists($path)) {
+                    $stream = \Illuminate\Support\Facades\Storage::disk($disk)->readStream($path);
+                    if ($stream) {
+                        $tempFile = tempnam(sys_get_temp_dir(), 'album_zip_');
+                        $out = fopen($tempFile, 'wb');
+                        stream_copy_to_stream($stream, $out);
+                        fclose($out);
+                        fclose($stream);
+                        
+                        $tempFiles[] = $tempFile;
+                        
+                        $ext = pathinfo($image->filename ?? $path, PATHINFO_EXTENSION) ?: 'jpg';
+                        $baseName = \Illuminate\Support\Str::slug($image->title ?: 'image_' . ($index + 1));
+                        $nameInZip = sprintf('%03d', $index + 1) . '_' . $baseName . '.' . $ext;
+                        
+                        $zip->addFile($tempFile, $nameInZip);
+                    }
+                }
+            }
+            $zip->close();
+            
+            foreach ($tempFiles as $tempFile) {
+                if (file_exists($tempFile)) @unlink($tempFile);
+            }
+            
+            if (file_exists($zipFilePath)) {
+                return response()->download($zipFilePath)->deleteFileAfterSend(true);
+            }
+        }
+
+        return response()->json(['success' => false, 'message' => 'Failed to create ZIP archive.'], 500);
+    }
+
     // ── Private Helpers ──────────────────────────────────────
 
     /**
