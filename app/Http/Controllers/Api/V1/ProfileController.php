@@ -428,33 +428,42 @@ class ProfileController extends Controller
         $query = trim($rawQuery, '@');
         $userId = Auth::id();
         
-        // Exclude blocked users
-        $blockedIds = \App\Models\Block::where('sender_id', $userId)
-            ->orWhere('blocked_id', $userId)
-            ->get()
-            ->flatMap(fn($b) => [$b->sender_id, $b->blocked_id])
-            ->unique()
-            ->toArray();
-
-        // Get connected IDs to prioritize them
         $user = Auth::user();
-        $connectedIds = $user ? $user->acceptedConnections()->pluck('id')->toArray() : [];
+        
+        // 1. Get blocked IDs (bidirectional)
+        $blockedIds = [];
+        if ($user) {
+            $blockedIds = \App\Models\Block::where('sender_id', $userId)
+                ->orWhere('blocked_id', $userId)
+                ->get()
+                ->flatMap(fn($b) => [$b->sender_id, $b->blocked_id])
+                ->unique()
+                ->toArray();
+        }
 
+        // 2. Get connected IDs to prioritize them
+        $connectedIds = ($user && method_exists($user, 'acceptedConnections')) 
+            ? $user->acceptedConnections()->pluck('id')->toArray() 
+            : [];
+
+        // 3. Perform search
         $users = User::where(function($q) use ($query) {
-                $q->where('name', 'like', "%{$query}%")
-                  ->orWhereHas('profile', function($q) use ($query) {
-                      $q->where('username', 'like', "%{$query}%");
+                $q->whereHas('profile', function($q) use ($query) {
+                      $q->where('name', 'like', "%{$query}%")
+                        ->orWhere('username', 'like', "%{$query}%");
                   });
             })
             ->where('id', '!=', $userId)
             ->whereNotIn('id', $blockedIds)
             ->with('profile')
-            ->get()
-            ->sortByDesc(fn($u) => in_array($u->id, $connectedIds))
-            ->take(15)
+            ->get();
+
+        // 4. Sort: Connected users first
+        $sortedUsers = $users->sortByDesc(fn($u) => in_array($u->id, $connectedIds))
+            ->take(20)
             ->values();
 
-        $data = $users->map(fn($user) => [
+        $data = $sortedUsers->map(fn($user) => [
             'id' => $user->id,
             'name' => $user->name,
             'username' => $user->profile?->username,
@@ -475,7 +484,12 @@ class ProfileController extends Controller
     public function suggestions(): JsonResponse
     {
         $userId = Auth::id();
+        $user = Auth::user();
         
+        if (!$user) {
+            return response()->json(['success' => true, 'data' => []]);
+        }
+
         // 1. Get blocked users IDs to exclude them
         $blockedIds = \App\Models\Block::where('sender_id', $userId)
             ->orWhere('blocked_id', $userId)
@@ -485,29 +499,31 @@ class ProfileController extends Controller
             ->toArray();
 
         // 2. Get accepted connections
-        $connectedIds = Auth::user()->acceptedConnections()->pluck('id')->toArray();
+        $connectedIds = method_exists($user, 'acceptedConnections') 
+            ? $user->acceptedConnections()->pluck('id')->toArray() 
+            : [];
 
         // 3. Prepare suggestions
         // First, people you are already connected with
-        $suggested = User::whereIn('id', $connectedIds)
+        $suggestedUsers = User::whereIn('id', $connectedIds)
             ->whereNotIn('id', $blockedIds)
             ->with('profile')
-            ->limit(5)
+            ->take(10)
             ->get();
 
-        // 4. If less than 5, add random users
-        if ($suggested->count() < 5) {
-            $randomUsers = User::where('id', '!=', $userId)
-                ->whereNotIn('id', array_merge($blockedIds, $connectedIds))
+        // 4. Fallback: If not enough connections, add random users
+        if ($suggestedUsers->count() < 10) {
+            $excludeIds = array_merge($blockedIds, $connectedIds, [$userId]);
+            $randomUsers = User::whereNotIn('id', $excludeIds)
                 ->with('profile')
                 ->inRandomOrder()
-                ->limit(10 - $suggested->count())
+                ->take(10 - $suggestedUsers->count())
                 ->get();
             
-            $suggested = $suggested->concat($randomUsers);
+            $suggestedUsers = $suggestedUsers->concat($randomUsers);
         }
 
-        $data = $suggested->map(fn($user) => [
+        $data = $suggestedUsers->map(fn($user) => [
             'id' => $user->id,
             'name' => $user->name,
             'username' => $user->profile?->username,

@@ -102,7 +102,7 @@ class MongoChatController extends Controller
         // ── 2. Group conversations ────────────────────────────
         $groupConversations = \App\Models\Conversation::where('type', 'group')
             ->whereHas('participants', fn($q) => $q->where('users.id', $userId))
-            ->with(['participants' => fn($q) => $q->select('users.id', 'users.name')])
+            ->with(['participants' => fn($q) => $q->with('profile')])
             ->orderByDesc('last_message_at')
             ->get()
             ->map(function (\App\Models\Conversation $conv) use ($userId) {
@@ -378,44 +378,6 @@ class MongoChatController extends Controller
         return response()->json(['success' => true, 'data' => $connections]);
     }
 
-    /**
-     * Accept a message request.
-     */
-    public function acceptConversation(User $partner): JsonResponse
-    {
-        $userId = Auth::id();
-        $connection = \App\Models\Connection::where('user_id', $partner->id)
-            ->where('connected_user_id', $userId)
-            ->where('status', 'pending')
-            ->first();
-
-        if (!$connection) {
-            return response()->json(['success' => false, 'message' => 'Request not found'], 404);
-        }
-
-        $connection->update(['status' => 'accepted']);
-
-        return response()->json(['success' => true, 'message' => 'Conversation accepted']);
-    }
-
-    /**
-     * Decline/Delete a conversation.
-     */
-    public function declineConversation(User $partner): JsonResponse
-    {
-        $userId = Auth::id();
-        $connection = \App\Models\Connection::where(function($q) use ($userId, $partner) {
-            $q->where('user_id', $userId)->where('connected_user_id', $partner->id);
-        })->orWhere(function($q) use ($userId, $partner) {
-            $q->where('user_id', $partner->id)->where('connected_user_id', $userId);
-        })->first();
-
-        if ($connection) {
-            $connection->delete();
-        }
-
-        return response()->json(['success' => true, 'message' => 'Conversation declined/deleted']);
-    }
 
     // ── Helpers ──
 
@@ -467,6 +429,64 @@ class MongoChatController extends Controller
         $message->delete();
 
         return response()->json(['success' => true, 'message' => 'Message deleted']);
+    }
+
+    /**
+     * Accept a message request.
+     */
+    public function acceptConversation(string $partner): \Illuminate\Http\JsonResponse
+    {
+        $userId = Auth::id();
+        $partnerId = $partner;
+        
+        $connection = \App\Models\Connection::where(function ($q) use ($userId, $partnerId) {
+            $q->where('user_id', $partnerId)->where('connected_user_id', $userId);
+        })->orWhere(function ($q) use ($userId, $partnerId) {
+            $q->where('user_id', $userId)->where('connected_user_id', $partnerId);
+        })->first();
+
+        if (!$connection) {
+            return response()->json(['success' => false, 'message' => 'Request not found'], 404);
+        }
+
+        $connection->update(['status' => 'accepted']);
+
+        // Notify the requester
+        $requesterId = ($connection->user_id == $userId) ? $connection->connected_user_id : $connection->user_id;
+        $requester = \App\Models\User::find($requesterId);
+        if ($requester) {
+            $requester->notify(new \App\Notifications\ChatRequestStatusNotification(Auth::user(), 'accepted'));
+        }
+
+        return response()->json(['success' => true, 'message' => 'Conversation accepted']);
+    }
+
+    /**
+     * Decline a message request.
+     */
+    public function declineConversation(string $partner): \Illuminate\Http\JsonResponse
+    {
+        $userId = Auth::id();
+        $partnerId = $partner;
+        
+        $connection = \App\Models\Connection::where(function ($q) use ($userId, $partnerId) {
+            $q->where('user_id', $partnerId)->where('connected_user_id', $userId);
+        })->orWhere(function ($q) use ($userId, $partnerId) {
+            $q->where('user_id', $userId)->where('connected_user_id', $partnerId);
+        })->first();
+
+        if ($connection) {
+            // Notify before deleting (polite rejection)
+            $requesterId = ($connection->user_id == $userId) ? $connection->connected_user_id : $connection->user_id;
+            $requester = \App\Models\User::find($requesterId);
+            if ($requester) {
+                $requester->notify(new \App\Notifications\ChatRequestStatusNotification(Auth::user(), 'declined'));
+            }
+            
+            $connection->delete();
+        }
+
+        return response()->json(['success' => true, 'message' => 'Conversation declined']);
     }
 
     private function formatMessage($msg, string $userId): array
