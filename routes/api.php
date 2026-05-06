@@ -123,7 +123,12 @@ Route::prefix('v1')->group(function () {
             Route::post('/export', [App\Http\Controllers\Api\V1\ProfileController::class, 'exportData']);
             Route::get('/analytics', [App\Http\Controllers\Api\V1\ProfileController::class, 'analytics']);
             Route::get('/search', [App\Http\Controllers\Api\V1\ProfileController::class, 'search']);
+            Route::get('/suggestions', [App\Http\Controllers\Api\V1\ProfileController::class, 'suggestions']);
         });
+
+        Route::post('/users/{user}/block', [App\Http\Controllers\Api\V1\BlockController::class, 'block']);
+        Route::post('/users/{user}/unblock', [App\Http\Controllers\Api\V1\BlockController::class, 'unblock']);
+        Route::get('/blocked-users', [App\Http\Controllers\Api\V1\BlockController::class, 'index']);
 
         // ─── 🖼️ Images (Enhanced CRUD) ──────────
         Route::prefix('images')->group(function () {

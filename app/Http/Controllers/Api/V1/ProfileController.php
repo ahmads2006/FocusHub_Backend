@@ -446,4 +446,57 @@ class ProfileController extends Controller
             'data' => $users,
         ]);
     }
+
+    /**
+     * Get suggested users for inviting to albums or starting chats.
+     * Priority: Users already connected to.
+     * Fallback: Random real users.
+     */
+    public function suggestions(): JsonResponse
+    {
+        $userId = Auth::id();
+        
+        // 1. Get blocked users IDs to exclude them
+        $blockedIds = \App\Models\Block::where('sender_id', $userId)
+            ->orWhere('blocked_id', $userId)
+            ->get()
+            ->flatMap(fn($b) => [$b->sender_id, $b->blocked_id])
+            ->unique()
+            ->toArray();
+
+        // 2. Get accepted connections
+        $connectedIds = Auth::user()->acceptedConnections()->pluck('id')->toArray();
+
+        // 3. Prepare suggestions
+        // First, people you are already connected with
+        $suggested = User::whereIn('id', $connectedIds)
+            ->whereNotIn('id', $blockedIds)
+            ->with('profile')
+            ->limit(5)
+            ->get();
+
+        // 4. If less than 5, add random users
+        if ($suggested->count() < 5) {
+            $randomUsers = User::where('id', '!=', $userId)
+                ->whereNotIn('id', array_merge($blockedIds, $connectedIds))
+                ->with('profile')
+                ->inRandomOrder()
+                ->limit(10 - $suggested->count())
+                ->get();
+            
+            $suggested = $suggested->concat($randomUsers);
+        }
+
+        $data = $suggested->map(fn($user) => [
+            'id' => $user->id,
+            'name' => $user->name,
+            'username' => $user->profile?->username,
+            'avatar' => $user->avatar,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'data' => $data,
+        ]);
+    }
 }
