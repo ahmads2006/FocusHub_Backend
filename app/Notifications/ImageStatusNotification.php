@@ -63,7 +63,7 @@ class ImageStatusNotification extends Notification implements ShouldQueue, Shoul
             'status' => $this->status,
             'message' => $this->message,
             'image_title' => $this->image->title,
-            'action_url' => route('images.gallery') . '#image-' . $this->image->id,
+            'action_url' => config('app.frontend_url', 'https://www.opalshot.studio') . '/dashboard?image=' . $this->image->id,
             'created_at' => now()->toIso8601String(),
         ];
     }
