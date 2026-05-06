@@ -420,21 +420,38 @@ class ProfileController extends Controller
     public function search(Request $request): JsonResponse
     {
         $query = $request->query('query');
-        if (strlen($query) < 2) {
+        if (!$query || strlen($query) < 2) {
             return response()->json(['success' => true, 'data' => []]);
         }
 
+        $userId = Auth::id();
+        
+        // Exclude blocked users
+        $blockedIds = \App\Models\Block::where('sender_id', $userId)
+            ->orWhere('blocked_id', $userId)
+            ->get()
+            ->flatMap(fn($b) => [$b->sender_id, $b->blocked_id])
+            ->unique()
+            ->toArray();
+
+        // Get connected IDs to prioritize them
+        $connectedIds = Auth::user()->acceptedConnections()->pluck('id')->toArray();
+
         $users = User::where(function($q) use ($query) {
-            $q->where('name', 'like', "%{$query}%")
-              ->orWhereHas('profile', function($pq) use ($query) {
-                  $pq->where('username', 'like', "%{$query}%");
-              });
-        })
-        ->where('id', '!=', Auth::id())
-        ->with('profile')
-        ->limit(10)
-        ->get()
-        ->map(fn($user) => [
+                $q->where('name', 'like', "%{$query}%")
+                  ->orWhereHas('profile', function($q) use ($query) {
+                      $q->where('username', 'like', "%{$query}%");
+                  });
+            })
+            ->where('id', '!=', $userId)
+            ->whereNotIn('id', $blockedIds)
+            ->with('profile')
+            ->get()
+            ->sortByDesc(fn($u) => in_array($u->id, $connectedIds))
+            ->take(15)
+            ->values();
+
+        $data = $users->map(fn($user) => [
             'id' => $user->id,
             'name' => $user->name,
             'username' => $user->profile?->username,
@@ -443,7 +460,7 @@ class ProfileController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $users,
+            'data' => $data,
         ]);
     }
 
