@@ -96,8 +96,7 @@ class MongoChatController extends Controller
             ];
         }
 
-        // Sort by latest message date
-        usort($conversations, fn($a, $b) => strcmp($b['last_message_at'], $a['last_message_at']));
+
 
         // ── 2. Group conversations ────────────────────────────
         $groupConversations = \App\Models\Conversation::where('type', 'group')
