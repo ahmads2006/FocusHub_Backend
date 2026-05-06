@@ -122,6 +122,7 @@ Route::prefix('v1')->group(function () {
             Route::put('/notification-preferences', [App\Http\Controllers\Api\V1\ProfileController::class, 'updateNotificationPreferences']);
             Route::post('/export', [App\Http\Controllers\Api\V1\ProfileController::class, 'exportData']);
             Route::get('/analytics', [App\Http\Controllers\Api\V1\ProfileController::class, 'analytics']);
+            Route::get('/search', [App\Http\Controllers\Api\V1\ProfileController::class, 'search']);
         });
 
         // ─── 🖼️ Images (Enhanced CRUD) ──────────
@@ -243,6 +244,8 @@ Route::prefix('v1')->group(function () {
             Route::get('/connections', [App\Http\Controllers\Api\V1\MongoChatController::class, 'connections']);
             Route::patch('/messages/{id}', [App\Http\Controllers\Api\V1\MongoChatController::class, 'update']);
             Route::delete('/messages/{id}', [App\Http\Controllers\Api\V1\MongoChatController::class, 'destroy']);
+            Route::post('/conversations/{partner}/accept', [App\Http\Controllers\Api\V1\MongoChatController::class, 'acceptConversation']);
+            Route::post('/conversations/{partner}/decline', [App\Http\Controllers\Api\V1\MongoChatController::class, 'declineConversation']);
 
             // ─── 👥 Group Chat ──────────────────────
             Route::prefix('groups')->group(function () {

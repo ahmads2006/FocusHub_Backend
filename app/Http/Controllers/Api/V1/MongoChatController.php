@@ -28,6 +28,9 @@ class MongoChatController extends Controller
     /**
      * Get all conversation threads for the current user.
      */
+    /**
+     * Get all conversation threads for the current user.
+     */
     public function conversations(): JsonResponse
     {
         $userId = Auth::id();
@@ -62,6 +65,14 @@ class MongoChatController extends Controller
                 ->where('is_read', false)
                 ->count();
 
+            // Check connection status
+            $connection = DB::table('connections')
+                ->where(function($q) use ($userId, $row) {
+                    $q->where('user_id', $userId)->where('connected_user_id', $row->partner_id);
+                })->orWhere(function($q) use ($userId, $row) {
+                    $q->where('user_id', $row->partner_id)->where('connected_user_id', $userId);
+                })->first();
+
             $conversations[] = [
                 'type'    => 'direct',
                 'partner' => [
@@ -69,6 +80,8 @@ class MongoChatController extends Controller
                     'name'   => $partner->name,
                     'avatar' => $partner->avatar,
                 ],
+                'status' => $connection->status ?? 'pending',
+                'is_requester' => $connection ? ($connection->user_id === $userId) : false,
                 'last_message' => [
                     'body'       => $message->image_id ? '📷 Shared an image' : $message->body,
                     'created_at' => $message->created_at->diffForHumans(),
@@ -135,12 +148,19 @@ class MongoChatController extends Controller
     {
         $userId = Auth::id();
 
-        if (!$this->isAcceptedConnection($userId, $partner->id)) {
+        // Allow reading if connection exists (even if pending)
+        $connection = DB::table('connections')
+            ->where(function($q) use ($userId, $partner) {
+                $q->where('user_id', $userId)->where('connected_user_id', $partner->id);
+            })->orWhere(function($q) use ($userId, $partner) {
+                $q->where('user_id', $partner->id)->where('connected_user_id', $userId);
+            })->first();
+
+        if (!$connection) {
             return response()->json(['success' => false, 'message' => __('chat.unauthorized')], 403);
         }
 
-        // Mark messages as read directly in Mongo (fallback to direct updates usually, or via outbox)
-        // Since reading doesn't strictly need outbox safety, direct update is fine for simplicity here.
+        // Mark messages as read directly in Mongo
         MongoMessage::where('sender_id', $partner->id)
             ->where('receiver_id', $userId)
             ->where('is_read', false)
@@ -156,7 +176,6 @@ class MongoChatController extends Controller
             ->reverse()
             ->values()
             ->map(function($msg) use ($userId) {
-                // Ensure $msg is treated as ChatMessage model for the linter and formatMessage
                 return $this->formatMessage($msg, $userId);
             });
 
@@ -164,6 +183,8 @@ class MongoChatController extends Controller
             'success' => true,
             'data'    => [
                 'messages' => $messages,
+                'status'   => $connection->status,
+                'is_requester' => $connection->user_id === $userId,
                 'partner'  => [
                     'id'        => $partner->id,
                     'name'      => $partner->name,
@@ -197,8 +218,20 @@ class MongoChatController extends Controller
 
         $userId = Auth::id();
 
-        if (!$this->isAcceptedConnection($userId, $request->receiver_id)) {
-            return response()->json(['success' => false, 'message' => __('chat.unauthorized')], 403);
+        // Check or create connection
+        $connection = \App\Models\Connection::where(function ($q) use ($userId, $request) {
+            $q->where('user_id', $userId)->where('connected_user_id', $request->receiver_id);
+        })->orWhere(function ($q) use ($userId, $request) {
+            $q->where('user_id', $request->receiver_id)->where('connected_user_id', $userId);
+        })->first();
+
+        if (!$connection) {
+            // Create pending connection (Message Request)
+            $connection = \App\Models\Connection::create([
+                'user_id' => $userId,
+                'connected_user_id' => $request->receiver_id,
+                'status' => 'pending'
+            ]);
         }
 
         $image = null;
@@ -235,11 +268,11 @@ class MongoChatController extends Controller
 
         $receiver = User::find($request->receiver_id);
         if ($receiver) {
+            // Send notification (Maybe different for requests?)
             $receiver->notify(new ChatMessageNotification(Auth::user(), $request->body ?? 'Shared an image'));
         }
 
         try {
-            // Can pass as array to avoid relationship loading issues in older event listeners
             event(new MessageSent($messageModel));
         } catch (\Throwable $e) {}
 
@@ -343,6 +376,45 @@ class MongoChatController extends Controller
             ]);
 
         return response()->json(['success' => true, 'data' => $connections]);
+    }
+
+    /**
+     * Accept a message request.
+     */
+    public function acceptConversation(User $partner): JsonResponse
+    {
+        $userId = Auth::id();
+        $connection = \App\Models\Connection::where('user_id', $partner->id)
+            ->where('connected_user_id', $userId)
+            ->where('status', 'pending')
+            ->first();
+
+        if (!$connection) {
+            return response()->json(['success' => false, 'message' => 'Request not found'], 404);
+        }
+
+        $connection->update(['status' => 'accepted']);
+
+        return response()->json(['success' => true, 'message' => 'Conversation accepted']);
+    }
+
+    /**
+     * Decline/Delete a conversation.
+     */
+    public function declineConversation(User $partner): JsonResponse
+    {
+        $userId = Auth::id();
+        $connection = \App\Models\Connection::where(function($q) use ($userId, $partner) {
+            $q->where('user_id', $userId)->where('connected_user_id', $partner->id);
+        })->orWhere(function($q) use ($userId, $partner) {
+            $q->where('user_id', $partner->id)->where('connected_user_id', $userId);
+        })->first();
+
+        if ($connection) {
+            $connection->delete();
+        }
+
+        return response()->json(['success' => true, 'message' => 'Conversation declined/deleted']);
     }
 
     // ── Helpers ──

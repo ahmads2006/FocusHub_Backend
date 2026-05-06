@@ -413,4 +413,37 @@ class ProfileController extends Controller
             ],
         ]);
     }
+
+    /**
+     * Search for users by name or username.
+     */
+    public function search(Request $request): JsonResponse
+    {
+        $query = $request->query('query');
+        if (strlen($query) < 2) {
+            return response()->json(['success' => true, 'data' => []]);
+        }
+
+        $users = User::where(function($q) use ($query) {
+            $q->where('name', 'like', "%{$query}%")
+              ->orWhereHas('profile', function($pq) use ($query) {
+                  $pq->where('username', 'like', "%{$query}%");
+              });
+        })
+        ->where('id', '!=', Auth::id())
+        ->with('profile')
+        ->limit(10)
+        ->get()
+        ->map(fn($user) => [
+            'id' => $user->id,
+            'name' => $user->name,
+            'username' => $user->profile?->username,
+            'avatar' => $user->avatar,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'data' => $users,
+        ]);
+    }
 }
