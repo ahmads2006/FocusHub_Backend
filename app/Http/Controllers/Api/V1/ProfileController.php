@@ -419,11 +419,13 @@ class ProfileController extends Controller
      */
     public function search(Request $request): JsonResponse
     {
-        $query = $request->query('query');
-        if (!$query || strlen($query) < 2) {
+        $rawQuery = $request->query('query');
+        if (!$rawQuery || strlen($rawQuery) < 2) {
             return response()->json(['success' => true, 'data' => []]);
         }
 
+        // Sanitize: strip '@' prefix/suffix for better username matching
+        $query = trim($rawQuery, '@');
         $userId = Auth::id();
         
         // Exclude blocked users
@@ -435,7 +437,8 @@ class ProfileController extends Controller
             ->toArray();
 
         // Get connected IDs to prioritize them
-        $connectedIds = Auth::user()->acceptedConnections()->pluck('id')->toArray();
+        $user = Auth::user();
+        $connectedIds = $user ? $user->acceptedConnections()->pluck('id')->toArray() : [];
 
         $users = User::where(function($q) use ($query) {
                 $q->where('name', 'like', "%{$query}%")
