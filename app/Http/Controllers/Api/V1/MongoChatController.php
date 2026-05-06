@@ -35,68 +35,69 @@ class MongoChatController extends Controller
     {
         $userId = Auth::id();
 
-        // ── 1. Direct (1-to-1) conversations ──────────────────
-        $latestMessages = DB::table('messages')
-            ->select(DB::raw("
-                CASE
-                    WHEN sender_id = '{$userId}' THEN receiver_id
-                    ELSE sender_id
-                END as partner_id
-            "), DB::raw('MAX(id) as latest_message_id'))
-            ->where(function ($q) use ($userId) {
-                $q->where('sender_id', $userId)->orWhere('receiver_id', $userId);
-            })
-            ->whereNull('conversation_id') // Only direct messages
-            ->groupBy('partner_id')
+        // 1. Get all connections first (including pending ones)
+        $connections = DB::table('connections')
+            ->where('user_id', $userId)
+            ->orWhere('connected_user_id', $userId)
             ->get();
 
         $conversations = [];
-        foreach ($latestMessages as $row) {
-            $message = Message::with(['sender:id', 'receiver:id'])->find($row->latest_message_id);
-            if (!$message) continue;
-
-            $partner = User::with('profile')->find($row->partner_id);
+        foreach ($connections as $conn) {
+            $partnerId = ($conn->user_id == $userId) ? $conn->connected_user_id : $conn->user_id;
+            $partner = User::with('profile')->find($partnerId);
             if (!$partner) continue;
 
-            $unreadCount = Message::where('sender_id', $row->partner_id)
+            // Get latest message from MongoDB
+            $latestMessage = MongoMessage::where(function($q) use ($userId, $partnerId) {
+                $q->where('sender_id', $userId)->where('receiver_id', $partnerId);
+            })->orWhere(function($q) use ($userId, $partnerId) {
+                $q->where('sender_id', $partnerId)->where('receiver_id', $userId);
+            })
+            ->whereNull('conversation_id')
+            ->orderBy('created_at', 'desc')
+            ->first();
+
+            // Skip if no message and it's not a pending request where I am the receiver
+            if (!$latestMessage && $conn->status === 'accepted') continue;
+
+            $unreadCount = MongoMessage::where('sender_id', $partnerId)
                 ->where('receiver_id', $userId)
                 ->whereNull('conversation_id')
                 ->where('is_read', false)
                 ->count();
 
-            // Check connection status
-            $connection = DB::table('connections')
-                ->where(function($q) use ($userId, $row) {
-                    $q->where('user_id', $userId)->where('connected_user_id', $row->partner_id);
-                })->orWhere(function($q) use ($userId, $row) {
-                    $q->where('user_id', $row->partner_id)->where('connected_user_id', $userId);
-                })->first();
-
             $conversations[] = [
                 'type'    => 'direct',
                 'partner' => [
                     'id'     => $partner->id,
-                    'name'   => $partner->name,
+                    'name'   => $partner->profile?->name ?? $partner->name,
                     'avatar' => $partner->avatar,
                 ],
-                'status' => $connection->status ?? 'pending',
-                'is_requester' => $connection ? ($connection->user_id === $userId) : false,
-                'last_message' => [
-                    'body'       => $message->image_id ? '📷 Shared an image' : $message->body,
-                    'created_at' => $message->created_at->diffForHumans(),
-                    'is_mine'    => $message->sender_id === $userId,
+                'status' => $conn->status,
+                'is_requester' => $conn->user_id == $userId,
+                'last_message' => $latestMessage ? [
+                    'body'       => $latestMessage->image_id ? '📷 Shared an image' : $latestMessage->body,
+                    'created_at' => \Carbon\Carbon::parse($latestMessage->created_at)->diffForHumans(),
+                    'is_mine'    => $latestMessage->sender_id == $userId,
+                ] : [
+                    'body' => 'طلب مراسلة جديد',
+                    'created_at' => \Carbon\Carbon::parse($conn->created_at)->diffForHumans(),
+                    'is_mine' => $conn->user_id == $userId,
                 ],
-                'last_message_at' => $message->created_at->toISOString(),
+                'last_message_at' => $latestMessage ? $latestMessage->created_at : $conn->created_at,
                 'unread_count' => $unreadCount,
-                'is_online'    => (function() use ($row) {
+                'is_online'    => (function() use ($partnerId) {
                     try {
-                        return (bool) Redis::exists('user:online:' . $row->partner_id);
+                        return (bool) Redis::exists('user:online:' . $partnerId);
                     } catch (\Exception $e) {
                         return false;
                     }
                 })(),
             ];
         }
+
+        // Sort by latest message date
+        usort($conversations, fn($a, $b) => strcmp($b['last_message_at'], $a['last_message_at']));
 
         // ── 2. Group conversations ────────────────────────────
         $groupConversations = \App\Models\Conversation::where('type', 'group')
@@ -114,7 +115,7 @@ class MongoChatController extends Controller
                     'album_id'     => $conv->album_id,
                     'participants' => $conv->participants->map(fn($p) => [
                         'id'     => $p->id,
-                        'name'   => $p->name,
+                        'name'   => $p->profile?->name ?? $p->name,
                         'avatar' => $p->avatar,
                     ]),
                     'last_message' => $lastMessage ? [
