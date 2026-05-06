@@ -37,20 +37,23 @@ class MessageSent implements ShouldBroadcast
      */
     public function broadcastWith(): array
     {
-        // For MongoMessage, sender is actually loaded manually or we send only sender_id and let auth/frontend resolve,
-        // but here we just manually pass sender details if loaded.
-        $senderName = $this->message->sender->name ?? 'User';
-        $senderAvatar = $this->message->sender->avatar ?? null;
+        // Ensure sender is loaded
+        $sender = $this->message->sender;
+        $senderName = $sender->name ?? 'User';
+        $senderAvatar = $sender->avatar ?? null;
 
         return [
-            'id'         => $this->message->id,
-            'sender_id'  => $this->message->sender_id,
-            'body'       => $this->message->body,
-            'created_at' => is_string($this->message->created_at) ? $this->message->created_at : $this->message->created_at->toISOString(),
-            'sender'     => [
+            'id'          => $this->message->id,
+            'sender_id'   => $this->message->sender_id,
+            'receiver_id' => $this->message->receiver_id,
+            'body'        => $this->message->body,
+            'created_at'  => is_string($this->message->created_at) ? $this->message->created_at : $this->message->created_at->toISOString(),
+            'sender'      => [
+                'id'     => $this->message->sender_id,
                 'name'   => $senderName,
                 'avatar' => $senderAvatar,
             ],
+            'conversation_id' => $this->message->conversation_id ?? null,
         ];
     }
 }
