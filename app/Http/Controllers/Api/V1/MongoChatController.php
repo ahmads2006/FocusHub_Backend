@@ -37,18 +37,17 @@ class MongoChatController extends Controller
 
         // ── 1. Direct (1-to-1) conversations ──────────────────
         $latestMessages = DB::table('messages')
-            ->select(DB::raw('
+            ->select(DB::raw("
                 CASE
-                    WHEN sender_id = ? THEN receiver_id
+                    WHEN sender_id = '{$userId}' THEN receiver_id
                     ELSE sender_id
                 END as partner_id
-            '), DB::raw('MAX(id) as latest_message_id'))
+            "), DB::raw('MAX(id) as latest_message_id'))
             ->where(function ($q) use ($userId) {
                 $q->where('sender_id', $userId)->orWhere('receiver_id', $userId);
             })
             ->whereNull('conversation_id') // Only direct messages
             ->groupBy('partner_id')
-            ->setBindings([$userId])
             ->get();
 
         $conversations = [];
@@ -207,9 +206,9 @@ class MongoChatController extends Controller
     public function store(Request $request): JsonResponse
     {
         $request->validate([
-            'receiver_id' => 'required|uuid|exists:users,id',
+            'receiver_id' => 'required|exists:users,id',
             'body'        => 'nullable|string|max:2000',
-            'image_id'    => 'nullable|uuid|exists:images,id',
+            'image_id'    => 'nullable|exists:images,id',
         ]);
 
         if (!$request->body && !$request->image_id) {

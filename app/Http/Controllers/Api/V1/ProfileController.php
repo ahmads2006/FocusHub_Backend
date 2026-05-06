@@ -465,7 +465,7 @@ class ProfileController extends Controller
 
         $data = $sortedUsers->map(fn($user) => [
             'id' => $user->id,
-            'name' => $user->name,
+            'name' => $user->profile?->name ?? 'User',
             'username' => $user->profile?->username,
             'avatar' => $user->avatar,
         ]);
