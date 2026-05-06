@@ -11,6 +11,9 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
+use App\Notifications\ImageStatusNotification;
+use App\Notifications\ReportStatusNotification;
+
 class ModerationController extends Controller
 {
     /**
@@ -77,6 +80,12 @@ class ModerationController extends Controller
         $image->withoutGlobalScopes()->touch();
         Log::info("Admin approved image: {$image->id}");
 
+        // Notify image owner
+        if ($image->user) {
+            $msg = __('لقد تمت الموافقة على صورتك ":title" من قبل فريق الإشراف.', ['title' => $image->title]);
+            $image->user->notify(new ImageStatusNotification($image, Image::STATUS_APPROVED, $msg));
+        }
+
         return response()->json([
             'success' => true,
             'message' => __('messages.image_approved'),
@@ -96,6 +105,12 @@ class ModerationController extends Controller
         $image->withoutGlobalScopes()->touch();
         Log::info("Admin rejected image: {$image->id}");
 
+        // Notify image owner
+        if ($image->user) {
+            $msg = __('تم رفض صورتك ":title" بسبب مخالفتها لمعايير المجتمع.', ['title' => $image->title]);
+            $image->user->notify(new ImageStatusNotification($image, Image::STATUS_REJECTED, $msg));
+        }
+
         return response()->json([
             'success' => true,
             'message' => __('messages.image_rejected'),
@@ -109,8 +124,17 @@ class ModerationController extends Controller
     {
         if ($action === 'dismiss') {
             $report->update(['status' => 'dismissed']);
+            $msg = __('تمت مراجعة بلاغك بخصوص الصورة ":id" وتقرر رفضه لأنه لا يخالف المعايير.', ['id' => $report->image_id]);
+            $notificationAction = 'dismissed';
         } else {
             $report->update(['status' => 'resolved']);
+            $msg = __('تم قبول بلاغك بخصوص الصورة ":id". شكراً لمساهمتك في الحفاظ على أمان المجتمع.', ['id' => $report->image_id]);
+            $notificationAction = 'resolved';
+        }
+
+        // Notify the reporter
+        if ($report->user) {
+            $report->user->notify(new ReportStatusNotification($report, $notificationAction, $msg));
         }
 
         return response()->json([

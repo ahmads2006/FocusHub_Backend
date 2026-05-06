@@ -49,19 +49,28 @@ class ImageSocialNotification extends Notification implements ShouldQueue, Shoul
 
     public function toArray($notifiable)
     {
+        $isAr = app()->getLocale() === 'ar';
         $actionTextAr = ($this->type === 'like' ? 'أعجب بـ' : 'قام بحفظ');
-        $message = "قام {$this->actor->name} بـ {$actionTextAr} صورتك: {$this->image->title}";
+        $actionTextEn = ($this->type === 'like' ? 'liked' : 'bookmarked');
+        
+        $title = $this->type === 'like' ? 'إعجاب جديد' : 'حفظ جديد';
+        $titleEn = $this->type === 'like' ? 'New Like' : 'New Bookmark';
+        
+        $message = $isAr 
+            ? "قام {$this->actor->name} بـ {$actionTextAr} صورتك: {$this->image->title}"
+            : "{$this->actor->name} {$actionTextEn} your photo: {$this->image->title}";
 
         return [
             'type' => "image_{$this->type}",
+            'title' => $isAr ? $title : $titleEn,
+            'message' => $message,
             'actor_id' => $this->actor->id,
             'actor_name' => $this->actor->name,
             'actor_avatar' => $this->actor->avatar,
             'image_id' => $this->image->id,
             'image_title' => $this->image->title,
-            'message' => $message,
-            
             'action_url' => route('images.gallery') . '#image-' . $this->image->id,
+            'created_at' => now()->toIso8601String(),
         ];
     }
 }

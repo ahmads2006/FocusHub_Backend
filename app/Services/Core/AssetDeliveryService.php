@@ -92,8 +92,12 @@ class AssetDeliveryService
                     break;
 
                 case 'srcset':
-                    // For simplicity in srcset, we might return the default optimized URL or a specific size
-                    return $imageKit->getOptimizedUrl($path, 800);
+                    $sizes = [400, 800, 1200, 1600];
+                    $srcset = [];
+                    foreach ($sizes as $s) {
+                        $srcset[] = $imageKit->getOptimizedUrl($path, $s) . " {$s}w";
+                    }
+                    return implode(', ', $srcset);
 
                 case 'placeholder':
                     $width = 20;

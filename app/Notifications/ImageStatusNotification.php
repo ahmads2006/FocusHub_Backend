@@ -49,13 +49,22 @@ class ImageStatusNotification extends Notification implements ShouldQueue, Shoul
 
     public function toArray($notifiable)
     {
+        $isAr = app()->getLocale() === 'ar';
+        $title = match($this->status) {
+            'approved' => $isAr ? 'تم قبول الصورة' : 'Image Approved',
+            'rejected' => $isAr ? 'تم رفض الصورة' : 'Image Rejected',
+            default    => $isAr ? 'تحديث حالة الصورة' : 'Image Status Update',
+        };
+
         return [
             'type' => 'image_status',
+            'title' => $title,
             'image_id' => $this->image->id,
-            'status' => $this->status, // 'success', 'failed', 'rejected'
+            'status' => $this->status,
             'message' => $this->message,
             'image_title' => $this->image->title,
             'action_url' => route('images.gallery') . '#image-' . $this->image->id,
+            'created_at' => now()->toIso8601String(),
         ];
     }
 }
