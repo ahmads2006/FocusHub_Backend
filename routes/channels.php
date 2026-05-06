@@ -22,3 +22,8 @@ Broadcast::channel('group-chat.{conversationId}', function ($user, $conversation
 
     return false;
 });
+
+// ── Direct Chat Private Channel ──────────────────────────
+Broadcast::channel('chat.{id}', function ($user, $id) {
+    return (int) $user->id === (int) $id;
+});

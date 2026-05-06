@@ -375,5 +375,10 @@ Route::prefix('v1')->group(function () {
         Route::post('/share/{token}/verify', [App\Http\Controllers\Api\V1\SharedLinkController::class, 'verifyPassword']);
         Route::get('/share/{token}/download', [App\Http\Controllers\Api\V1\SharedLinkController::class, 'downloadAlbum']);
     });
+
+    // ══════════════════════════════════════════
+    // 5. 📡 BROADCASTING AUTH (WebSockets)
+    // ══════════════════════════════════════════
+    \Illuminate\Support\Facades\Broadcast::routes(['middleware' => ['auth:sanctum']]);
 });
 

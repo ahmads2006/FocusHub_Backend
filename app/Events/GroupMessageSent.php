@@ -26,7 +26,7 @@ class GroupMessageSent implements ShouldBroadcast
     public function broadcastOn(): array
     {
         return [
-            new PresenceChannel('group-chat.' . $this->message->conversation_id),
+            new \Illuminate\Broadcasting\PresenceChannel('group-chat.' . $this->message->conversation_id),
         ];
     }
 
