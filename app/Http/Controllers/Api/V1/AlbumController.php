@@ -117,6 +117,7 @@ class AlbumController extends Controller
         }
 
         $album->load(['images.user', 'images.storage', 'images.settings', 'collaborators']);
+        $album->accepted_collaborators_count = $album->collaborators()->wherePivot('status', 'accepted')->count() + 1;
 
         return response()->json([
             'success' => true,
@@ -253,11 +254,12 @@ class AlbumController extends Controller
         }
 
         // Debug Log (Temporary)
-        \Log::info("Album Members Check V2", [
+        \Log::info("Album Members Request", [
             'album_id' => $album->id,
             'user_id' => Auth::id(),
             'is_owner' => $isOwner,
-            'count' => count($members)
+            'members_found' => count($members),
+            'members_ids' => $members->pluck('id')->toArray()
         ]);
 
         return response()->json([
@@ -287,6 +289,13 @@ class AlbumController extends Controller
 
         if ($userToAdd->id === $album->user_id) {
             return response()->json(['success' => false, 'message' => __('messages.cannot_add_self_collaborator')], 400);
+        }
+
+        if ($album->collaborators()->wherePivot('status', 'accepted')->count() >= 4) {
+            return response()->json([
+                'success' => false,
+                'message' => 'عذراً، وصل الألبوم للحد الأقصى من الأعضاء (5 أشخاص).'
+            ], 403);
         }
 
         if ($album->collaborators->contains($userToAdd->id)) {
@@ -518,6 +527,13 @@ class AlbumController extends Controller
             ], 409);
         }
 
+        if ($album->collaborators()->wherePivot('status', 'accepted')->count() >= 4) {
+            return response()->json([
+                'success' => false,
+                'message' => 'عذراً، وصل الألبوم للحد الأقصى من الأعضاء (5 أشخاص).'
+            ], 403);
+        }
+
         // Add user with the role defined in the invitation, but as PENDING
         $album->collaborators()->attach($user->id, [
             'role'      => $invitation->role,
@@ -620,6 +636,13 @@ class AlbumController extends Controller
             if (!$isOwner && !$isAdmin) {
                 return response()->json(['success' => false, 'message' => __('messages.cannot_accept_join_requests')], 403);
             }
+        }
+
+        if ($album->collaborators()->wherePivot('status', 'accepted')->count() >= 4) {
+            return response()->json([
+                'success' => false,
+                'message' => 'عذراً، وصل الألبوم للحد الأقصى من الأعضاء (5 أشخاص).'
+            ], 403);
         }
 
         // Approve
