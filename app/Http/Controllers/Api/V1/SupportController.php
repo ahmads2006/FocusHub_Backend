@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Events\SupportMessageSent;
 use App\Models\SupportConversation;
 use App\Models\SupportMessage;
 use App\Models\User;
@@ -100,14 +101,23 @@ class SupportController extends Controller
         ];
 
         if (isset($supportAutoReplies[$request->body])) {
-            SupportMessage::create([
+            $systemMsg = SupportMessage::create([
                 'conversation_id' => $conversation->id,
                 'sender_id'       => null,
                 'body'            => $supportAutoReplies[$request->body],
                 'is_system'       => true,
                 'created_at'      => now()->addSecond(), // Ensure it's after the user question
             ]);
+            
+            try {
+                event(new SupportMessageSent($systemMsg));
+            } catch (\Exception $e) {}
         }
+
+        // Broadcast the user message too
+        try {
+            event(new SupportMessageSent($message));
+        } catch (\Exception $e) {}
 
         // Default Auto-reply + admin notification on first real message (if not a quick question)
         if (!$conversation->isClaimed() && !isset($supportAutoReplies[$request->body])) {
