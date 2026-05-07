@@ -287,9 +287,10 @@ class MongoChatController extends Controller
     public function poll(User $partner, Request $request): JsonResponse
     {
         $userId  = Auth::id();
-        $afterDate = $request->query('after_date'); // Better to use ISO date for polling in NoSQL than incremental integers
+        $afterId = $request->query('after_id');
+        $afterDate = $request->query('after_date');
 
-        // 🛡️ SECURITY: Prevent unauthorized polling of messages and online status
+        // 🛡️ SECURITY: Prevent unauthorized polling
         if (!$this->isAcceptedConnection($userId, $partner->id)) {
             return response()->json(['success' => false, 'message' => __('chat.unauthorized')], 403);
         }
@@ -298,7 +299,12 @@ class MongoChatController extends Controller
             ->whereIn('receiver_id', [$userId, $partner->id])
             ->whereNull('conversation_id');
 
-        if ($afterDate) {
+        if ($afterId) {
+            $lastMsg = MongoMessage::where('id', $afterId)->first();
+            if ($lastMsg) {
+                $query->where('created_at', '>', $lastMsg->created_at);
+            }
+        } elseif ($afterDate) {
             $query->where('created_at', '>', \Carbon\Carbon::parse($afterDate));
         }
 
