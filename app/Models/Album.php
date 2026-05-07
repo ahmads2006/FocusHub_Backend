@@ -11,14 +11,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
-use Spatie\MediaLibrary\HasMedia;
-use Spatie\MediaLibrary\InteractsWithMedia;
 use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\Activitylog\LogOptions;
 
-class Album extends Model implements HasMedia
+class Album extends Model
 {
-    use HasFactory, HasUuids, InteractsWithMedia, LogsActivity;
+    use HasFactory, HasUuids, LogsActivity;
 
     protected $pendingSettings = [];
 
