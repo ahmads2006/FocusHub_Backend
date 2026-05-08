@@ -31,6 +31,7 @@ class PromoteUserCommand extends Command
         }
 
         $user->syncRoles([$roleName]);
+        $user->update(['role' => $roleName]);
         $this->info("تم ترقية {$user->name} ({$email}) إلى دور: {$roleName}");
 
         return 0;
