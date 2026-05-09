@@ -126,7 +126,7 @@ class ImageService
             throw $e;
         }
 
-        return $image->load(['moderation', 'user', 'storage']);
+        return $image->load(['moderation', 'user', 'storage', 'settings']);
     }
 
     protected function extractSpecsFromPath(string $path): array

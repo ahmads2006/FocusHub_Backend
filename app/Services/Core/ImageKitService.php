@@ -78,13 +78,15 @@ class ImageKitService
                     'progressive' => 'true'
                 ],
                 [
-                    'overlayText' => $text,
-                    'overlayTextFontSize' => '30',
+                    'overlayText' => base64_encode($text),
+                    'overlayTextFontSize' => '80',
                     'overlayTextColor' => 'FFFFFF',
-                    'overlayAlpha' => '50',
+                    'overlayAlpha' => '80',
                     'overlayFocus' => 'bottom_right',
-                    'overlayX' => '20',
-                    'overlayY' => '20',
+                    'overlayX' => '40',
+                    'overlayY' => '40',
+                    'overlayTextBackground' => '000000',
+                    'overlayTextEncoded' => 'true', // Better for Arabic/Special chars
                 ]
             ],
         ]);

@@ -102,7 +102,8 @@ class Image extends Model
         'analyzer_name', 
         'display_title',
         'orientation',
-        'formatted_size'
+        'formatted_size',
+        'watermark_on_download'
     ];
 
     /**

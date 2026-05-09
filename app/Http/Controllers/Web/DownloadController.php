@@ -40,9 +40,11 @@ class DownloadController extends Controller
             abort(404, 'الصورة غير موجودة.');
         }
 
-        $watermarkText = $image->user->name;
+        $image->load('user');
+        $watermarkText = $image->user->name ?? 'OpalShot';
 
-        // Generate signed watermarked URL via ImageKit
+        // Increase font size for better visibility on high-res images
+        // We can also use a dynamic font size or a standard large one like 120
         $url = $this->imageKit->getWatermarkedUrl($path, $watermarkText, true, 30);
         // Add ik-attachment=true to force download
         $url .= (parse_url($url, PHP_URL_QUERY) ? '&' : '?') . 'ik-attachment=true';
