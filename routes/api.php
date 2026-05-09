@@ -145,8 +145,7 @@ Route::prefix('v1')->group(function () {
 
             // Downloads
             Route::get('/{image}/download', [App\Http\Controllers\Web\DownloadController::class, 'download']);
-            Route::get('/{image}/download-original', [App\Http\Controllers\Web\DownloadController::class, 'downloadOriginal'])
-                ->middleware('signed');
+            Route::get('/{image}/download-original', [App\Http\Controllers\Web\DownloadController::class, 'downloadOriginal']);
 
             // Social Interactions
             Route::post('/{image}/like', [App\Http\Controllers\Api\V1\FeedController::class, 'like'])
