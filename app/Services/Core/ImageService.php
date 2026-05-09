@@ -78,6 +78,7 @@ class ImageService
 
             $image->settings()->updateOrCreate(['image_id' => $image->id], [
                 'allow_download' => isset($data['allow_download']) ? filter_var($data['allow_download'], FILTER_VALIDATE_BOOLEAN) : true,
+                'watermark_on_download' => isset($data['watermark_on_download']) ? filter_var($data['watermark_on_download'], FILTER_VALIDATE_BOOLEAN) : false,
             ]);
 
             return $image;

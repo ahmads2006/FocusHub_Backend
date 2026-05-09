@@ -49,6 +49,17 @@ class BlockController extends Controller
             ->where('blocked_id', $user->id)
             ->delete();
 
+        // Restore the connection so chat works again (block() deletes it)
+        Connection::firstOrCreate(
+            [
+                'user_id' => $senderId,
+                'connected_user_id' => $user->id,
+            ],
+            [
+                'status' => 'accepted',
+            ]
+        );
+
         return response()->json([
             'success' => true,
             'message' => 'User unblocked successfully'
