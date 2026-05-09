@@ -25,7 +25,7 @@ class DownloadController extends Controller
     public function download(Image $image)
     {
         // Permission Check: If allow_download is false, only owner can download
-        if (!$image->settings->allow_download) {
+        if (!($image->settings?->allow_download ?? true)) {
             if (Auth::id() !== $image->user_id) {
                 abort(403, 'تنزيل هذه الصورة غير مسموح به من قبل المالك.');
             }

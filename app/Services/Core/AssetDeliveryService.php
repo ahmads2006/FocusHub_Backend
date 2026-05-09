@@ -244,7 +244,8 @@ class AssetDeliveryService
         }
 
         // 4. Public assets are downloadable if allowed by owner
-        if ($image->privacy === 'public' && $image->allow_download) {
+        if ($image->privacy === 'public' && ($image->settings?->allow_download ?? true)) {
+            
             return true;
         }
 
