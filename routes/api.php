@@ -46,9 +46,6 @@ Route::post('/webhooks/imagekit', [\App\Http\Controllers\Api\ImageKitWebhookCont
     ->name('api.webhooks.imagekit');
 
 // ─── Diagnostic API ──────────────────────────────────────────
-Route::get('/health', [App\Http\Controllers\Api\SystemHealthController::class, 'index'])
-    ->middleware(['auth:sanctum', 'role:super-admin']);
-
 Route::get('/ping', function () {
     return response()->json([
         'status' => 'UP',
@@ -74,6 +71,9 @@ Route::post('/auth/facebook/deletion', [\App\Http\Controllers\Api\Auth\FacebookD
 // ╚══════════════════════════════════════════════════════════════════╝
 
 Route::prefix('v1')->group(function () {
+    // Health Check (Admin Only)
+    Route::get('/health', [App\Http\Controllers\Api\SystemHealthController::class, 'index'])
+        ->middleware(['auth:sanctum', 'role:super-admin']);
 
     // ══════════════════════════════════════════
     // 1. 🔐 AUTHENTICATION (Public)
@@ -332,12 +332,23 @@ Route::prefix('v1')->group(function () {
 
         // Dashboard Stats
         Route::get('/stats', function () {
-            return response()->json([
-                'totalUsers'         => \App\Models\User::count(),
-                'totalPhotographers' => \App\Models\User::role('photographer')->count(),
-                'totalAlbums'        => \App\Models\Album::count(),
-                'totalImages'        => \App\Models\Image::count(),
-            ]);
+            try {
+                return response()->json([
+                    'totalUsers'         => \App\Models\User::count(),
+                    'totalPhotographers' => \App\Models\User::where('role', 'photographer')->count(),
+                    'totalAlbums'        => \App\Models\Album::count(),
+                    'totalImages'        => \App\Models\Image::count(),
+                    'moderationStats'    => [
+                        'safe'    => \App\Models\Image::withoutGlobalScopes()->whereHas('moderation', fn($q) => $q->where('status', 'approved'))->count(),
+                        'pending' => \App\Models\Image::withoutGlobalScopes()->whereHas('moderation', fn($q) => $q->whereIn('status', ['pending_review', 'under_review']))->count(),
+                        'banned'  => \App\Models\Image::withoutGlobalScopes()->whereHas('moderation', fn($q) => $q->where('status', 'rejected'))->count(),
+                    ]
+                ]);
+            } catch (\Exception $e) {
+                return response()->json([
+                    'error' => $e->getMessage(),
+                ], 500);
+            }
         });
 
         // Moderation

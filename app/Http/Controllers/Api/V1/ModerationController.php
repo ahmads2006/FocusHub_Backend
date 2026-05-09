@@ -30,6 +30,23 @@ class ModerationController extends Controller
             ->latest()
             ->paginate(20);
 
+        $safeImages = Image::withoutGlobalScopes()
+            ->where('privacy', 'public')
+            ->whereHas('moderation', function ($query) {
+                $query->where('status', 'approved');
+            })
+            ->with(['user', 'moderation', 'storage'])
+            ->latest()
+            ->paginate(20);
+
+        $bannedImages = Image::withoutGlobalScopes()
+            ->whereHas('moderation', function ($query) {
+                $query->where('status', 'rejected');
+            })
+            ->with(['user', 'moderation', 'storage'])
+            ->latest()
+            ->paginate(20);
+
         $reports = ImageReport::with(['user', 'image.storage', 'image.settings'])
             ->where('status', 'open')
             ->latest()
@@ -39,6 +56,8 @@ class ModerationController extends Controller
             'success' => true,
             'data'    => [
                 'pending_images' => $pendingImages,
+                'safe_images'    => $safeImages,
+                'banned_images'  => $bannedImages,
                 'reports'        => $reports,
             ],
         ]);
