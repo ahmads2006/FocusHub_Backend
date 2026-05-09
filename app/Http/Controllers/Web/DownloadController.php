@@ -43,11 +43,17 @@ class DownloadController extends Controller
         $image->load('user');
         $watermarkText = $image->user->name ?? 'OpalShot';
 
-        // Increase font size for better visibility on high-res images
-        // We can also use a dynamic font size or a standard large one like 120
+        $path = $image->storage?->imagekit_file_path ?? $image->storage?->path;
+        if ($path) {
+            $path = ltrim($path, '/');
+            if (str_starts_with(strtolower($path), 'opticvault/')) {
+                $path = substr($path, strlen('opticvault/'));
+            }
+        }
+
+        // Generate signed watermarked URL via ImageKit
+        // We pass the attachment parameter to be included in the signature
         $url = $this->imageKit->getWatermarkedUrl($path, $watermarkText, true, 30);
-        // Add ik-attachment=true to force download
-        $url .= (parse_url($url, PHP_URL_QUERY) ? '&' : '?') . 'ik-attachment=true';
 
         return response()->json(['url' => $url]);
     }

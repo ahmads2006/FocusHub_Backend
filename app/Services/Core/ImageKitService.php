@@ -73,7 +73,7 @@ class ImageKitService
             'expireSeconds' => $expireMinutes * 60,
             'transformation' => [
                 [
-                    'format' => 'auto', // Upgraded from webp
+                    'format' => 'auto',
                     'quality' => 'auto',
                     'progressive' => 'true'
                 ],
@@ -86,9 +86,12 @@ class ImageKitService
                     'overlayX' => '40',
                     'overlayY' => '40',
                     'overlayTextBackground' => '000000',
-                    'overlayTextEncoded' => 'true', // Better for Arabic/Special chars
+                    'overlayTextEncoded' => 'true',
                 ]
             ],
+            'queryParameters' => [
+                'ik-attachment' => 'true'
+            ]
         ]);
     }
 
