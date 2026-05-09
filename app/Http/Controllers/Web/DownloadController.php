@@ -44,8 +44,10 @@ class DownloadController extends Controller
 
         // Generate signed watermarked URL via ImageKit
         $url = $this->imageKit->getWatermarkedUrl($path, $watermarkText, true, 30);
+        // Add ik-attachment=true to force download
+        $url .= (parse_url($url, PHP_URL_QUERY) ? '&' : '?') . 'ik-attachment=true';
 
-        return redirect($url);
+        return response()->json(['url' => $url]);
     }
 
     /**
@@ -64,6 +66,6 @@ class DownloadController extends Controller
 
         $url = $this->deliveryService->getUrl($image, 'original');
 
-        return redirect($url);
+        return response()->json(['url' => $url]);
     }
 }

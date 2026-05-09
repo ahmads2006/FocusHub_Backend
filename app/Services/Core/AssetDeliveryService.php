@@ -173,7 +173,11 @@ class AssetDeliveryService
             // ☁️ Cloud disk: generate a pre-signed URL directly from S3/Spaces
             if ($disk === 's3') {
                 try {
-                    return Storage::disk($disk)->temporaryUrl($path, now()->addMinutes(5));
+                    $ext = pathinfo($path, PATHINFO_EXTENSION);
+                    $filename = 'OpalShot-' . $image->id . ($ext ? '.' . $ext : '.jpg');
+                    return Storage::disk($disk)->temporaryUrl($path, now()->addMinutes(5), [
+                        'ResponseContentDisposition' => 'attachment; filename="' . $filename . '"'
+                    ]);
                 } catch (\RuntimeException $e) {
                     // Driver doesn't support temporaryUrl (e.g. local), fall through
                 }
