@@ -78,15 +78,7 @@ class ImageKitService
                     'progressive' => 'true'
                 ],
                 [
-                    'overlayText' => base64_encode($text),
-                    'overlayTextFontSize' => '80',
-                    'overlayTextColor' => 'FFFFFF',
-                    'overlayAlpha' => '80',
-                    'overlayFocus' => 'bottom_right',
-                    'overlayX' => '40',
-                    'overlayY' => '40',
-                    'overlayTextBackground' => '000000',
-                    'overlayTextEncoded' => 'true',
+                    'raw' => 'l-text,i-' . str_replace(['+', '/', '='], ['-', '_', ''], base64_encode($text)) . ',ie-true,fs-150,co-FFFFFF,lfo-bottom_right,bg-000000,pa-10,l-end'
                 ]
             ],
             'queryParameters' => [

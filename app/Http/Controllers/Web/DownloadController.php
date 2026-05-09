@@ -55,6 +55,8 @@ class DownloadController extends Controller
         // We pass the attachment parameter to be included in the signature
         $url = $this->imageKit->getWatermarkedUrl($path, $watermarkText, true, 30);
 
+        \Illuminate\Support\Facades\Log::info("Generated Watermark URL for image {$image->id}: {$url}");
+
         return response()->json(['url' => $url]);
     }
 
