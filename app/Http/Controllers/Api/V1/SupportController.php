@@ -214,15 +214,21 @@ class SupportController extends Controller
             ->withCount('messages')
             ->latest()
             ->get()
-            ->map(fn(SupportConversation $c) => [
-                'id'             => $c->id,
-                'user_name'      => $c->user ? $c->user->name : 'Unknown User',
-                'user_avatar'    => $c->user ? $c->user->avatar : '/default-avatar.png',
-                'messages_count' => $c->messages_count,
-                'status'         => 'pending',
-                'created_at'     => $c->created_at->diffForHumans(),
-                'last_message'   => $c->messages()->latest()->first()?->body ?? '',
-            ]);
+            ->map(function(SupportConversation $c) {
+                $name = $c->user?->profile?->name ?? 'Unknown User';
+                $avatar = $c->user?->profile?->profile_picture 
+                            ? url('storage/' . $c->user->profile->profile_picture) 
+                            : 'https://ui-avatars.com/api/?name=' . urlencode($name) . '&background=333&color=fff';
+                return [
+                    'id'             => $c->id,
+                    'user_name'      => $name,
+                    'user_avatar'    => $avatar,
+                    'messages_count' => $c->messages_count,
+                    'status'         => 'pending',
+                    'created_at'     => $c->created_at->diffForHumans(),
+                    'last_message'   => $c->messages()->latest()->first()?->body ?? '',
+                ];
+            });
 
         $myActive = SupportConversation::active()
             ->forAdmin($adminId)
@@ -230,15 +236,21 @@ class SupportController extends Controller
             ->withCount('messages')
             ->latest('updated_at')
             ->get()
-            ->map(fn(SupportConversation $c) => [
-                'id'             => $c->id,
-                'user_name'      => $c->user ? $c->user->name : 'Unknown User',
-                'user_avatar'    => $c->user ? $c->user->avatar : '/default-avatar.png',
-                'messages_count' => $c->messages_count,
-                'status'         => 'active',
-                'created_at'     => $c->created_at->diffForHumans(),
-                'last_message'   => $c->messages()->latest()->first()?->body ?? '',
-            ]);
+            ->map(function(SupportConversation $c) {
+                $name = $c->user?->profile?->name ?? 'Unknown User';
+                $avatar = $c->user?->profile?->profile_picture 
+                            ? url('storage/' . $c->user->profile->profile_picture) 
+                            : 'https://ui-avatars.com/api/?name=' . urlencode($name) . '&background=333&color=fff';
+                return [
+                    'id'             => $c->id,
+                    'user_name'      => $name,
+                    'user_avatar'    => $avatar,
+                    'messages_count' => $c->messages_count,
+                    'status'         => 'active',
+                    'created_at'     => $c->created_at->diffForHumans(),
+                    'last_message'   => $c->messages()->latest()->first()?->body ?? '',
+                ];
+            });
 
         return response()->json([
             'success' => true,
