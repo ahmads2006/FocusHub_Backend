@@ -207,18 +207,13 @@ class ProfileController extends Controller
                 ->exists();
         }
 
-        // Stats from Redis (Resilient to Redis failure)
-        $redisPrefix = "user:{$user->id}:stats";
-        try {
-            $totalLikes       = (int) Redis::get("{$redisPrefix}:likes") ?: 0;
-            $totalPhotos      = (int) Redis::get("{$redisPrefix}:photos") ?: 0;
-            $totalConnections = (int) Redis::get("{$redisPrefix}:connections") ?: 0;
-        } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::warning("Redis is down while fetching profile stats for user {$user->id}: " . $e->getMessage());
-            $totalLikes       = 0;
-            $totalPhotos      = 0;
-            $totalConnections = 0;
-        }
+        // Stats: Always query real DB for accuracy
+        $totalPhotos = $user->images()->count();
+        $totalLikes = \App\Models\Like::whereHas('image', fn($q) => $q->where('user_id', $user->id))->count();
+        // Followers = people who follow THIS user
+        $totalConnections = \App\Models\Connection::where('connected_user_id', $user->id)
+            ->where('status', 'accepted')
+            ->count();
 
         $tab = $request->get('tab', 'public');
         if (!$isOwner) $tab = 'public';
