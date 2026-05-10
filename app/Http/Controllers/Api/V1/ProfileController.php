@@ -223,8 +223,10 @@ class ProfileController extends Controller
             $query = $user->images()->with(['likes', 'labelData', 'storage', 'settings']);
 
             if ($tab === 'private' && $isOwner) {
-                $query->where('privacy', 'private')
-                    ->whereHas('moderation', fn($q) => $q->where('status', \App\Models\Image::STATUS_APPROVED));
+                $query->where('privacy', 'private');
+                if (!$isOwner) {
+                    $query->whereHas('moderation', fn($q) => $q->where('status', \App\Models\Image::STATUS_APPROVED));
+                }
             } elseif ($tab === 'saved' && $isOwner) {
                 $images = $user->bookmarkedImages()
                     ->where(function ($q) use ($user) {
@@ -246,8 +248,10 @@ class ProfileController extends Controller
                     ->latest()
                     ->paginate(24);
             } else {
-                $query->where('privacy', 'public')
-                    ->whereHas('moderation', fn($q) => $q->where('status', \App\Models\Image::STATUS_APPROVED));
+                $query->where('privacy', 'public');
+                if (!$isOwner) {
+                    $query->whereHas('moderation', fn($q) => $q->where('status', \App\Models\Image::STATUS_APPROVED));
+                }
             }
 
             if ($images->isEmpty() && isset($query)) {

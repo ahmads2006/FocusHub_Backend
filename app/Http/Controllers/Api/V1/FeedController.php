@@ -87,10 +87,14 @@ class FeedController extends Controller
             $image->user->notify(new ImageSocialNotification($user, $image, 'like'));
         }
 
+        $image->loadCount('likes');
+
         return response()->json([
-            'success' => true,
-            'action'  => $result['action'],
-            'message' => $result['action'] === 'like' ? 'تم الإعجاب بالصورة' : 'تم إزالة الإعجاب',
+            'success'     => true,
+            'action'      => $result['action'],
+            'liked'       => $result['action'] === 'like',
+            'likes_count' => $image->likes_count,
+            'message'     => $result['action'] === 'like' ? 'تم الإعجاب بالصورة' : 'تم إزالة الإعجاب',
         ]);
     }
 
@@ -115,10 +119,14 @@ class FeedController extends Controller
             $image->user->notify(new ImageSocialNotification($user, $image, 'bookmark'));
         }
 
+        $image->loadCount('bookmarks');
+
         return response()->json([
-            'success' => true,
-            'action'  => $action,
-            'message' => $message,
+            'success'     => true,
+            'action'      => $action,
+            'saved'       => $action === 'bookmark',
+            'saves_count' => $image->bookmarks_count,
+            'message'     => $message,
         ]);
     }
 
