@@ -216,8 +216,8 @@ class SupportController extends Controller
             ->get()
             ->map(fn(SupportConversation $c) => [
                 'id'             => $c->id,
-                'user_name'      => $c->user->name,
-                'user_avatar'    => $c->user->avatar,
+                'user_name'      => $c->user ? $c->user->name : 'Unknown User',
+                'user_avatar'    => $c->user ? $c->user->avatar : '/default-avatar.png',
                 'messages_count' => $c->messages_count,
                 'status'         => 'pending',
                 'created_at'     => $c->created_at->diffForHumans(),
@@ -232,8 +232,8 @@ class SupportController extends Controller
             ->get()
             ->map(fn(SupportConversation $c) => [
                 'id'             => $c->id,
-                'user_name'      => $c->user->name,
-                'user_avatar'    => $c->user->avatar,
+                'user_name'      => $c->user ? $c->user->name : 'Unknown User',
+                'user_avatar'    => $c->user ? $c->user->avatar : '/default-avatar.png',
                 'messages_count' => $c->messages_count,
                 'status'         => 'active',
                 'created_at'     => $c->created_at->diffForHumans(),
