@@ -335,7 +335,7 @@ Route::prefix('v1')->group(function () {
                 // Calculate total storage used in bytes (sum of image sizes)
                 // Use withoutGlobalScopes to include all images (even hidden ones)
                 $storageBytes = (float) \App\Models\Image::withoutGlobalScopes()->sum('size');
-                $storageLimitBytes = 100 * 1024 * 1024 * 1024; // 100 GB limit
+                $storageLimitBytes = 250 * 1024 * 1024 * 1024; // 250 GB limit
 
                 return response()->json([
                     'totalUsers'         => \App\Models\User::count(),
