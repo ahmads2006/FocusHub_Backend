@@ -76,6 +76,8 @@ class PhotoResource extends JsonResource
             }),
             'likes_count' => (int) ($this->likes_count ?? $this->resource->likes_count ?? 0),
             'saves_count' => (int) ($this->bookmarks_count ?? $this->resource->bookmarks_count ?? 0),
+            'likes' => (int) ($this->likes_count ?? $this->resource->likes_count ?? 0),
+            'bookmarks' => (int) ($this->bookmarks_count ?? $this->resource->bookmarks_count ?? 0),
             
             '_t' => time(),
         ];
