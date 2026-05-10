@@ -276,7 +276,7 @@ Route::prefix('v1')->group(function () {
             Route::delete('/messages/{message}', [App\Http\Controllers\Api\V1\SupportController::class, 'deleteMessage']);
 
             // Admin endpoints
-            Route::middleware('permission:access-admin-panel')->prefix('admin')->group(function () {
+            Route::middleware('role:super-admin|super_admin|admin')->prefix('admin')->group(function () {
                 Route::get('/pending', [App\Http\Controllers\Api\V1\SupportController::class, 'pendingConversations']);
                 Route::get('/count', [App\Http\Controllers\Api\V1\SupportController::class, 'pendingCount']);
                 Route::post('/claim/{conversation}', [App\Http\Controllers\Api\V1\SupportController::class, 'claimConversation']);
