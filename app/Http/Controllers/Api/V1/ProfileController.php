@@ -9,8 +9,10 @@ use App\Services\Core\ImageService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Mail;
+use App\Mail\VerificationCodeMail;
 
 class ProfileController extends Controller
 {
@@ -48,12 +50,20 @@ class ProfileController extends Controller
             $profile->username_last_changed_at = now();
         }
 
-        $user->fill($request->validated());
-
-        if ($user->isDirty('email')) {
-            $user->email_verified_at = null;
+        // Check email verification if changed
+        if ($request->has('email') && $request->input('email') !== $user->email) {
+            $temp = Cache::get('email_update_' . $user->id);
+            if (!$temp || $temp['email'] !== $request->input('email') || $temp['code'] !== $request->input('verification_code')) {
+                return response()->json([
+                    'success' => false,
+                    'message' => __('messages.invalid_code') ?? 'رمز التحقق غير صحيح أو منتهي الصلاحية',
+                ], 422);
+            }
+            Cache::forget('email_update_' . $user->id);
+            $user->is_verified = true; // Mark new email as verified
         }
 
+        $user->fill($request->validated());
         $user->save();
         $profile->save();
 
@@ -61,6 +71,40 @@ class ProfileController extends Controller
             'success' => true,
             'message' => __('messages.profile_updated'),
             'data'    => $this->formatProfile($user->fresh(['profile', 'roles'])),
+        ]);
+    }
+
+    /**
+     * Request verification code for a new email.
+     */
+    public function requestEmailUpdate(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $request->validate([
+            'email' => ['required', 'email', 'unique:users,email,' . $user->id],
+        ]);
+
+        $email = $request->input('email');
+        $code = (string) random_int(100000, 999999);
+
+        // Store in cache for 10 minutes
+        Cache::put('email_update_' . $user->id, [
+            'email' => $email,
+            'code'  => $code
+        ], now()->addMinutes(10));
+
+        try {
+            Mail::to($email)->queue(new VerificationCodeMail($code, $user->name));
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'فشل إرسال البريد الإلكتروني. يرجى المحاولة مرة أخرى.',
+            ], 500);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'تم إرسال رمز التحقق إلى البريد الجديد.',
         ]);
     }
 

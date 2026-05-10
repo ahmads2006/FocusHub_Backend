@@ -124,6 +124,7 @@ Route::prefix('v1')->group(function () {
             Route::get('/analytics', [App\Http\Controllers\Api\V1\ProfileController::class, 'analytics']);
             Route::get('/search', [App\Http\Controllers\Api\V1\ProfileController::class, 'search']);
             Route::get('/suggestions', [App\Http\Controllers\Api\V1\ProfileController::class, 'suggestions']);
+            Route::post('/request-email-update', [App\Http\Controllers\Api\V1\ProfileController::class, 'requestEmailUpdate']);
         });
 
         Route::post('/users/{user}/block', [App\Http\Controllers\Api\V1\BlockController::class, 'block']);

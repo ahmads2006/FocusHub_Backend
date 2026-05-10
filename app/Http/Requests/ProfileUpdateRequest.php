@@ -39,6 +39,7 @@ class ProfileUpdateRequest extends FormRequest
                 'max:255',
                 Rule::unique(User::class)->ignore($this->user()->id),
             ],
+            'verification_code' => ['nullable', 'string', 'digits:6'],
         ];
 
         // Require current password if the user is changing their email
