@@ -291,7 +291,7 @@ class ProfileController extends Controller
                     'photos'      => $totalPhotos,
                     'connections' => $totalConnections,
                 ],
-                'images'               => $formattedImages->response()->getData(true),
+                'images'               => \App\Http\Resources\PhotoResource::collection($images),
                 'liked_image_ids'      => $likedImageIds,
                 'bookmarked_image_ids' => $bookmarkedImageIds,
                 'active_tab'           => $tab,
