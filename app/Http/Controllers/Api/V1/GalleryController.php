@@ -129,10 +129,16 @@ class GalleryController extends Controller
                 ->whereIn('image_id', $imageIds)->pluck('image_id')->toArray();
         }
 
+        $images->getCollection()->transform(function ($image) use ($likedImageIds, $bookmarkedImageIds) {
+            $image->is_liked = in_array($image->id, $likedImageIds);
+            $image->is_saved = in_array($image->id, $bookmarkedImageIds);
+            return $image;
+        });
+
         return response()->json([
             'success' => true,
             'data'    => [
-                'images'               => $images,
+                'images'               => \App\Http\Resources\PhotoResource::collection($images)->response()->getData(true),
                 'liked_image_ids'      => $likedImageIds,
                 'bookmarked_image_ids' => $bookmarkedImageIds,
                 'filters'              => [
