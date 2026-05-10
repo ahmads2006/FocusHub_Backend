@@ -65,6 +65,8 @@ class DownloadController extends Controller
      */
     public function downloadOriginal(Image $image)
     {
+        \Illuminate\Support\Facades\Log::info("downloadOriginal() called for image {$image->id}");
+
         // Only accessible if user has permission
         if (!$this->deliveryService->canAccessOriginal($image)) {
             abort(403, 'غير مصرح لك بتنزيل النسخة الأصلية من هذه الصورة.');

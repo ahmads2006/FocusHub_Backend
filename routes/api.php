@@ -332,11 +332,18 @@ Route::prefix('v1')->group(function () {
         // Dashboard Stats
         Route::get('/stats', function () {
             try {
+                // Calculate total storage used in bytes (sum of image sizes)
+                // Use withoutGlobalScopes to include all images (even hidden ones)
+                $storageBytes = (float) \App\Models\Image::withoutGlobalScopes()->sum('size');
+                $storageLimitBytes = 100 * 1024 * 1024 * 1024; // 100 GB limit
+
                 return response()->json([
                     'totalUsers'         => \App\Models\User::count(),
                     'totalPhotographers' => \App\Models\User::where('role', 'photographer')->count(),
                     'totalAlbums'        => \App\Models\Album::count(),
                     'totalImages'        => \App\Models\Image::count(),
+                    'storageBytes'       => $storageBytes,
+                    'storageLimitBytes'  => $storageLimitBytes,
                     'moderationStats'    => [
                         'safe'    => \App\Models\Image::withoutGlobalScopes()->whereHas('moderation', fn($q) => $q->where('status', 'approved'))->count(),
                         'pending' => \App\Models\Image::withoutGlobalScopes()->whereHas('moderation', fn($q) => $q->whereIn('status', ['pending_review', 'under_review']))->count(),

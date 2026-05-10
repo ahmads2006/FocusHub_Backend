@@ -78,7 +78,7 @@ class ImageKitService
                     'progressive' => 'true'
                 ],
                 [
-                    'raw' => 'l-text,i-' . str_replace(['+', '/', '='], ['-', '_', ''], base64_encode($text)) . ',ie-true,fs-150,co-FFFFFF,lfo-bottom_right,bg-000000,pa-10,l-end'
+                    'raw' => 'l-text,ie-' . urlencode(base64_encode($text)) . ',fs-600,co-FFFFFF,lfo-bottom_right,bg-000000,pa-40,l-end'
                 ]
             ],
             'queryParameters' => [

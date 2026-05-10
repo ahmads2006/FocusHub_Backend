@@ -144,6 +144,10 @@ class AlbumUploadController extends Controller
                 if ($request->has('allow_download')) {
                     $data['allow_download'] = filter_var($request->allow_download, FILTER_VALIDATE_BOOLEAN);
                 }
+                
+                if ($request->has('watermark_on_download')) {
+                    $data['watermark_on_download'] = filter_var($request->watermark_on_download, FILTER_VALIDATE_BOOLEAN);
+                }
 
                 $image = $this->imageService->processAndUpload($file, $data, $user->id);
                 $uploadedImages[] = $image;
