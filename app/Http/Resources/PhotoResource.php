@@ -68,10 +68,14 @@ class PhotoResource extends JsonResource
             }),
             'match_count' => $this->when(isset($this->match_count), $this->match_count),
             
-            'is_liked' => \Illuminate\Support\Facades\Auth::check() ? \App\Models\Like::where('user_id', \Illuminate\Support\Facades\Auth::id())->where('image_id', $this->id)->exists() : false,
-            'is_saved' => \Illuminate\Support\Facades\Auth::check() ? \App\Models\Bookmark::where('user_id', \Illuminate\Support\Facades\Auth::id())->where('image_id', $this->id)->exists() : false,
-            'likes_count' => $this->likes_count ?? \App\Models\Like::where('image_id', $this->id)->count(),
-            'saves_count' => $this->saves_count ?? \App\Models\Bookmark::where('image_id', $this->id)->count(),
+            'is_liked' => $this->when(isset($this->is_liked), $this->is_liked, function() {
+                return \Illuminate\Support\Facades\Auth::check() ? \App\Models\Like::where('user_id', \Illuminate\Support\Facades\Auth::id())->where('image_id', $this->id)->exists() : false;
+            }),
+            'is_saved' => $this->when(isset($this->is_saved), $this->is_saved, function() {
+                return \Illuminate\Support\Facades\Auth::check() ? \App\Models\Bookmark::where('user_id', \Illuminate\Support\Facades\Auth::id())->where('image_id', $this->id)->exists() : false;
+            }),
+            'likes_count' => $this->likes_count ?? 0,
+            'saves_count' => $this->bookmarks_count ?? 0,
             
             '_t' => time(),
         ];
