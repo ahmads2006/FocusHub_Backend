@@ -31,10 +31,16 @@ class ShadowPrivacyScope implements Scope
         $builder->where(function ($query) use ($user, $userColumn, $hiddenCondition, $table, $safeStatuses) {
             // Logic for Images table (normalized status)
             if ($table === 'images') {
-                $statusCheck = fn($q) => $q->whereHas('moderation', fn($sq) => $sq->whereIn('status', $safeStatuses));
+                $statusCheck = fn($q) => $q->where(function($sq) use ($safeStatuses) {
+                    $sq->whereHas('moderation', fn($ssq) => $ssq->whereIn('status', $safeStatuses))
+                       ->orWhereDoesntHave('moderation');
+                });
             } elseif ($table === 'albums') {
                 // Logic for Albums table (normalized status)
-                $statusCheck = fn($q) => $q->whereHas('settings', fn($sq) => $sq->whereIn('status', $safeStatuses));
+                $statusCheck = fn($q) => $q->where(function($sq) use ($safeStatuses) {
+                    $sq->whereHas('settings', fn($ssq) => $ssq->whereIn('status', $safeStatuses))
+                       ->orWhereDoesntHave('settings');
+                });
             } else {
                 // Default logic for other tables
                 $statusCheck = fn($q) => $q->whereIn('status', $safeStatuses);
