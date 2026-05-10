@@ -277,6 +277,9 @@ class ProfileController extends Controller
         $images->getCollection()->transform(function ($image) use ($likedImageIds, $bookmarkedImageIds) {
             $image->is_liked = in_array($image->id, $likedImageIds);
             $image->is_saved = in_array($image->id, $bookmarkedImageIds);
+            // Ensure counts are preserved on the model instance
+            $image->likes_count = $image->likes_count ?? 0;
+            $image->bookmarks_count = $image->bookmarks_count ?? 0;
             return $image;
         });
 

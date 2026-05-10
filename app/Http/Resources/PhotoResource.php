@@ -74,8 +74,8 @@ class PhotoResource extends JsonResource
             'is_saved' => $this->when(isset($this->is_saved), $this->is_saved, function() {
                 return \Illuminate\Support\Facades\Auth::check() ? \App\Models\Bookmark::where('user_id', \Illuminate\Support\Facades\Auth::id())->where('image_id', $this->id)->exists() : false;
             }),
-            'likes_count' => (int) ($this->resource->getAttribute('likes_count') ?? 0),
-            'saves_count' => (int) ($this->resource->getAttribute('bookmarks_count') ?? 0),
+            'likes_count' => (int) ($this->likes_count ?? $this->resource->likes_count ?? 0),
+            'saves_count' => (int) ($this->bookmarks_count ?? $this->resource->bookmarks_count ?? 0),
             
             '_t' => time(),
         ];
