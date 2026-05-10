@@ -210,15 +210,13 @@ class SupportController extends Controller
         $adminId = Auth::id();
 
         $pending = SupportConversation::pending()
-            ->with(['user:id', 'user.profile:id,user_id,name,profile_picture'])
+            ->with(['user', 'user.profile'])
             ->withCount('messages')
             ->latest()
             ->get()
             ->map(function(SupportConversation $c) {
-                $name = $c->user?->profile?->name ?? 'Unknown User';
-                $avatar = $c->user?->profile?->profile_picture 
-                            ? url('storage/' . $c->user->profile->profile_picture) 
-                            : 'https://ui-avatars.com/api/?name=' . urlencode($name) . '&background=333&color=fff';
+                $name = $c->user?->name ?? 'Unknown User';
+                $avatar = $c->user?->avatar;
                 return [
                     'id'             => $c->id,
                     'user_name'      => $name,
@@ -232,15 +230,13 @@ class SupportController extends Controller
 
         $myActive = SupportConversation::active()
             ->forAdmin($adminId)
-            ->with(['user:id', 'user.profile:id,user_id,name,profile_picture'])
+            ->with(['user', 'user.profile'])
             ->withCount('messages')
             ->latest('updated_at')
             ->get()
             ->map(function(SupportConversation $c) {
-                $name = $c->user?->profile?->name ?? 'Unknown User';
-                $avatar = $c->user?->profile?->profile_picture 
-                            ? url('storage/' . $c->user->profile->profile_picture) 
-                            : 'https://ui-avatars.com/api/?name=' . urlencode($name) . '&background=333&color=fff';
+                $name = $c->user?->name ?? 'Unknown User';
+                $avatar = $c->user?->avatar;
                 return [
                     'id'             => $c->id,
                     'user_name'      => $name,
