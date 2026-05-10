@@ -37,7 +37,8 @@ class ImageController extends Controller
             });
         }
 
-        return response()->json($query->latest()->paginate(20));
+        $images = $query->latest()->paginate(20);
+        return PhotoResource::collection($images);
     }
 
     public function store(Request $request)

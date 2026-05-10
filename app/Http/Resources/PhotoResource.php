@@ -71,6 +71,7 @@ class PhotoResource extends JsonResource
             'is_liked' => \Illuminate\Support\Facades\Auth::check() ? \App\Models\Like::where('user_id', \Illuminate\Support\Facades\Auth::id())->where('image_id', $this->id)->exists() : false,
             'is_saved' => \Illuminate\Support\Facades\Auth::check() ? \App\Models\Bookmark::where('user_id', \Illuminate\Support\Facades\Auth::id())->where('image_id', $this->id)->exists() : false,
             'likes_count' => $this->likes_count ?? \App\Models\Like::where('image_id', $this->id)->count(),
+            'saves_count' => $this->saves_count ?? \App\Models\Bookmark::where('image_id', $this->id)->count(),
             
             '_t' => time(),
         ];

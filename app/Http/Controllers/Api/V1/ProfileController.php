@@ -255,6 +255,8 @@ class ProfileController extends Controller
             }
         }
 
+        $formattedImages = \App\Http\Resources\PhotoResource::collection($images);
+
         // Liked & Bookmarked state for current viewer
         $likedImageIds = [];
         $bookmarkedImageIds = [];
@@ -285,7 +287,7 @@ class ProfileController extends Controller
                     'photos'      => $totalPhotos,
                     'connections' => $totalConnections,
                 ],
-                'images'               => $images,
+                'images'               => $formattedImages,
                 'liked_image_ids'      => $likedImageIds,
                 'bookmarked_image_ids' => $bookmarkedImageIds,
                 'active_tab'           => $tab,
