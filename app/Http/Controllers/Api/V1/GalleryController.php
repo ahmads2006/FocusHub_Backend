@@ -32,7 +32,7 @@ class GalleryController extends Controller
 
         $query = Image::where('privacy', 'public')
             ->with(['settings', 'user.profile', 'storage', 'meta', 'album', 'tags'])
-            ->withCount('likes');
+            ->withCount(['likes', 'bookmarks']);
 
         // ── AI-Powered Smart Search ──
         if ($searchQuery) {
@@ -95,7 +95,7 @@ class GalleryController extends Controller
                               });
                         })
                         ->with(['settings', 'user.profile', 'storage', 'meta', 'album'])
-                        ->withCount('likes')
+                        ->withCount(['likes', 'bookmarks'])
                         ->orderByRaw("FIELD(id, {$placeholders})", $slicedIds)
                         ->get();
                 } else {
