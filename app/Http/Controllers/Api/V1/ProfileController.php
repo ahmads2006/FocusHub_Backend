@@ -234,7 +234,8 @@ class ProfileController extends Controller
                           ->orWhere('images.user_id', $user->id);
                     })
                     ->whereHas('moderation', fn($q) => $q->where('status', \App\Models\Image::STATUS_APPROVED))
-                    ->with(['user', 'likes', 'labelData', 'storage', 'settings', 'aiMetadata'])
+                    ->with(['user', 'labelData', 'storage', 'settings', 'aiMetadata'])
+                    ->withCount(['likes', 'bookmarks'])
                     ->latest('bookmarks.created_at')
                     ->paginate(24);
             } elseif ($tab === 'liked' && $isOwner) {
@@ -244,7 +245,8 @@ class ProfileController extends Controller
                           ->orWhere('images.user_id', $user->id);
                     })
                     ->whereHas('moderation', fn($q) => $q->where('status', \App\Models\Image::STATUS_APPROVED))
-                    ->with(['user', 'likes', 'labelData', 'storage', 'settings', 'aiMetadata'])
+                    ->with(['user', 'labelData', 'storage', 'settings', 'aiMetadata'])
+                    ->withCount(['likes', 'bookmarks'])
                     ->latest()
                     ->paginate(24);
             } else {
