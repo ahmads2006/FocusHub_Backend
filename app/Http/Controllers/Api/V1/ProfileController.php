@@ -237,7 +237,7 @@ class ProfileController extends Controller
                     ->with(['user', 'labelData', 'storage', 'settings', 'aiMetadata'])
                     ->withCount(['likes', 'bookmarks'])
                     ->latest('bookmarks.created_at')
-                    ->paginate(24);
+                    ->paginate($request->get('per_page', 50));
             } elseif ($tab === 'liked' && $isOwner) {
                 $images = \App\Models\Image::whereHas('likes', fn($q) => $q->where('user_id', $user->id))
                     ->where(function ($q) use ($user) {
@@ -248,7 +248,7 @@ class ProfileController extends Controller
                     ->with(['user', 'labelData', 'storage', 'settings', 'aiMetadata'])
                     ->withCount(['likes', 'bookmarks'])
                     ->latest()
-                    ->paginate(24);
+                    ->paginate($request->get('per_page', 50));
             } else {
                 $query->where('privacy', 'public');
                 if (!$isOwner) {
@@ -257,7 +257,7 @@ class ProfileController extends Controller
             }
 
             if ($images->isEmpty() && isset($query)) {
-                $images = $query->latest()->paginate(24);
+                $images = $query->latest()->paginate($request->get('per_page', 50));
             }
         }
 
