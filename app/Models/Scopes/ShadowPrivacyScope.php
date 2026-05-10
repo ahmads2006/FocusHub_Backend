@@ -46,10 +46,9 @@ class ShadowPrivacyScope implements Scope
                     // Admin bypasses the profile shadow ban entirely but still respects standard feed status
                     $statusCheck($query);
                 } else {
-                    $query->where(function($sub) use ($user, $userColumn, $statusCheck) {
-                        // Owner can see their own content regardless of profile shadow status
+                    $query->where(function($sub) use ($user, $userColumn) {
+                        // Owner can see their own content regardless of profile shadow status OR moderation status
                         $sub->where($userColumn, $user->id);
-                        $statusCheck($sub);
                     })->orWhere(function($sub) use ($hiddenCondition, $statusCheck) {
                         // Others see only safe content from non-hidden users
                         $statusCheck($sub);

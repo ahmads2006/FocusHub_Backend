@@ -34,7 +34,17 @@ class Image extends Model
 
         // Filter by moderation visibility via denormalized column (v22.0 Performance)
         static::addGlobalScope('visible', function (\Illuminate\Database\Eloquent\Builder $builder) {
-            $builder->where('images.is_visible', true);
+            $user = auth()->user();
+            if ($user && $user->role === 'super_admin') {
+                return;
+            }
+            
+            $builder->where(function($q) use ($user) {
+                $q->where('images.is_visible', true);
+                if ($user) {
+                    $q->orWhere('images.user_id', $user->id);
+                }
+            });
         });
 
         static::created(function (Image $image) {
