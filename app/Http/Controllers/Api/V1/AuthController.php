@@ -44,6 +44,13 @@ class AuthController extends Controller
         // Send verification code via email
         $user->sendVerificationEmail();
 
+        // Send Welcome Email
+        try {
+            \Illuminate\Support\Facades\Mail::to($user->email)->queue(new \App\Mail\WelcomeMail($user->name));
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::warning("Welcome Email failed for user {$user->email}: " . $e->getMessage());
+        }
+
         // Create Sanctum token
         $token = $user->createToken('api-token')->plainTextToken;
 

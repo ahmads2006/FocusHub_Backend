@@ -1,6 +1,3 @@
-Option3 star logo · HTML
-Copy
-
 @php
     $isAr = app()->getLocale() == 'ar';
     $dir = $isAr ? 'rtl' : 'ltr';
