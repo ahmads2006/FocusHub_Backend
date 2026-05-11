@@ -78,7 +78,7 @@ class SocialAuthController extends Controller
                     $user->profile()->create([
                         'name' => $displayName,
                         'username' => \App\Helpers\RestrictedNameHelper::generateUniqueHandle($displayName),
-                        'username_last_changed_at' => now(),
+                        'username_last_changed_at' => null,
                     ]);
                 } elseif (empty($user->profile->name)) {
                     // Sync name to profile if it was empty
