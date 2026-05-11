@@ -327,7 +327,7 @@ class AuthController extends Controller
             $user->profile()->create([
                 'name' => $displayName,
                 'username' => \App\Helpers\RestrictedNameHelper::generateUniqueHandle($displayName),
-                'username_last_changed_at' => now(),
+                'username_last_changed_at' => null,
             ]);
         }
 

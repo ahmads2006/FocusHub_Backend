@@ -41,7 +41,7 @@ class ProfileController extends Controller
         if ($request->has('username') && $request->input('username') !== $profile->username) {
             $lastChanged = $profile->username_last_changed_at;
             if ($lastChanged && $lastChanged->diffInDays(now()) < 30) {
-                $daysRemaining = 30 - $lastChanged->diffInDays(now());
+                $daysRemaining = (int) ceil(30 - $lastChanged->floatDiffInDays(now()));
                 return response()->json([
                     'success' => false,
                     'message' => "لا يمكنك تغيير اسم المستخدم إلا مرة واحدة كل 30 يومًا. يتبقى $daysRemaining أيام.",

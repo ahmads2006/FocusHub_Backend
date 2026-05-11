@@ -44,7 +44,7 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
             $user->profile()->create(array_merge([
                 'name' => $displayName,
                 'username' => $handle,
-                'username_last_changed_at' => now(),
+                'username_last_changed_at' => null,
             ], $profileData));
 
             // Extract deferred data for settings
