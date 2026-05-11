@@ -251,9 +251,22 @@ class ProfileController extends Controller
                 ->exists();
         }
 
-        // Stats: Always query real DB for accuracy
-        $totalPhotos = $user->images()->count();
-        $totalLikes = \App\Models\Like::whereHas('image', fn($q) => $q->where('user_id', $user->id))->count();
+        // Stats: Query DB for accuracy, respecting privacy if not owner
+        $photoQuery = $user->images();
+        $likeQuery = \App\Models\Like::whereHas('image', fn($q) => $q->where('user_id', $user->id));
+
+        if (!$isOwner) {
+            $photoQuery->where('privacy', 'public')
+                       ->whereHas('moderation', fn($q) => $q->where('status', \App\Models\Image::STATUS_APPROVED));
+            $likeQuery->whereHas('image', fn($q) => 
+                $q->where('privacy', 'public')
+                  ->whereHas('moderation', fn($sq) => $sq->where('status', \App\Models\Image::STATUS_APPROVED))
+            );
+        }
+
+        $totalPhotos = $photoQuery->count();
+        $totalLikes = $likeQuery->count();
+        
         // Followers = people who follow THIS user
         $totalConnections = \App\Models\Connection::where('connected_user_id', $user->id)
             ->where('status', 'accepted')
