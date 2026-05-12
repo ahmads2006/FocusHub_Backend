@@ -14,6 +14,8 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\DB;
 use App\Mail\VerificationCodeMail;
+use App\Models\Connection;
+use Illuminate\Support\Facades\Log;
 
 class ProfileController extends Controller
 {
@@ -211,42 +213,63 @@ class ProfileController extends Controller
         $user = $request->user();
 
         try {
-            DB::transaction(function () use ($user) {
-                // 1. Delete all images (physical files + records)
-                $images = $user->images()->with('storage')->get();
-                foreach ($images as $image) {
-                    if ($image->storage) {
-                        if ($image->storage->path) Storage::disk('public')->delete($image->storage->path);
-                        if ($image->storage->original_path) Storage::disk('public')->delete($image->storage->original_path);
-                    }
-                    $image->delete();
+            DB::beginTransaction();
+
+            // 1. Delete all images (physical files + related records)
+            $images = $user->images()->with(['storage', 'meta', 'moderation', 'labelData', 'settings'])->get();
+            foreach ($images as $image) {
+                // Delete physical files
+                if ($image->storage) {
+                    if ($image->storage->path) Storage::disk('public')->delete($image->storage->path);
+                    if ($image->storage->original_path) Storage::disk('public')->delete($image->storage->original_path);
+                    $image->storage()->delete();
                 }
 
-                // 2. Delete owned albums
-                $user->ownedAlbums()->delete();
-
-                // 3. Delete connections (bidirectional)
-                $user->connections()->delete();
-                \App\Models\Connection::where('connected_user_id', $user->id)->delete();
-
-                // 4. Delete interactions
-                $user->bookmarks()->delete();
-                $user->likes()->delete();
+                // Delete other metadata
+                $image->meta()->delete();
+                $image->moderation()->delete();
+                $image->labelData()->delete();
+                $image->settings()->delete();
+                $image->analytics()->delete();
+                $image->reports()->delete();
+                $image->appeals()->delete();
+                $image->likes()->delete();
+                $image->bookmarks()->delete();
                 
-                // 5. Delete chat history
-                $user->sentMessages()->delete();
-                $user->receivedMessages()->delete();
+                $image->delete();
+            }
 
-                // 6. Delete related profile data
-                $user->profile()->delete();
-                $user->settings()->delete();
-                $user->verification()->delete();
-                $user->oauth()->delete();
+            // 2. Delete owned albums
+            foreach ($user->ownedAlbums as $album) {
+                $album->images()->detach(); // Detach images from album
+                $album->delete();
+            }
 
-                // 7. Revoke all tokens and delete user record
-                $user->tokens()->delete();
-                $user->delete();
-            });
+            // 3. Delete connections (bidirectional)
+            $user->connections()->delete();
+            Connection::where('connected_user_id', $user->id)->delete();
+
+            // 4. Delete interactions
+            $user->bookmarks()->delete();
+            $user->likes()->delete();
+            
+            // 5. Delete chat history
+            $user->sentMessages()->delete();
+            $user->receivedMessages()->delete();
+
+            // 6. Delete related profile data
+            $user->profile()?->delete();
+            $user->settings()?->delete();
+            $user->verification()?->delete();
+            $user->oauth()?->delete();
+            $user->preference()?->delete();
+            $user->userStatus()?->delete();
+
+            // 7. Revoke all tokens and delete user record
+            $user->tokens()->delete();
+            $user->delete();
+
+            DB::commit();
 
             return response()->json([
                 'success' => true,
@@ -254,6 +277,12 @@ class ProfileController extends Controller
             ]);
 
         } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Account Deletion Error for user ' . $user->id . ': ' . $e->getMessage(), [
+                'exception' => $e,
+                'user_id' => $user->id
+            ]);
+
             return response()->json([
                 'success' => false,
                 'message' => (app()->getLocale() === 'ar' || request()->header('Accept-Language') === 'ar') 
