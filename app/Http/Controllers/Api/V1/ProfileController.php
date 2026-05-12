@@ -239,9 +239,11 @@ class ProfileController extends Controller
                 $image->delete();
             }
 
-            // 2. Delete owned albums
+            // 2. Delete owned albums (images already deleted in step 1, just nullify FK)
             foreach ($user->ownedAlbums as $album) {
-                $album->images()->detach(); // Detach images from album
+                $album->images()->update(['album_id' => null]); // Nullify FK for any remaining images
+                $album->collaborators()->detach(); // Detach collaborators (BelongsToMany)
+                $album->invitations()->delete();
                 $album->delete();
             }
 
@@ -258,12 +260,12 @@ class ProfileController extends Controller
             $user->receivedMessages()->delete();
 
             // 6. Delete related profile data
-            $user->profile()?->delete();
-            $user->settings()?->delete();
-            $user->verification()?->delete();
-            $user->oauth()?->delete();
-            $user->preference()?->delete();
-            $user->userStatus()?->delete();
+            $user->profile()->delete();
+            $user->settings()->delete();
+            $user->verification()->delete();
+            $user->oauth()->delete();
+            $user->preference()->delete();
+            $user->userStatus()->delete();
 
             // 7. Revoke all tokens and delete user record
             $user->tokens()->delete();

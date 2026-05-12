@@ -62,7 +62,8 @@ return [
                 (PHP_VERSION_ID >= 80500 ? \Pdo\Mysql::ATTR_SSL_CA : \PDO::MYSQL_ATTR_SSL_CA) => 
                     file_exists(env('MYSQL_ATTR_SSL_CA', '')) 
                         ? env('MYSQL_ATTR_SSL_CA') 
-                        : (file_exists(storage_path('aiven-ca.pem')) ? storage_path('aiven-ca.pem') : null),
+                        : (file_exists(storage_path('ca-certificate.crt')) ? storage_path('ca-certificate.crt') : null),
+                \PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT => false,
             ]) : [],
         ],
 
