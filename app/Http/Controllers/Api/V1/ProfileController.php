@@ -192,6 +192,11 @@ class ProfileController extends Controller
 
         $user->update(['profile_picture' => $path]);
 
+        // Sync with UserProfile if it exists to ensure consistency across accessors
+        if ($user->profile) {
+            $user->profile->update(['profile_picture' => $path]);
+        }
+
         return response()->json([
             'success' => true,
             'message' => __('messages.profile_picture_updated'),
