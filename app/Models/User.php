@@ -127,7 +127,7 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
     protected $with = ['userStatus', 'profile' ];
 
     
-    protected $appends = ['can_edit', 'name', 'username'];
+    protected $appends = ['can_edit', 'name', 'username', 'avatar'];
 
     protected $hidden = [
         'password',
@@ -440,13 +440,20 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
     {
         // 1. Check custom uploaded profile picture (Manual change)
         // We prefer this over the social provider avatar once the user changes it.
-        $profilePicture = $this->profile ? $this->profile->profile_picture : ($this->attributes['profile_picture'] ?? null);
+        $profilePicture = $this->profile ? $this->profile->profile_picture : null;
+        
+        // If not in profile, check the user model itself (fallback)
+        if (!$profilePicture) {
+            $profilePicture = $this->attributes['profile_picture'] ?? null;
+        }
         
         if ($profilePicture) {
             if (filter_var($profilePicture, FILTER_VALIDATE_URL)) {
                 return $profilePicture;
             }
-            return asset('storage/' . $profilePicture);
+            
+            // Use the Storage facade to generate the correct URL based on the disk config
+            return \Illuminate\Support\Facades\Storage::disk('public')->url($profilePicture);
         }
 
         // 2. Check provider_avatar (Social Login)

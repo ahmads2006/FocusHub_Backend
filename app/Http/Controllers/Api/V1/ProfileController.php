@@ -220,6 +220,11 @@ class ProfileController extends Controller
         try {
             DB::beginTransaction();
 
+            // 0. Delete user's profile picture if it's not a URL
+            if ($user->profile_picture && !filter_var($user->profile_picture, FILTER_VALIDATE_URL)) {
+                Storage::disk('public')->delete($user->profile_picture);
+            }
+
             // 1. Delete all images (physical files + related records)
             $images = $user->images()->with(['storage', 'meta', 'moderation', 'labelData', 'settings'])->get();
             foreach ($images as $image) {
