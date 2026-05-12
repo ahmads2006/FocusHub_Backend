@@ -81,9 +81,28 @@ class ImageController extends Controller
         ], 201);
     }
 
-    public function show(Image $image)
+    public function show(Request $request, Image $image)
     {
-        $this->authorize('view', $image);
+        // 🛡️ MULTI-LAYER AUTHORIZATION
+        // 1. Check if user is normally authorized (owner, public, etc.)
+        try {
+            $this->authorize('view', $image);
+        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            // 2. Check for a valid sharing token if normal auth fails
+            $token = $request->get('token');
+            if (!$token) throw $e;
+
+            // Search for an active shared link pointing to this image
+            // We use token_hash for secure database searching
+            $tokenHash = hash('sha256', $token);
+            $isValid = \App\Models\SharedLink::where('token_hash', $tokenHash)
+                ->where('shareable_id', $image->id)
+                ->get()
+                ->filter(fn($link) => $link->is_active)
+                ->isNotEmpty();
+            
+            if (!$isValid) throw $e;
+        }
         
         $image->load(['meta', 'user', 'tags', 'aiMetadata', 'settings']);
         
