@@ -114,19 +114,15 @@ class SharedLinkController extends Controller
         if ($shareable instanceof Album) {
             $images = Image::withoutGlobalScopes()
                 ->where('album_id', $shareable->id)
-                ->with(['storage', 'settings', 'user'])
+                ->with(['storage', 'settings', 'user', 'meta', 'tags'])
                 ->get();
             
-            $shareable->setRelation('images', $images);
-            $shareable->load('owner');
-            
-            \Illuminate\Support\Facades\Log::info("Shared album loaded: " . $shareable->id . " with " . $images->count() . " images");
-
             return response()->json([
                 'success' => true,
                 'type'    => 'album',
                 'data'    => [
                     'album'      => $shareable,
+                    'photos'     => \App\Http\Resources\PhotoResource::collection($images)->resolve(),
                     'permission' => $link->permission,
                     'link'       => [
                         'token'        => $link->token,
@@ -139,15 +135,15 @@ class SharedLinkController extends Controller
         }
 
         if ($shareable instanceof Image) {
-            // Re-fetch without global scopes to ensure visibility
             $shareable = Image::withoutGlobalScopes()
-                ->with(['storage', 'settings', 'user'])
+                ->with(['storage', 'settings', 'user', 'meta', 'tags'])
                 ->findOrFail($shareable->id);
+
             return response()->json([
                 'success' => true,
                 'type'    => 'image',
                 'data'    => [
-                    'image'      => $shareable,
+                    'image'      => (new \App\Http\Resources\PhotoResource($shareable))->resolve(),
                     'permission' => $link->permission,
                     'link'       => [
                         'token'        => $link->token,
