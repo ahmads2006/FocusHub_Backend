@@ -707,11 +707,26 @@ class AlbumController extends Controller
             $tempFiles = [];
             
             foreach ($items as $index => $image) {
-                $disk = $image->storage->disk ?? 'public';
-                $path = $image->storage->path ?? null;
+                $path = $image->storage->path ?? $image->path ?? null;
+                if (!$path) continue;
+
+                $preferredDisk = $image->storage->disk ?? 'public';
+                if ($preferredDisk === 'spaces') {
+                    $preferredDisk = 's3';
+                }
+
+                $activeDisk = null;
+                $disksToCheck = array_unique([$preferredDisk, 'public', 'local', 's3']);
                 
-                if ($path && \Illuminate\Support\Facades\Storage::disk($disk)->exists($path)) {
-                    $stream = \Illuminate\Support\Facades\Storage::disk($disk)->readStream($path);
+                foreach ($disksToCheck as $d) {
+                    if (\Illuminate\Support\Facades\Storage::disk($d)->exists($path)) {
+                        $activeDisk = $d;
+                        break;
+                    }
+                }
+                
+                if ($activeDisk) {
+                    $stream = \Illuminate\Support\Facades\Storage::disk($activeDisk)->readStream($path);
                     if ($stream) {
                         $tempFile = tempnam(sys_get_temp_dir(), 'album_zip_');
                         $out = fopen($tempFile, 'wb');
