@@ -158,7 +158,7 @@ class ImageController extends Controller
         });
 
         return response()->json([
-            'image' => new PhotoResource($image),
+            'image' => (new PhotoResource($image))->resolve(),
             'related' => PhotoResource::collection($related)->resolve(),
             'has_related' => $hasRelated,
             'match_base' => count($tagNames)
