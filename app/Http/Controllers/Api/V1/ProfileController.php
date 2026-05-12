@@ -255,13 +255,22 @@ class ProfileController extends Controller
         $photoQuery = $user->images();
         $likeQuery = \App\Models\Like::whereHas('image', fn($q) => $q->where('user_id', $user->id));
 
+        // PRIVATE ACCOUNT LOGIC: If account is private and viewer is NOT owner, hide photos count & images
+        $isAccountPrivate = !$isOwner && !$isPublic;
+
         if (!$isOwner) {
-            $photoQuery->where('privacy', 'public')
-                       ->whereHas('moderation', fn($q) => $q->where('status', \App\Models\Image::STATUS_APPROVED));
-            $likeQuery->whereHas('image', fn($q) => 
-                $q->where('privacy', 'public')
-                  ->whereHas('moderation', fn($sq) => $sq->where('status', \App\Models\Image::STATUS_APPROVED))
-            );
+            if ($isAccountPrivate) {
+                $photoQuery->where('id', '0'); // Return empty
+                $likeQuery->where('id', '0');
+            } else {
+                $photoQuery->where('privacy', 'public')
+                           ->whereHas('moderation', fn($q) => $q->where('status', \App\Models\Image::STATUS_APPROVED));
+                
+                $likeQuery->whereHas('image', fn($q) => 
+                    $q->where('privacy', 'public')
+                      ->whereHas('moderation', fn($sq) => $sq->where('status', \App\Models\Image::STATUS_APPROVED))
+                );
+            }
         }
 
         $totalPhotos = $photoQuery->count();
