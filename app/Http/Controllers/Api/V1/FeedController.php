@@ -84,7 +84,10 @@ class FeedController extends Controller
         $result = $this->engine->toggleLike($user, $image);
 
         if ($result['action'] === 'like' && $image->user_id !== $user->id) {
-            $image->user->notify(new ImageSocialNotification($user, $image, 'like'));
+            $prefs = $image->user->notification_preferences ?? [];
+            if (($prefs['push_likes'] ?? true) === true) {
+                $image->user->notify(new ImageSocialNotification($user, $image, 'like'));
+            }
         }
 
         $image->loadCount('likes');
@@ -116,7 +119,10 @@ class FeedController extends Controller
         }
 
         if ($action === 'bookmark' && $image->user_id !== $user->id) {
-            $image->user->notify(new ImageSocialNotification($user, $image, 'bookmark'));
+            $prefs = $image->user->notification_preferences ?? [];
+            if (($prefs['push_likes'] ?? true) === true) {
+                $image->user->notify(new ImageSocialNotification($user, $image, 'bookmark'));
+            }
         }
 
         $image->loadCount('bookmarks');

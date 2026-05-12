@@ -403,13 +403,14 @@ class ProfileController extends Controller
     {
         $user = $request->user();
         // Default preferences if null
-        $preferences = $user->notification_preferences ?? [
-            'email_marketing' => true,
-            'email_security' => true,
-            'push_likes' => true,
+        $defaults = [
+            'push_likes'    => true,
             'push_comments' => true,
-            'push_follows' => true,
+            'push_follows'  => true,
+            'push_albums'   => true,
+            'push_chat'     => true,
         ];
+        $preferences = array_merge($defaults, $user->notification_preferences ?? []);
 
         return response()->json([
             'success' => true,
@@ -424,11 +425,11 @@ class ProfileController extends Controller
     {
         $user = $request->user();
         $validated = $request->validate([
-            'email_marketing' => 'boolean',
-            'email_security'  => 'boolean',
             'push_likes'      => 'boolean',
             'push_comments'   => 'boolean',
             'push_follows'    => 'boolean',
+            'push_albums'     => 'boolean',
+            'push_chat'       => 'boolean',
         ]);
 
         $currentPreferences = $user->notification_preferences ?? [];

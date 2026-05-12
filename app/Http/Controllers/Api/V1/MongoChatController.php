@@ -267,8 +267,10 @@ class MongoChatController extends Controller
 
         $receiver = User::find($request->receiver_id);
         if ($receiver) {
-            // Send notification (Maybe different for requests?)
-            $receiver->notify(new ChatMessageNotification(Auth::user(), $request->body ?? 'Shared an image'));
+            $prefs = $receiver->notification_preferences ?? [];
+            if (($prefs['push_chat'] ?? true) === true) {
+                $receiver->notify(new ChatMessageNotification(Auth::user(), $request->body ?? 'Shared an image'));
+            }
         }
 
         try {

@@ -45,7 +45,10 @@ class ImageObserver
 
         foreach ($recipients as $recipient) {
             if ($recipient->id !== $actor->id) {
-                $recipient->notify(new AlbumActivityNotification($actor, $album, $action));
+                $prefs = $recipient->notification_preferences ?? [];
+                if (($prefs['push_albums'] ?? true) === true) {
+                    $recipient->notify(new AlbumActivityNotification($actor, $album, $action));
+                }
             }
         }
     }
