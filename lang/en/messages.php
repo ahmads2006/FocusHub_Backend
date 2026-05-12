@@ -82,7 +82,7 @@ return [
     'upload_limit_batches' => 'You have exceeded the maximum upload limit (20 image batches per hour). Please try again later.',
     'storage_limit_batch' => 'Sorry, your storage space is insufficient to upload this batch of images. The user limit is 5GB.',
     'account_created' => 'Account created successfully. Please check your email.',
-    'invalid_credentials' => 'Invalid credentials (Password | Email).',
+    'invalid_credentials' => 'Invalid credentials (Email | Password).',
     'account_banned' => 'Your account has been banned. Please contact support.',
     'email_unverified' => 'You must verify your email address first.',
     'login_success' => 'Logged in successfully.',
