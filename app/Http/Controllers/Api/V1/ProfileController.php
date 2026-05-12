@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\DB;
 use App\Mail\VerificationCodeMail;
 
 class ProfileController extends Controller
@@ -203,18 +204,64 @@ class ProfileController extends Controller
     {
         $request->validate([
             'password' => ['required', 'current_password'],
+        ], [
+            'password.current_password' => __('messages.incorrect_password'),
         ]);
 
         $user = $request->user();
 
-        // Revoke all tokens
-        $user->tokens()->delete();
-        $user->delete();
+        try {
+            DB::transaction(function () use ($user) {
+                // 1. Delete all images (physical files + records)
+                $images = $user->images()->with('storage')->get();
+                foreach ($images as $image) {
+                    if ($image->storage) {
+                        if ($image->storage->path) Storage::disk('public')->delete($image->storage->path);
+                        if ($image->storage->original_path) Storage::disk('public')->delete($image->storage->original_path);
+                    }
+                    $image->delete();
+                }
 
-        return response()->json([
-            'success' => true,
-            'message' => __('messages.account_deleted'),
-        ]);
+                // 2. Delete owned albums
+                $user->ownedAlbums()->delete();
+
+                // 3. Delete connections (bidirectional)
+                $user->connections()->delete();
+                \App\Models\Connection::where('connected_user_id', $user->id)->delete();
+
+                // 4. Delete interactions
+                $user->bookmarks()->delete();
+                $user->likes()->delete();
+                
+                // 5. Delete chat history
+                $user->sentMessages()->delete();
+                $user->receivedMessages()->delete();
+
+                // 6. Delete related profile data
+                $user->profile()->delete();
+                $user->settings()->delete();
+                $user->verification()->delete();
+                $user->oauth()->delete();
+
+                // 7. Revoke all tokens and delete user record
+                $user->tokens()->delete();
+                $user->delete();
+            });
+
+            return response()->json([
+                'success' => true,
+                'message' => __('messages.account_deleted'),
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => (app()->getLocale() === 'ar' || request()->header('Accept-Language') === 'ar') 
+                    ? 'حدث خطأ أثناء حذف الحساب. يرجى المحاولة لاحقاً.' 
+                    : 'An error occurred while deleting the account. Please try again later.',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 
     /**
