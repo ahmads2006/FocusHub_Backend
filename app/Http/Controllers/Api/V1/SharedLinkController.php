@@ -29,9 +29,7 @@ class SharedLinkController extends Controller
      */
     public function generateShareOnceLink(Image $image): JsonResponse
     {
-        if (Auth::id() !== $image->user_id) {
-            return response()->json(['success' => false, 'message' => __('messages.cannot_share_image')], 403);
-        }
+        $this->authorize('share', $image);
 
         $link = $this->service->generate($image, null, null, 1);
         $url  = $this->service->getFullUrl($link);
@@ -63,9 +61,7 @@ class SharedLinkController extends Controller
         $modelClass = $request->shareable_type;
         $model      = $modelClass::findOrFail($request->shareable_id);
 
-        if (Auth::id() !== $model->user_id) {
-            return response()->json(['success' => false, 'message' => __('messages.cannot_share_item')], 403);
-        }
+        $this->authorize('share', $model);
 
         $expiry     = $request->expires_in ? now()->addHours((int) $request->expires_in) : null;
         $permission = $request->permission ?? 'view';

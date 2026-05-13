@@ -112,4 +112,30 @@ class ImagePolicy
 
         return \Illuminate\Auth\Access\Response::deny('You do not have permission to delete this image.');
     }
+
+    /**
+     * Determine whether the user can share the image.
+     */
+    public function share(User $user, Image $image): \Illuminate\Auth\Access\Response
+    {
+        // Owner of the image can always share
+        if ($user->id === $image->user_id) {
+            return \Illuminate\Auth\Access\Response::allow();
+        }
+
+        // Owner of the album can share any image in it
+        if ($image->album && $user->id === $image->album->user_id) {
+            return \Illuminate\Auth\Access\Response::allow();
+        }
+
+        // Admin/Contributor collaborators of the album can share any image in it
+        if ($image->album) {
+            $collaborator = $image->album->collaborators()->where('user_id', $user->id)->first();
+            if ($collaborator && in_array($collaborator->pivot->role, ['admin', 'contributor'])) {
+                return \Illuminate\Auth\Access\Response::allow();
+            }
+        }
+
+        return \Illuminate\Auth\Access\Response::deny('You do not have permission to generate share links for this image.');
+    }
 }

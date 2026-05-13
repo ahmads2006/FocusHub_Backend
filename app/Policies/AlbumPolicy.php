@@ -78,4 +78,23 @@ class AlbumPolicy
             ? Response::allow()
             : Response::deny('Only the album owner can delete this album.');
     }
+
+    /**
+     * Determine whether the user can share the album.
+     */
+    public function share(User $user, Album $album): Response
+    {
+        // Owner can always share
+        if ($user->id === $album->user_id) {
+            return Response::allow();
+        }
+
+        // Admins and Contributors can share
+        $collaborator = $album->collaborators()->where('user_id', $user->id)->first();
+        if ($collaborator && in_array($collaborator->pivot->role, ['admin', 'contributor'])) {
+            return Response::allow();
+        }
+
+        return Response::deny('You do not have permission to generate share links for this album.');
+    }
 }

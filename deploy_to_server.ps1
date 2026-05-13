@@ -12,6 +12,11 @@ upload_file "opalshot/app/Models/User.php" "$REMOTE_PATH/app/Models/User.php"
 Write-Host "Updating ProfileController.php..."
 upload_file "opalshot/app/Http/Controllers/Api/V1/ProfileController.php" "$REMOTE_PATH/app/Http/Controllers/Api/V1/ProfileController.php"
 
+Write-Host "Updating Shared Link Logic & Policies..."
+upload_file "opalshot/app/Http/Controllers/Api/V1/SharedLinkController.php" "$REMOTE_PATH/app/Http/Controllers/Api/V1/SharedLinkController.php"
+upload_file "opalshot/app/Policies/ImagePolicy.php" "$REMOTE_PATH/app/Policies/ImagePolicy.php"
+upload_file "opalshot/app/Policies/AlbumPolicy.php" "$REMOTE_PATH/app/Policies/AlbumPolicy.php"
+
 Write-Host "Fixing storage link in Docker..."
 ssh -i $KEY root@$IP "docker exec opalshot-app-1 rm -f public/storage"
 ssh -i $KEY root@$IP "docker exec opalshot-app-1 php artisan storage:link"
