@@ -16,6 +16,7 @@ Write-Host "Updating Shared Link Logic & Policies..."
 upload_file "opalshot/app/Http/Controllers/Api/V1/SharedLinkController.php" "$REMOTE_PATH/app/Http/Controllers/Api/V1/SharedLinkController.php"
 upload_file "opalshot/app/Policies/ImagePolicy.php" "$REMOTE_PATH/app/Policies/ImagePolicy.php"
 upload_file "opalshot/app/Policies/AlbumPolicy.php" "$REMOTE_PATH/app/Policies/AlbumPolicy.php"
+upload_file "opalshot/bootstrap/app.php" "$REMOTE_PATH/bootstrap/app.php"
 
 Write-Host "Fixing storage link in Docker..."
 ssh -i $KEY root@$IP "docker exec opalshot-app-1 rm -f public/storage"
