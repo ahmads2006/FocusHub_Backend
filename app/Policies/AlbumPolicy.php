@@ -45,18 +45,10 @@ class AlbumPolicy
      */
     public function update(User $user, Album $album): Response
     {
-        // Owner always can
-        if ($user->id === $album->user_id) {
-            return Response::allow();
-        }
-
-        // Admin collaborators can update
-        $collaborator = $album->collaborators()->where('user_id', $user->id)->first();
-        if ($collaborator && $collaborator->pivot->role === 'admin') {
-            return Response::allow();
-        }
-
-        return Response::deny('You do not have permission to update this album.');
+        // Only owner can update (Rename, Privacy, etc.)
+        return $user->id === $album->user_id
+            ? Response::allow()
+            : Response::deny('Only the album owner can update settings.');
     }
 
     /**

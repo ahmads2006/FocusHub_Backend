@@ -273,7 +273,14 @@ class AlbumController extends Controller
      */
     public function addCollaborator(Request $request, Album $album): JsonResponse
     {
-        if (Auth::id() !== $album->user_id) {
+        $currentUser = Auth::user();
+        $isOwner = $currentUser->id === $album->user_id;
+        
+        $myCollab = $album->collaborators()->where('user_id', $currentUser->id)->wherePivot('status', 'accepted')->first();
+        $myRole = $isOwner ? 'owner' : ($myCollab ? $myCollab->pivot->role : null);
+
+        // Authorization: Only Owner or Admin can add members
+        if ($myRole !== 'owner' && $myRole !== 'admin') {
             return response()->json(['success' => false, 'message' => __('messages.unauthorized')], 403);
         }
 
@@ -281,6 +288,11 @@ class AlbumController extends Controller
             'user_id' => 'required|string',
             'role'    => 'required|in:admin,contributor,viewer',
         ]);
+
+        // Hierarchy Check: Admin can only add roles lower than admin (contributor, viewer)
+        if ($myRole === 'admin' && $validated['role'] === 'admin') {
+            return response()->json(['success' => false, 'message' => 'Admins can only invite Contributors or Viewers.'], 403);
+        }
 
         $userToAdd = User::find($validated['user_id']);
         if (!$userToAdd) {
@@ -331,18 +343,29 @@ class AlbumController extends Controller
      */
     public function updateCollaboratorRole(Request $request, Album $album, User $user): JsonResponse
     {
-        if (Auth::id() !== $album->user_id) {
-            return response()->json(['success' => false, 'message' => __('messages.unauthorized')], 403);
+        $currentUser = Auth::user();
+        $isOwner = $currentUser->id === $album->user_id;
+        $myCollab = $album->collaborators()->where('user_id', $currentUser->id)->wherePivot('status', 'accepted')->first();
+        $myRole = $isOwner ? 'owner' : ($myCollab ? $myCollab->pivot->role : null);
+
+        // Target collaborator
+        $targetCollab = $album->collaborators()->where('user_id', $user->id)->first();
+        if (!$targetCollab) {
+            return response()->json(['success' => false, 'message' => __('messages.not_collaborator')], 404);
+        }
+
+        $targetRole = $targetCollab->pivot->role;
+
+        // Hierarchy Check: Current user must have higher rank than target
+        if ($this->getRoleWeight($myRole) >= $this->getRoleWeight($targetRole) && !$isOwner) {
+            return response()->json(['success' => false, 'message' => 'You can only manage members with a lower rank than yours.'], 403);
         }
 
         $request->validate(['role' => 'required|in:admin,contributor,viewer']);
 
-        if (!$album->collaborators->contains($user->id)) {
-            return response()->json(['success' => false, 'message' => __('messages.not_collaborator')], 404);
-        }
-
-        if ($album->user_id === $user->id) {
-            return response()->json(['success' => false, 'message' => __('messages.cannot_change_owner_role')], 400);
+        // Admin cannot upgrade someone to Admin
+        if ($myRole === 'admin' && $request->role === 'admin') {
+             return response()->json(['success' => false, 'message' => 'Admins cannot assign the Admin role.'], 403);
         }
 
         $album->collaborators()->updateExistingPivot($user->id, ['role' => $request->role]);
@@ -358,15 +381,32 @@ class AlbumController extends Controller
      */
     public function removeCollaborator(Album $album, User $user): JsonResponse
     {
-        if (Auth::id() !== $album->user_id) {
-            return response()->json(['success' => false, 'message' => __('messages.unauthorized')], 403);
+        $currentUser = Auth::user();
+        $isOwner = $currentUser->id === $album->user_id;
+        $myCollab = $album->collaborators()->where('user_id', $currentUser->id)->wherePivot('status', 'accepted')->first();
+        $myRole = $isOwner ? 'owner' : ($myCollab ? $myCollab->pivot->role : null);
+
+        // Target collaborator
+        $targetCollab = $album->collaborators()->where('user_id', $user->id)->first();
+        if (!$targetCollab) {
+             return response()->json(['success' => true, 'message' => 'User is not a collaborator.']);
+        }
+
+        $targetRole = $targetCollab->pivot->role;
+
+        // Hierarchy Check: Current user must have higher rank than target
+        // Exception: User can remove themselves (leave album)
+        if ($currentUser->id !== $user->id) {
+            if ($this->getRoleWeight($myRole) >= $this->getRoleWeight($targetRole) && !$isOwner) {
+                return response()->json(['success' => false, 'message' => 'You can only remove members with a lower rank than yours.'], 403);
+            }
         }
 
         $album->collaborators()->detach($user->id);
 
         return response()->json([
             'success' => true,
-            'message' => __('messages.collaborator_removed', ['name' => $user->name]),
+            'message' => $currentUser->id === $user->id ? 'You have left the album.' : __('messages.collaborator_removed', ['name' => $user->name]),
         ]);
     }
 
@@ -671,18 +711,13 @@ class AlbumController extends Controller
      */
     public function download(Album $album)
     {
-        // Authorization: Only owner or accepted collaborators with contributor/admin role
+        // Authorization: Only owner can download the full album
         $isOwner = Auth::id() === $album->user_id;
-        $isCollaborator = $album->collaborators()
-            ->where('users.id', Auth::id())
-            ->wherePivot('status', 'accepted')
-            ->whereIn('role', ['admin', 'contributor'])
-            ->exists();
 
-        if (!$isOwner && !$isCollaborator) {
+        if (!$isOwner) {
             return response()->json([
                 'success' => false,
-                'message' => __('messages.album_unauthorized'),
+                'message' => 'Only the album owner can download the full album ZIP.',
             ], 403);
         }
 
@@ -828,6 +863,20 @@ class AlbumController extends Controller
                 }
             }
         }
+    }
+
+    /**
+     * Get numeric weight for a role (lower is more powerful).
+     */
+    private function getRoleWeight($role): int
+    {
+        $weights = [
+            'owner'       => 0,
+            'admin'       => 1,
+            'contributor' => 2,
+            'viewer'      => 3,
+        ];
+        return $weights[$role] ?? 99;
     }
 }
 
