@@ -46,7 +46,8 @@ class DownloadController extends Controller
             // In ImageKit, the image path uses slashes which need replacing or just passing directly
             // ImageKit format: l-image,i-logo.png,lfo-bottom_right,l-end
         } else {
-            $watermarkText = $image->settings?->watermark_text ?: ($image->user->name ?? 'OpalShot');
+            $userText = $image->settings?->watermark_text ?: ($image->user->name ?? 'OpalShot');
+            $watermarkText = '© ' . trim(str_replace('©', '', $userText));
         }
 
         // Read watermark customization from settings
