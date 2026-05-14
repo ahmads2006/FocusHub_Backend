@@ -76,6 +76,17 @@ class DownloadController extends Controller
         session()->forget("shared_link_access_{$image->id}");
         session()->forget("shared_link_watermark_{$image->id}");
 
+        // 🛡️ WATERMARK ENFORCEMENT: If the owner enabled watermark_on_download
+        // and the requesting user is NOT the owner, force watermarked download.
+        $image->load('settings');
+        $hasWatermark = (bool) ($image->settings?->watermark_on_download ?? false);
+        $isOwner = \Illuminate\Support\Facades\Auth::id() === $image->user_id;
+
+        if ($hasWatermark && !$isOwner) {
+            \Illuminate\Support\Facades\Log::info("Watermark enforced for non-owner on image {$image->id}");
+            return $this->download($image);
+        }
+
         $url = $this->deliveryService->getUrl($image, 'original');
 
         return response()->json(['url' => $url]);
