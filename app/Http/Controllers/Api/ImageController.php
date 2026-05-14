@@ -176,13 +176,19 @@ class ImageController extends Controller
             'album_id' => 'nullable|exists:albums,id',
             'is_comparison' => 'boolean',
             'allow_download' => 'boolean',
-            'watermark_on_download' => 'boolean'
+            'watermark_on_download' => 'boolean',
+            'watermark_font_size' => 'nullable|integer|min:20|max:800',
+            'watermark_opacity' => 'nullable|integer|min:10|max:100',
+            'watermark_color' => 'nullable|string|max:8',
         ]);
 
         $image->update(\Illuminate\Support\Arr::only($validated, ['title', 'description', 'privacy', 'album_id', 'is_comparison']));
 
-        if (isset($validated['allow_download']) || isset($validated['watermark_on_download'])) {
-            $image->settings()->updateOrCreate([], \Illuminate\Support\Arr::only($validated, ['allow_download', 'watermark_on_download']));
+        $settingsFields = ['allow_download', 'watermark_on_download', 'watermark_font_size', 'watermark_opacity', 'watermark_color'];
+        $settingsData = \Illuminate\Support\Arr::only($validated, $settingsFields);
+        
+        if (!empty($settingsData)) {
+            $image->settings()->updateOrCreate([], $settingsData);
         }
 
         return response()->json([

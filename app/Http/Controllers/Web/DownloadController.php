@@ -31,17 +31,26 @@ class DownloadController extends Controller
             }
         }
 
-        // If user is owner, they can just download original directly without watermark if they want, 
-        // but this route serves the watermarked version if requested.
-        
         $path = $image->storage?->imagekit_file_path ?? $image->storage?->path;
         
         if (!$path) {
             abort(404, 'الصورة غير موجودة.');
         }
 
-        $image->load('user');
+        $image->load(['user', 'settings']);
         $watermarkText = $image->user->name ?? 'OpalShot';
+
+        // Read watermark customization from settings
+        $fontSize = (int) ($image->settings?->watermark_font_size ?? 80);
+        $opacity  = (int) ($image->settings?->watermark_opacity ?? 70);
+        $color    = $image->settings?->watermark_color ?? 'FFFFFF';
+
+        // Apply opacity to color as hex alpha (e.g. FFFFFF + B3 for 70%)
+        $alphaHex = str_pad(dechex(round($opacity / 100 * 255)), 2, '0', STR_PAD_LEFT);
+        $colorWithAlpha = $color . $alphaHex;
+
+        // Scale font size for ImageKit (ImageKit uses pixels, user sets a relative value)
+        $ikFontSize = max(20, $fontSize);
 
         $path = $image->storage?->imagekit_file_path ?? $image->storage?->path;
         if ($path) {
@@ -51,11 +60,10 @@ class DownloadController extends Controller
             }
         }
 
-        // Generate signed watermarked URL via ImageKit
-        // We pass the attachment parameter to be included in the signature
-        $url = $this->imageKit->getWatermarkedUrl($path, $watermarkText, true, 30);
+        // Generate signed watermarked URL via ImageKit with customization
+        $url = $this->imageKit->getWatermarkedUrl($path, $watermarkText, true, 30, $ikFontSize, $colorWithAlpha);
 
-        \Illuminate\Support\Facades\Log::info("Generated Watermark URL for image {$image->id}: {$url}");
+        \Illuminate\Support\Facades\Log::info("Generated Watermark URL for image {$image->id}: fontSize={$ikFontSize}, opacity={$opacity}%, color=#{$colorWithAlpha}");
 
         return response()->json(['url' => $url]);
     }

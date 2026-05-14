@@ -16,6 +16,9 @@ class ImageSettings extends Model
         'image_id',
         'allow_download',
         'watermark_on_download',
+        'watermark_font_size',
+        'watermark_opacity',
+        'watermark_color',
         'copyright_enabled',
         'is_comparison',
         'views_count',
@@ -27,6 +30,8 @@ class ImageSettings extends Model
         'watermark_on_download' => 'boolean',
         'copyright_enabled'     => 'boolean',
         'is_comparison'         => 'boolean',
+        'watermark_font_size'   => 'integer',
+        'watermark_opacity'     => 'integer',
     ];
 
     public function image(): BelongsTo
