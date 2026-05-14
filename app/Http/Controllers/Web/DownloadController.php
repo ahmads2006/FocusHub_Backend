@@ -52,7 +52,9 @@ class DownloadController extends Controller
             $userSettings = \App\Models\UserSettings::where('user_id', $image->user_id)->first();
             $watermarkText = $userSettings?->watermark_logo_path ?: 'default_logo.png'; 
         } else {
-            $userText = $image->settings?->watermark_text ?: ($image->user->name ?? 'OpalShot');
+            $rawText = $image->settings?->watermark_text;
+            // Use stored text if not empty, otherwise default to 'OpalShot'
+            $userText = (!empty($rawText) && trim($rawText) !== '') ? $rawText : 'OpalShot';
             $watermarkText = '© ' . trim(str_replace('©', '', $userText));
         }
 
