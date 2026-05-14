@@ -37,14 +37,20 @@ class DownloadController extends Controller
             abort(404, 'الصورة غير موجودة.');
         }
 
+        $image->load(['user', 'settings']);
+
+        \Illuminate\Support\Facades\Log::info("Watermark Debug for image {$image->id}", [
+            'settings_exists' => $image->settings !== null,
+            'watermark_type' => $image->settings?->watermark_type,
+            'watermark_text' => $image->settings?->watermark_text,
+            'user_name' => $image->user?->name,
+        ]);
+
         $watermarkType = $image->settings?->watermark_type ?? 'text';
         
         if ($watermarkType === 'logo') {
             $userSettings = \App\Models\UserSettings::where('user_id', $image->user_id)->first();
-            // Default logo if none uploaded
             $watermarkText = $userSettings?->watermark_logo_path ?: 'default_logo.png'; 
-            // In ImageKit, the image path uses slashes which need replacing or just passing directly
-            // ImageKit format: l-image,i-logo.png,lfo-bottom_right,l-end
         } else {
             $userText = $image->settings?->watermark_text ?: ($image->user->name ?? 'OpalShot');
             $watermarkText = '© ' . trim(str_replace('©', '', $userText));
