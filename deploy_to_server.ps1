@@ -23,6 +23,26 @@ upload_file "opalshot/app/Notifications/SharedLinkLeakDetected.php" "$REMOTE_PAT
 Write-Host "Updating Bootstrap..."
 upload_file "opalshot/bootstrap/app.php" "$REMOTE_PATH/bootstrap/app.php"
 
+Write-Host "Updating Kernel..."
+upload_file "opalshot/app/Http/Kernel.php" "$REMOTE_PATH/app/Http/Kernel.php"
+
+Write-Host "Updating Security & Logs..."
+upload_file "opalshot/app/Http/Middleware/RequestLogger.php" "$REMOTE_PATH/app/Http/Middleware/RequestLogger.php"
+upload_file "opalshot/app/Helpers/SecurityHelper.php" "$REMOTE_PATH/app/Helpers/SecurityHelper.php"
+
+Write-Host "Updating Image Policy..."
+upload_file "opalshot/app/Policies/ImagePolicy.php" "$REMOTE_PATH/app/Policies/ImagePolicy.php"
+
+Write-Host "Updating Album Policy..."
+upload_file "opalshot/app/Policies/AlbumPolicy.php" "$REMOTE_PATH/app/Policies/AlbumPolicy.php"
+
+Write-Host "Updating ProfileController..."
+Write-Host "Updating ProfileController..."
+upload_file "opalshot/app/Http/Controllers/Api/V1/ProfileController.php" "$REMOTE_PATH/app/Http/Controllers/Api/V1/ProfileController.php"
+
+Write-Host "Updating User Profile..."
+upload_file "opalshot/app/Models/User.php" "$REMOTE_PATH/app/Models/User.php"
+
 Write-Host "Uploading new migrations..."
 upload_file "opalshot/database/migrations/2026_05_14_181300_add_token_hash_to_shared_links.php" "$REMOTE_PATH/database/migrations/2026_05_14_181300_add_token_hash_to_shared_links.php"
 

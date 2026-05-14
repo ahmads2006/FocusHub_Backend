@@ -30,6 +30,7 @@ class SharedLinkService
             'max_access' => $maxAccess,
             'auto_rotate'        => $autoRotate,
             'require_watermark'  => $requireWatermark,
+            'persistent_id'      => (string) Str::uuid(),
         ];
 
         // 🛡️ Create a model instance to handle encryption and attributes consistently

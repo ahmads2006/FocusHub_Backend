@@ -385,12 +385,12 @@ Route::prefix('v1')->group(function () {
         Route::delete('/images/{image}', [AdminController::class, 'deleteImage']);
     });
 
-    // ══════════════════════════════════════════
-    // 4. 🔗 SHARED LINKS (Public with Token)
-    // ══════════════════════════════════════════
+    // 🔗 SHARED LINKS (Public with Token)
+    // Verify route must be OUTSIDE the middleware or it might block itself
+    Route::post('/share/{token}/verify', [App\Http\Controllers\Api\V1\SharedLinkController::class, 'verifyPassword']);
+
     Route::middleware(\App\Http\Middleware\ValidateSharedLink::class)->group(function () {
         Route::get('/share/{token}', [App\Http\Controllers\Api\V1\SharedLinkController::class, 'show'])->name('shared_link.show');
-        Route::post('/share/{token}/verify', [App\Http\Controllers\Api\V1\SharedLinkController::class, 'verifyPassword']);
         Route::get('/share/{token}/download', [App\Http\Controllers\Api\V1\SharedLinkController::class, 'downloadAlbum']);
     });
 

@@ -25,6 +25,7 @@ class SharedLink extends Model
         'last_accessed_at',
         'revoked_at',
         'require_watermark',
+        'persistent_id',
     ];
 
     protected $appends = ['is_active', 'status_text'];
@@ -37,7 +38,14 @@ class SharedLink extends Model
     {
         static::saving(function ($link) {
             if ($link->isDirty('token')) {
-                $link->token_hash = hash('sha256', $link->token);
+                // Ensure we hash the RAW token, not the encrypted one
+                $rawToken = $link->token;
+                $link->token_hash = hash('sha256', $rawToken);
+                
+                \Illuminate\Support\Facades\Log::info("Generated token_hash for link:", [
+                    'persistent_id' => $link->persistent_id,
+                    'hash' => $link->token_hash
+                ]);
             }
         });
     }

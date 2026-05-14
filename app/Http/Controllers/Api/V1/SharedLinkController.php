@@ -164,24 +164,58 @@ class SharedLinkController extends Controller
      */
     public function verifyPassword(Request $request, string $token): JsonResponse
     {
-        $link   = $request->attributes->get('shared_link');
-        $authId = $request->attributes->get('shared_link_auth_id');
+        // Manually resolve the link since we moved this route out of the middleware
+        $tokenHash = hash('sha256', $token);
+        $link = \App\Models\SharedLink::where('token_hash', $tokenHash)
+            ->orWhere('token', $token) // Fallback for old tokens
+            ->first();
 
+        // Also check Redis for ephemeral links
         if (!$link) {
+            $cachedData = \Illuminate\Support\Facades\Cache::get("ephemeral_link:{$tokenHash}");
+            if ($cachedData) {
+                $link = new \App\Models\SharedLink($cachedData);
+            }
+        }
+
+        if (!$link || ($link->expires_at && $link->expires_at->isPast())) {
             return response()->json(['success' => false, 'message' => __('messages.invalid_link_short')], 404);
         }
 
         $request->validate(['password' => 'required|string']);
 
+        \Illuminate\Support\Facades\Log::info("Attempting password check for link:", [
+            'token_hash' => $tokenHash,
+            'persistent_id' => $link->persistent_id ?? 'none',
+            'has_password_in_model' => !empty($link->password),
+            'password_hash_start' => substr($link->password, 0, 10) . '...'
+        ]);
+
         if (Hash::check($request->password, $link->password)) {
+            $authKeyId = $link->persistent_id ?? $tokenHash;
+            $authKey = "shared_link_auth_" . $authKeyId;
+            
+            // 🔓 Store authentication in session (standard)
+            $request->session()->put($authKey, true);
+            $request->session()->save();
+
+            // 🚀 IP-BASED FALLBACK
+            $ipAuthKey = "shared_link_ip_auth_" . $authKeyId . "_" . md5($request->ip() . $request->userAgent());
+            \Illuminate\Support\Facades\Cache::put($ipAuthKey, true, now()->addHours(2));
+
+            \Illuminate\Support\Facades\Log::info("Shared link password verified successfully!", [
+                'authKey' => $authKey,
+                'ipAuthKey' => $ipAuthKey
+            ]);
+
             return response()->json([
                 'success'    => true,
                 'message'    => __('messages.verified_successfully'),
-                'auth_token' => encrypt("link_auth_{$authId}"),
+                'auth_key'   => $authKey, // Return for frontend reference if needed
             ]);
         }
 
-        return response()->json(['success' => false, 'message' => __('messages.incorrect_password')], 401);
+        return response()->json(['success' => false, 'message' => __('messages.incorrect_password')], 403);
     }
 
     /**

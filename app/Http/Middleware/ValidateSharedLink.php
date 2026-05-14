@@ -77,7 +77,7 @@ class ValidateSharedLink
                     $link->token = $newToken;
                     
                     $ttl = $link->expires_at ? now()->diffInSeconds($link->expires_at) : 3600;
-                    \Illuminate\Support\Facades\Cache::put("ephemeral_link:{$newTokenHash}", $link->toArray(), $ttl);
+                    \Illuminate\Support\Facades\Cache::put("ephemeral_link:{$newTokenHash}", $link->getAttributes(), $ttl);
                     \Illuminate\Support\Facades\Cache::forget("ephemeral_link:{$tokenHash}");
                 } else {
                     $link->update([
@@ -126,17 +126,45 @@ class ValidateSharedLink
         // Use token hash as fallback ID for ephemeral links
         $authId = $link->id ?? $tokenHash;
 
-        // Handle password protection
-        if ($link->password && !$request->session()->get("link_auth_{$authId}")) {
-            // If it's the POST request for password verification, let it through to controller
-            if ($request->isMethod('post') && $request->has('password')) {
-                // Store link in request for controller usage
-                $request->attributes->set('shared_link', $link);
-                $request->attributes->set('shared_link_auth_id', $authId);
-                return $next($request);
+        // 🔒 4. Password Protection Logic
+        // For ephemeral links, we must have a stable ID that survives rotation.
+        if (!$link->id && empty($link->persistent_id)) {
+            $link->persistent_id = md5($tokenHash); // Use initial token hash as stable ID
+            // Save it back to cache so it persists
+            $ttl = $link->expires_at ? now()->diffInSeconds($link->expires_at) : 3600;
+            if ($ttl > 0) {
+                \Illuminate\Support\Facades\Cache::put("ephemeral_link:{$tokenHash}", $link->getAttributes(), $ttl);
             }
-            
-            return response()->view('shared_links.password', ['link' => $link]);
+        }
+
+        $authKeyId = $link->persistent_id ?? $tokenHash;
+        $authKey = "shared_link_auth_" . $authKeyId;
+        $ipAuthKey = "shared_link_ip_auth_" . $authKeyId . "_" . md5($request->ip() . $request->userAgent());
+
+        $hasSessionAuth = $request->session()->has($authKey);
+        $hasIpAuth = \Illuminate\Support\Facades\Cache::has($ipAuthKey);
+
+        if ($link->password && !$hasSessionAuth && !$hasIpAuth) {
+            \Illuminate\Support\Facades\Log::info("Shared link password required:", [
+                'token' => $token,
+                'authKey' => $authKey,
+                'ipAuthKey' => $ipAuthKey,
+                'session_id' => $request->session()->getId(),
+                'has_auth' => false,
+                'persistent_id' => $link->persistent_id ?? 'none'
+            ]);
+
+            return response()->json([
+                'message' => 'Password required',
+                'auth_required' => true,
+                'auth_key_debug' => $authKey,
+                'target' => $link->label ?? 'العنصر المشترك'
+            ], 403);
+        }
+
+        // If IP auth exists but session auth doesn't, sync it back to session for consistency
+        if ($hasIpAuth && !$hasSessionAuth) {
+            $request->session()->put($authKey, true);
         }
 
         // Increment access count (unless we just rotated the token and redirected, or it's the owner)
@@ -145,7 +173,7 @@ class ValidateSharedLink
                 $link->access_count++;
                 $link->last_accessed_at = now();
                 $ttl = $link->expires_at ? now()->diffInSeconds($link->expires_at) : 3600;
-                \Illuminate\Support\Facades\Cache::put("ephemeral_link:{$tokenHash}", $link->toArray(), $ttl);
+                \Illuminate\Support\Facades\Cache::put("ephemeral_link:{$tokenHash}", $link->getAttributes(), $ttl);
             } else {
                 $link->increment('access_count');
                 $link->update(['last_accessed_at' => now()]);
