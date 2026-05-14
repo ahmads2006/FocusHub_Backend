@@ -19,6 +19,8 @@ class ImageSettings extends Model
         'watermark_font_size',
         'watermark_opacity',
         'watermark_color',
+        'watermark_type',
+        'watermark_text',
         'copyright_enabled',
         'is_comparison',
         'views_count',

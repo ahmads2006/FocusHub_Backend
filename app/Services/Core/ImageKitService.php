@@ -65,11 +65,27 @@ class ImageKitService
      * Apply a dynamic watermark (SecureShield) via ImageKit overlay.
      * Returns a signed URL by default for maximum security to prevent manual tampering.
      */
-    public function getWatermarkedUrl(string $path, string $text, bool $signed = true, int $expireMinutes = 10, int $fontSize = 600, string $color = 'FFFFFF'): string
+    public function getWatermarkedUrl(string $path, string $textOrLogo, bool $signed = true, int $expireMinutes = 10, int $fontSize = 600, string $color = 'FFFFFF', string $type = 'text'): string
     {
-        // Added some transparency/opacity to the text (e.g. co-FFFFFF80) if needed, but let's stick to standard color.
-        // Removed bg-000000 to remove the black background.
-        $rawTransformation = 'l-text,ie-' . urlencode(base64_encode($text)) . ",fs-{$fontSize},co-{$color},lfo-bottom_right,pa-40,l-end";
+        if ($type === 'logo') {
+            // For logo, we use the imagekit format for image overlays: l-image,i-<image_path>
+            // We need to replace slashes in the path with @@ for ImageKit image overlays
+            $logoPath = str_replace('/', '@@', ltrim($textOrLogo, '/'));
+            
+            // Adjust width based on fontSize (treating fontSize as a relative width for the logo)
+            // e.g., w-150 means 150px width. If user selected 80 (default), maybe map that to 150px.
+            $logoWidth = (int) ($fontSize * 2); 
+            
+            // Apply opacity
+            $opacity = hexdec(substr($color, 6, 2)); // Extract alpha from FFFFFFB3
+            if ($opacity === 0) $opacity = 255;
+            $opacityPercentage = round(($opacity / 255) * 100);
+            
+            $rawTransformation = "l-image,i-{$logoPath},w-{$logoWidth},o-{$opacityPercentage},lfo-bottom_right,pa-40,l-end";
+        } else {
+            // Text Watermark
+            $rawTransformation = 'l-text,ie-' . urlencode(base64_encode($textOrLogo)) . ",fs-{$fontSize},co-{$color},lfo-bottom_right,pa-40,l-end";
+        }
 
         return $this->imagekit->url([
             'path' => $path,

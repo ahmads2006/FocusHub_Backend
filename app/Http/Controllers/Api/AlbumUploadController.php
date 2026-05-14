@@ -149,6 +149,13 @@ class AlbumUploadController extends Controller
                     $data['watermark_on_download'] = filter_var($request->watermark_on_download, FILTER_VALIDATE_BOOLEAN);
                 }
 
+                $wmFields = ['watermark_font_size', 'watermark_opacity', 'watermark_color', 'watermark_type', 'watermark_text'];
+                foreach ($wmFields as $field) {
+                    if ($request->has($field)) {
+                        $data[$field] = $request->input($field);
+                    }
+                }
+
                 $image = $this->imageService->processAndUpload($file, $data, $user->id);
                 $uploadedImages[] = $image;
             }

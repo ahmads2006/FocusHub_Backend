@@ -37,20 +37,34 @@ class DownloadController extends Controller
             abort(404, 'الصورة غير موجودة.');
         }
 
-        $image->load(['user', 'settings']);
-        $watermarkText = $image->user->name ?? 'OpalShot';
+        $watermarkType = $image->settings?->watermark_type ?? 'text';
+        
+        if ($watermarkType === 'logo') {
+            $userSettings = \App\Models\UserSettings::where('user_id', $image->user_id)->first();
+            // Default logo if none uploaded
+            $watermarkText = $userSettings?->watermark_logo_path ?: 'default_logo.png'; 
+            // In ImageKit, the image path uses slashes which need replacing or just passing directly
+            // ImageKit format: l-image,i-logo.png,lfo-bottom_right,l-end
+        } else {
+            $watermarkText = $image->settings?->watermark_text ?: ($image->user->name ?? 'OpalShot');
+        }
 
         // Read watermark customization from settings
         $fontSize = (int) ($image->settings?->watermark_font_size ?? 80);
         $opacity  = (int) ($image->settings?->watermark_opacity ?? 70);
-        $color    = $image->settings?->watermark_color ?? 'FFFFFF';
+        
+        // Remove color customization if type is logo
+        if ($watermarkType === 'logo') {
+            $color = 'FFFFFF'; 
+            $ikFontSize = max(50, $fontSize); // Logo might need different scaling
+        } else {
+            $color = $image->settings?->watermark_color ?? 'FFFFFF';
+            $ikFontSize = max(20, $fontSize);
+        }
 
         // Apply opacity to color as hex alpha (e.g. FFFFFF + B3 for 70%)
         $alphaHex = str_pad(dechex(round($opacity / 100 * 255)), 2, '0', STR_PAD_LEFT);
         $colorWithAlpha = $color . $alphaHex;
-
-        // Scale font size for ImageKit (ImageKit uses pixels, user sets a relative value)
-        $ikFontSize = max(20, $fontSize);
 
         $path = $image->storage?->imagekit_file_path ?? $image->storage?->path;
         if ($path) {
@@ -61,9 +75,9 @@ class DownloadController extends Controller
         }
 
         // Generate signed watermarked URL via ImageKit with customization
-        $url = $this->imageKit->getWatermarkedUrl($path, $watermarkText, true, 30, $ikFontSize, $colorWithAlpha);
+        $url = $this->imageKit->getWatermarkedUrl($path, $watermarkText, true, 30, $ikFontSize, $colorWithAlpha, $watermarkType);
 
-        \Illuminate\Support\Facades\Log::info("Generated Watermark URL for image {$image->id}: fontSize={$ikFontSize}, opacity={$opacity}%, color=#{$colorWithAlpha}");
+        \Illuminate\Support\Facades\Log::info("Generated Watermark URL for image {$image->id}: type={$watermarkType}, fontSize={$ikFontSize}, opacity={$opacity}%, color=#{$colorWithAlpha}");
 
         return response()->json(['url' => $url]);
     }

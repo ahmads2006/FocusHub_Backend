@@ -323,10 +323,19 @@ class ImageService
                 ]);
 
                 // 4f. Settings/permissions
-                $image->settings()->updateOrCreate(['image_id' => $image->id], [
-                    'allow_download'        => isset($data['allow_download']),
-                    'watermark_on_download' => isset($data['watermark_on_download']),
-                ]);
+                $settingsDataToSave = [
+                    'allow_download'        => isset($data['allow_download']) ? $data['allow_download'] : true,
+                    'watermark_on_download' => isset($data['watermark_on_download']) ? $data['watermark_on_download'] : false,
+                ];
+                
+                $wmFields = ['watermark_font_size', 'watermark_opacity', 'watermark_color', 'watermark_type', 'watermark_text'];
+                foreach ($wmFields as $f) {
+                    if (array_key_exists($f, $data)) {
+                        $settingsDataToSave[$f] = $data[$f];
+                    }
+                }
+                
+                $image->settings()->updateOrCreate(['image_id' => $image->id], $settingsDataToSave);
 
                 return $image;
             });

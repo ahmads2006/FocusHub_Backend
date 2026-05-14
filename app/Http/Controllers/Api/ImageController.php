@@ -180,11 +180,13 @@ class ImageController extends Controller
             'watermark_font_size' => 'nullable|integer|min:20|max:800',
             'watermark_opacity' => 'nullable|integer|min:10|max:100',
             'watermark_color' => 'nullable|string|max:8',
+            'watermark_type' => 'nullable|string|in:text,logo',
+            'watermark_text' => 'nullable|string|max:255',
         ]);
 
         $image->update(\Illuminate\Support\Arr::only($validated, ['title', 'description', 'privacy', 'album_id', 'is_comparison']));
 
-        $settingsFields = ['allow_download', 'watermark_on_download', 'watermark_font_size', 'watermark_opacity', 'watermark_color'];
+        $settingsFields = ['allow_download', 'watermark_on_download', 'watermark_font_size', 'watermark_opacity', 'watermark_color', 'watermark_type', 'watermark_text'];
         $settingsData = \Illuminate\Support\Arr::only($validated, $settingsFields);
         
         if (!empty($settingsData)) {
