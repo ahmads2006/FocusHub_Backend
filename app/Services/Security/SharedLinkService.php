@@ -32,23 +32,27 @@ class SharedLinkService
             'require_watermark'  => $requireWatermark,
         ];
 
+        // 🛡️ Create a model instance to handle encryption and attributes consistently
+        $link = new SharedLink($data);
+
         // If the link is temporary (has expiry), store it ONLY in Redis
         if ($expiry) {
             $ttl = now()->diffInSeconds($expiry);
             if ($ttl > 0) {
-                // Store in Redis as a JSON array
-                \Illuminate\Support\Facades\Cache::put("ephemeral_link:{$tokenHash}", $data, $ttl);
-                
-                // Return a "Virtual" model instance (unsaved) for compatibility
-                $link = new SharedLink($data);
                 // Important: SharedLink model casts 'token' to 'encrypted'. 
-                // We need the raw token to be accessible in the service return.
+                // We need the raw token to be returned to the user, but stored encrypted in cache.
                 $link->token = $token; 
+                
+                // Store the encrypted attributes in Redis
+                \Illuminate\Support\Facades\Cache::put("ephemeral_link:{$tokenHash}", $link->getAttributes(), $ttl);
+                
+                $link->exists = true;
                 return $link;
             }
         }
 
-        return SharedLink::create($data);
+        $link->save();
+        return $link;
     }
 
 

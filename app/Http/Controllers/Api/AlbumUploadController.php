@@ -155,6 +155,8 @@ class AlbumUploadController extends Controller
                         $data[$field] = $request->input($field);
                     }
                 }
+                
+                \Illuminate\Support\Facades\Log::info("Extracted Watermark Data for Image", $data);
 
                 $image = $this->imageService->processAndUpload($file, $data, $user->id);
                 $uploadedImages[] = $image;

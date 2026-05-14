@@ -37,7 +37,7 @@ class SharedLinkLeakDetected extends Notification implements ShouldQueue
     /**
      * Get the mail representation of the notification.
      */
-    public function merchantsMail(object $notifiable): MailMessage
+    public function toMail(object $notifiable): MailMessage
     {
         $shareableName = $this->link->shareable?->title ?? 'العنصر';
         $targetLabel = $this->link->label ?? 'غير مسمى';

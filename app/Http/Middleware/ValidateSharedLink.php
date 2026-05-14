@@ -19,32 +19,54 @@ class ValidateSharedLink
         
         // 1. Check Redis for Ephemeral Links First
         $ephemeralData = \Illuminate\Support\Facades\Cache::get("ephemeral_link:{$tokenHash}");
-        
+
         if ($ephemeralData) {
-            $link = new SharedLink($ephemeralData);
-            // Re-set the raw token since it's used in rotation/UI
-            $link->exists = true; // Pretend it exists for logic that checks this
+            $link = new SharedLink();
+            // 🛡️ Data from Redis is already encrypted/casted, so set as Raw Attributes
+            $link->setRawAttributes($ephemeralData);
+            $link->exists = true;
+            
+            // 🔗 Load shareable relationship manually
+            if ($link->shareable_id && $link->shareable_type) {
+                try {
+                    $modelClass = $link->shareable_type;
+                    if (class_exists($modelClass)) {
+                        $link->setRelation('shareable', $modelClass::find($link->shareable_id));
+                    }
+                } catch (\Exception $e) {
+                    \Illuminate\Support\Facades\Log::error("Failed to load shareable: " . $e->getMessage());
+                }
+            }
+            
+            // Override the encrypted token with the raw one from URL for this instance
             $link->token = $token;
         } else {
             // 2. Fallback to MySQL for Persistent Links
             $link = SharedLink::where('token_hash', $tokenHash)->first();
         }
 
-        if (!$link || $link->isExpired() || $link->isRevoked() || $link->isLimitReached()) {
+        if (!$link || $link->isExpired() || $link->isRevoked() || $link->isLimitReached() || !$link->shareable) {
             \Illuminate\Support\Facades\Log::warning("Shared link validation failed: ", [
                 'has_link' => (bool)$link,
+                'has_shareable' => $link ? (bool)$link->shareable : false,
                 'expired'  => $link ? $link->isExpired() : null,
-                'revoked'  => $link ? $link->isRevoked() : null,
-                'limit'    => $link ? $link->isLimitReached() : null,
-                'token'    => $token,
-                'hash'     => $tokenHash
+                'token'    => $token
             ]);
             abort(404, 'Shared link is invalid or expired.');
         }
 
-        // 🛡️ SECURITY ENFORCEMENT: Mandatory session locking and token rotation for all links.
+        // 🛡️ SECURITY ENFORCEMENT: Session locking & Token rotation.
+        // Mandatory for Albums and Private Images. Disabled ONLY for Public Images.
         $sessionId = $request->session()->getId();
+        $isOwner = auth()->check() && $link->shareable && isset($link->shareable->user_id) && $link->shareable->user_id === auth()->id();
 
+        $isPublicImage = $link->shareable instanceof \App\Models\Image && $link->shareable->privacy === 'public';
+        
+        // As requested: Disable device lock ONLY for public images.
+        // If an image changes from public to private, this will automatically become true.
+        $shouldLock = !$isPublicImage;
+
+        if ($shouldLock && !$isOwner) {
             if (empty($link->session_id)) {
                 // First visit: lock link to this session and rotate token
                 $newToken = \Illuminate\Support\Str::random(64);
@@ -83,7 +105,11 @@ class ValidateSharedLink
                     
                     $owner = $link->shareable?->user;
                     if ($owner) {
-                        $owner->notify(new \App\Notifications\SharedLinkLeakDetected($link, $metadata));
+                        try {
+                            $owner->notify(new \App\Notifications\SharedLinkLeakDetected($link, $metadata));
+                        } catch (\Exception $e) {
+                            \Illuminate\Support\Facades\Log::error("Failed to send leak notification: " . $e->getMessage());
+                        }
                     }
 
                     \Illuminate\Support\Facades\Log::error("Shared link session mismatch: ", [
@@ -95,6 +121,7 @@ class ValidateSharedLink
                     abort(403, 'عذراً، هذا الرابط مخصص لجهاز آخر فقط. تم إبلاغ المصور بمحاولة الدخول هذه لحماية الخصوصية.');
                 }
             }
+        }
 
         // Use token hash as fallback ID for ephemeral links
         $authId = $link->id ?? $tokenHash;
@@ -112,8 +139,8 @@ class ValidateSharedLink
             return response()->view('shared_links.password', ['link' => $link]);
         }
 
-        // Increment access count (unless we just rotated the token and redirected)
-        if (!$request->session()->has("rotated_link_" . ($link->id ?? "redis"))) {
+        // Increment access count (unless we just rotated the token and redirected, or it's the owner)
+        if (!$request->session()->has("rotated_link_" . ($link->id ?? "redis")) && !$isOwner) {
             if (!$link->id) {
                 $link->access_count++;
                 $link->last_accessed_at = now();

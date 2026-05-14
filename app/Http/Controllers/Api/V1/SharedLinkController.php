@@ -52,7 +52,7 @@ class SharedLinkController extends Controller
             'expires_in'        => 'nullable|integer',
             'password'          => 'nullable|string|min:4',
             'permission'        => 'nullable|in:view,download',
-            'max_access'        => 'nullable|integer|min:1',
+            'max_access'        => 'nullable|integer|min:0', // Allowed 0 for unlimited
             'auto_rotate'       => 'nullable|boolean',
             'require_watermark' => 'nullable|boolean',
             'label'             => 'nullable|string|max:100',
