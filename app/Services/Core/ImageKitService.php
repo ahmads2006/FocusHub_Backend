@@ -65,8 +65,12 @@ class ImageKitService
      * Apply a dynamic watermark (SecureShield) via ImageKit overlay.
      * Returns a signed URL by default for maximum security to prevent manual tampering.
      */
-    public function getWatermarkedUrl(string $path, string $text, bool $signed = true, int $expireMinutes = 10): string
+    public function getWatermarkedUrl(string $path, string $text, bool $signed = true, int $expireMinutes = 10, int $fontSize = 600, string $color = 'FFFFFF'): string
     {
+        // Added some transparency/opacity to the text (e.g. co-FFFFFF80) if needed, but let's stick to standard color.
+        // Removed bg-000000 to remove the black background.
+        $rawTransformation = 'l-text,ie-' . urlencode(base64_encode($text)) . ",fs-{$fontSize},co-{$color},lfo-bottom_right,pa-40,l-end";
+
         return $this->imagekit->url([
             'path' => $path,
             'signed' => $signed,
@@ -78,7 +82,7 @@ class ImageKitService
                     'progressive' => 'true'
                 ],
                 [
-                    'raw' => 'l-text,ie-' . urlencode(base64_encode($text)) . ',fs-600,co-FFFFFF,lfo-bottom_right,bg-000000,pa-40,l-end'
+                    'raw' => $rawTransformation
                 ]
             ],
             'queryParameters' => [
