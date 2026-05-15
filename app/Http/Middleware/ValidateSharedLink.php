@@ -66,6 +66,23 @@ class ValidateSharedLink
             abort(404, 'Shared link is invalid or expired.');
         }
 
+        // 🔑 CRITICAL: Assign a stable persistent_id BEFORE token rotation
+        // This ensures the password auth key remains valid even after token changes.
+        // Must be done for ALL link types (DB and ephemeral) that have a password.
+        if ($link->password && empty($link->persistent_id)) {
+            $link->persistent_id = md5($tokenHash); // Derived from original token hash
+            if ($link->id) {
+                // DB link: persist the stable ID
+                $link->saveQuietly(); // Use saveQuietly to avoid triggering token_hash recalculation
+            } else {
+                // Ephemeral link: save back to cache
+                $ttl = $link->expires_at ? now()->diffInSeconds($link->expires_at) : 3600;
+                if ($ttl > 0) {
+                    \Illuminate\Support\Facades\Cache::put("ephemeral_link:{$tokenHash}", $link->getAttributes(), $ttl);
+                }
+            }
+        }
+
         // 🛡️ SECURITY ENFORCEMENT: Session locking & Token rotation.
         // Mandatory for Albums and Private Images. Disabled ONLY for Public Images.
         $sessionId = $request->session()->getId();
@@ -138,16 +155,7 @@ class ValidateSharedLink
         $authId = $link->id ?? $tokenHash;
 
         // 🔒 4. Password Protection Logic
-        // For ephemeral links, we must have a stable ID that survives rotation.
-        if (!$link->id && empty($link->persistent_id)) {
-            $link->persistent_id = md5($tokenHash); // Use initial token hash as stable ID
-            // Save it back to cache so it persists
-            $ttl = $link->expires_at ? now()->diffInSeconds($link->expires_at) : 3600;
-            if ($ttl > 0) {
-                \Illuminate\Support\Facades\Cache::put("ephemeral_link:{$tokenHash}", $link->getAttributes(), $ttl);
-            }
-        }
-
+        // persistent_id was already assigned above (before token rotation)
         $authKeyId = $link->persistent_id ?? $tokenHash;
         $authKey = "shared_link_auth_" . $authKeyId;
         $ipAuthKey = "shared_link_fp_auth_" . $authKeyId . "_" . md5($request->userAgent());
