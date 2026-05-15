@@ -14,8 +14,19 @@ class ValidateSharedLink
      */
     public function handle(Request $request, Closure $next): Response
     {
+        // 🛡️ CRITICAL: Skip validation for the verification route itself to avoid recursive loops
+        if ($request->is('*/verify') || $request->routeIs('shared_link.verify')) {
+            return $next($request);
+        }
+
         $token = $request->route('token');
         $tokenHash = hash('sha256', $token);
+
+        // 📝 DEBUG: Log Headers
+        \Illuminate\Support\Facades\Log::info("Shared Link Request Headers:", [
+            'url' => $request->fullUrl(),
+            'headers' => collect($request->headers->all())->map(fn($v) => $v[0])->toArray(),
+        ]);
         
         // 1. Check Redis for Ephemeral Links First
         $ephemeralData = \Illuminate\Support\Facades\Cache::get("ephemeral_link:{$tokenHash}");
@@ -139,19 +150,20 @@ class ValidateSharedLink
 
         $authKeyId = $link->persistent_id ?? $tokenHash;
         $authKey = "shared_link_auth_" . $authKeyId;
-        $ipAuthKey = "shared_link_ip_auth_" . $authKeyId . "_" . md5($request->ip() . $request->userAgent());
+        $ipAuthKey = "shared_link_fp_auth_" . $authKeyId . "_" . md5($request->userAgent());
 
         $hasSessionAuth = $request->session()->has($authKey);
         $hasIpAuth = \Illuminate\Support\Facades\Cache::has($ipAuthKey);
+        $cookieName = "sl_auth_" . substr($authKeyId, 0, 8);
+        $hasCookieAuth = $request->hasCookie($cookieName);
 
-        if ($link->password && !$hasSessionAuth && !$hasIpAuth) {
+        if ($link->password && !$hasSessionAuth && !$hasIpAuth && !$hasCookieAuth) {
             \Illuminate\Support\Facades\Log::info("Shared link password required:", [
-                'token' => $token,
+                'ip' => $request->ip(),
+                'ua_md5' => md5($request->userAgent()),
                 'authKey' => $authKey,
-                'ipAuthKey' => $ipAuthKey,
-                'session_id' => $request->session()->getId(),
-                'has_auth' => false,
-                'persistent_id' => $link->persistent_id ?? 'none'
+                'fpKey' => $ipAuthKey,
+                'has_cookie' => $hasCookieAuth
             ]);
 
             return response()->json([

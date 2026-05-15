@@ -167,8 +167,14 @@ class SharedLinkController extends Controller
         // Manually resolve the link since we moved this route out of the middleware
         $tokenHash = hash('sha256', $token);
         $link = \App\Models\SharedLink::where('token_hash', $tokenHash)
-            ->orWhere('token', $token) // Fallback for old tokens
             ->first();
+
+        // If not found by current token hash, try to find by persistent_id
+        // (Token may have been rotated by session locking middleware)
+        if (!$link) {
+            $persistentId = md5($tokenHash);
+            $link = \App\Models\SharedLink::where('persistent_id', $persistentId)->first();
+        }
 
         // Also check Redis for ephemeral links
         if (!$link) {
@@ -192,27 +198,51 @@ class SharedLinkController extends Controller
         ]);
 
         if (Hash::check($request->password, $link->password)) {
-            $authKeyId = $link->persistent_id ?? $tokenHash;
+            // 🔑 Use persistent_id for the auth key when available (stable across token rotations)
+            // Fallback: use the LINK's current token hash (not the URL token hash which may be outdated)
+            $currentTokenHash = $link->token_hash ?? $tokenHash;
+            $authKeyId = $link->persistent_id ?? $currentTokenHash;
             $authKey = "shared_link_auth_" . $authKeyId;
             
             // 🔓 Store authentication in session (standard)
             $request->session()->put($authKey, true);
             $request->session()->save();
 
-            // 🚀 IP-BASED FALLBACK
-            $ipAuthKey = "shared_link_ip_auth_" . $authKeyId . "_" . md5($request->ip() . $request->userAgent());
+            // 🚀 FINGERPRINT-BASED FALLBACK (Stable across proxy IP changes)
+            $ipAuthKey = "shared_link_fp_auth_" . $authKeyId . "_" . md5($request->userAgent());
             \Illuminate\Support\Facades\Cache::put($ipAuthKey, true, now()->addHours(2));
 
             \Illuminate\Support\Facades\Log::info("Shared link password verified successfully!", [
                 'authKey' => $authKey,
-                'ipAuthKey' => $ipAuthKey
+                'fpKey' => $ipAuthKey,
+                'ip' => $request->ip(),
+                'ua_md5' => md5($request->userAgent()),
+                'current_token_hash' => $currentTokenHash,
             ]);
+
+            // 🍪 MANUAL COOKIE FALLBACK (Cross-subdomain compatible)
+            $cookieName = "sl_auth_" . substr($authKeyId, 0, 8);
+            $cookie = cookie(
+                $cookieName, 
+                '1', 
+                240, // 4 hours
+                '/', 
+                '.opalshot.studio', // 🌐 CRITICAL: Share across all subdomains
+                true, // Secure
+                true, // HttpOnly
+                false, 
+                'None'
+            );
+            
+            // 📌 Return the current valid token so the frontend can sync its URL
+            $currentToken = $link->token;
 
             return response()->json([
                 'success'    => true,
                 'message'    => __('messages.verified_successfully'),
-                'auth_key'   => $authKey, // Return for frontend reference if needed
-            ]);
+                'auth_key'   => $authKey,
+                'token'      => $currentToken, // Frontend needs this to make the next API call
+            ])->withCookie($cookie);
         }
 
         return response()->json(['success' => false, 'message' => __('messages.incorrect_password')], 403);
