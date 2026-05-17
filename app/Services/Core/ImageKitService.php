@@ -86,24 +86,25 @@ class ImageKitService
             // ─── IMAGE OVERLAY ───
             // Replace slashes with @@ for ImageKit image overlay paths
             $logoPath = str_replace('/', '@@', ltrim($textOrLogo, '/'));
-            $logoWidth = max(50, min(800, (int) ($fontSize * 2)));
+            // Calculate a scale factor based on fontSize (e.g., fontSize 40 = 10% of image width)
+            $scaleFactor = max(0.02, min(0.5, round($fontSize / 400, 3)));
             
-            // For image overlays: use o- (opacity) for opacity. lfo-bottom_right with lx and ly acts as a margin from the bottom-right corner.
-            $rawTransformation = "l-image,i-{$logoPath},w-{$logoWidth},o-{$opacityPercent},lfo-bottom_right,lx-50,ly-50,l-end";
+            // For image overlays: use proportional width (bw_mul_...) and proportional margins (2% of width)
+            $rawTransformation = "l-image,i-{$logoPath},w-bw_mul_{$scaleFactor},o-{$opacityPercent},lfo-bottom_right,lx-bw_mul_0.02,ly-bw_mul_0.02,l-end";
         } else {
             // ─── TEXT OVERLAY ───
-            // Cap font size to ImageKit's practical limit (10-300)
-            $safeFontSize = max(10, min(300, (int) $fontSize));
-
             // ImageKit requires URL-safe base64 for the ie- parameter
             $base64Text = rtrim(strtr(base64_encode($textOrLogo), '+/', '-_'), '=');
 
             // For text overlays: opacity is embedded in co- as 8-char hex (RRGGBBAA)
-            // ImageKit does NOT support a separate o- param for text layers
             $alphaHex = str_pad(dechex(round($opacityPercent / 100 * 255)), 2, '0', STR_PAD_LEFT);
             $colorWithAlpha = $hexColor . $alphaHex;
 
-            $rawTransformation = "l-text,ie-{$base64Text},fs-{$safeFontSize},co-{$colorWithAlpha},lfo-bottom_right,pa-50,l-end";
+            // Calculate proportional font size (e.g., fontSize 40 = 4% of image width)
+            $textScale = max(0.01, min(0.2, round($fontSize / 1000, 3)));
+
+            // Use proportional font size and padding (2% of width)
+            $rawTransformation = "l-text,ie-{$base64Text},fs-bw_mul_{$textScale},co-{$colorWithAlpha},lfo-bottom_right,pa-bw_mul_0.02,l-end";
         }
 
         Log::info("ImageKit Watermark Transform: type={$type}, raw={$rawTransformation}");
