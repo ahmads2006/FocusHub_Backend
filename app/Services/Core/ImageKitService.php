@@ -88,8 +88,8 @@ class ImageKitService
             $logoPath = str_replace('/', '@@', ltrim($textOrLogo, '/'));
             $logoWidth = max(50, min(800, (int) ($fontSize * 2)));
             
-            // For image overlays: use o- (opacity) for opacity and lx/ly for margin instead of pa
-            $rawTransformation = "l-image,i-{$logoPath},w-{$logoWidth},o-{$opacityPercent},lfo-bottom_right,lx-40,ly-40,l-end";
+            // For image overlays: use o- (opacity) for opacity. lfo-bottom_right with lx and ly acts as a margin from the bottom-right corner.
+            $rawTransformation = "l-image,i-{$logoPath},w-{$logoWidth},o-{$opacityPercent},lfo-bottom_right,lx-50,ly-50,l-end";
         } else {
             // ─── TEXT OVERLAY ───
             // Cap font size to ImageKit's practical limit (10-300)
@@ -103,7 +103,7 @@ class ImageKitService
             $alphaHex = str_pad(dechex(round($opacityPercent / 100 * 255)), 2, '0', STR_PAD_LEFT);
             $colorWithAlpha = $hexColor . $alphaHex;
 
-            $rawTransformation = "l-text,ie-{$base64Text},fs-{$safeFontSize},co-{$colorWithAlpha},lfo-bottom_right,pa-40,l-end";
+            $rawTransformation = "l-text,ie-{$base64Text},fs-{$safeFontSize},co-{$colorWithAlpha},lfo-bottom_right,pa-50,l-end";
         }
 
         Log::info("ImageKit Watermark Transform: type={$type}, raw={$rawTransformation}");
