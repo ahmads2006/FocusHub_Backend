@@ -88,8 +88,8 @@ class ImageKitService
             $logoPath = str_replace('/', '@@', ltrim($textOrLogo, '/'));
             $logoWidth = max(50, min(800, (int) ($fontSize * 2)));
             
-            // For image overlays: use oa- (overlay alpha) for opacity
-            $rawTransformation = "l-image,i-{$logoPath},w-{$logoWidth},oa-{$opacityPercent},lfo-bottom_right,pa-40,l-end";
+            // For image overlays: use o- (opacity) for opacity and lx/ly for margin instead of pa
+            $rawTransformation = "l-image,i-{$logoPath},w-{$logoWidth},o-{$opacityPercent},lfo-bottom_right,lx-40,ly-40,l-end";
         } else {
             // ─── TEXT OVERLAY ───
             // Cap font size to ImageKit's practical limit (10-300)
