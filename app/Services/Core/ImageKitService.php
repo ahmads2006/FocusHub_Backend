@@ -88,9 +88,13 @@ class ImageKitService
             $logoPath = str_replace('/', '@@', ltrim($textOrLogo, '/'));
             // Calculate a scale factor based on fontSize (e.g., fontSize 40 = 10% of image width)
             $scaleFactor = max(0.02, min(0.5, round($fontSize / 400, 3)));
+
             
-            // For image overlays: use proportional width (bw_mul_...) and proportional margins (2% of width)
-            $rawTransformation = "l-image,i-{$logoPath},w-bw_mul_{$scaleFactor},o-{$opacityPercent},lfo-bottom_right,lx-bw_mul_0.02,ly-bw_mul_0.02,l-end";
+
+
+
+            // For image overlays: use proportional width (bw_mul_...) and fixed margins
+            $rawTransformation = "l-image,i-{$logoPath},w-bw_mul_{$scaleFactor},o-{$opacityPercent},lfo-bottom_left,lx-15,ly-15,l-end";
         } else {
             // ─── TEXT OVERLAY ───
             // ImageKit requires URL-safe base64 for the ie- parameter
@@ -103,8 +107,8 @@ class ImageKitService
             // Calculate proportional font size (e.g., fontSize 40 = 4% of image width)
             $textScale = max(0.01, min(0.2, round($fontSize / 1000, 3)));
 
-            // Use proportional font size and padding (2% of width)
-            $rawTransformation = "l-text,ie-{$base64Text},fs-bw_mul_{$textScale},co-{$colorWithAlpha},lfo-bottom_right,pa-bw_mul_0.02,l-end";
+            // Use proportional font size and fixed padding
+            $rawTransformation = "l-text,ie-{$base64Text},fs-bw_mul_{$textScale},co-{$colorWithAlpha},lfo-bottom_left,pa-15,l-end";
         }
 
         Log::info("ImageKit Watermark Transform: type={$type}, raw={$rawTransformation}");
