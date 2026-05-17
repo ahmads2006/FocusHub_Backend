@@ -21,14 +21,14 @@ class SettingsController extends Controller
         return response()->json([
             'success' => true,
             'watermark' => [
-                'text'     => $settings->watermark_text ?? '© ' . date('Y') . ' OpalShot',
-                'type'     => $settings->watermark_mode ?? 'text',
-                'logoUrl'  => $settings->watermark_logo_url ?? null,
-                'opacity'  => $settings->watermark_opacity ?? 70,
-                'scale'    => $settings->watermark_scale ?? 50,
-                'glow'     => $settings->watermark_glow ?? 5,
-                'color'    => $settings->watermark_color ?? '#D4AF37',
-                'position' => $settings->watermark_position ?? 'bottom-right',
+                'text'     => $settings?->watermark_text ?? '© ' . date('Y') . ' OpalShot',
+                'type'     => $settings?->watermark_mode ?? 'text',
+                'logoUrl'  => $settings?->watermark_logo ?? null,
+                'opacity'  => $settings?->watermark_opacity !== null ? (int)($settings->watermark_opacity * 100) : 70,
+                'scale'    => 50,
+                'glow'     => 5,
+                'color'    => $settings?->watermark_text_color ?? '#D4AF37',
+                'position' => 'bottom-right',
             ],
         ]);
     }
@@ -44,28 +44,25 @@ class SettingsController extends Controller
             'watermark.type'     => 'nullable|in:text,logo',
             'watermark.logoUrl'  => 'nullable|string|max:500',
             'watermark.opacity'  => 'nullable|integer|min:0|max:100',
-            'watermark.scale'    => 'nullable|integer|min:10|max:100',
-            'watermark.glow'     => 'nullable|integer|min:0|max:20',
             'watermark.color'    => 'nullable|string|max:20',
-            'watermark.position' => 'nullable|in:top-left,top-right,bottom-left,bottom-right,center',
         ]);
 
         $wm = $validated['watermark'] ?? [];
         $user = Auth::user();
-        $settings = $user->settings;
 
-        if ($settings) {
-            $settings->update([
-                'watermark_text'     => $wm['text'] ?? $settings->watermark_text,
-                'watermark_mode'     => $wm['type'] ?? $settings->watermark_mode,
-                'watermark_logo_url' => $wm['logoUrl'] ?? $settings->watermark_logo_url,
-                'watermark_opacity'  => $wm['opacity'] ?? $settings->watermark_opacity,
-                'watermark_scale'    => $wm['scale'] ?? $settings->watermark_scale,
-                'watermark_glow'     => $wm['glow'] ?? $settings->watermark_glow,
-                'watermark_color'    => $wm['color'] ?? $settings->watermark_color,
-                'watermark_position' => $wm['position'] ?? $settings->watermark_position,
-            ]);
-        }
+        // Map frontend field names → DB column names
+        $updateData = [];
+        if (isset($wm['text']))    $updateData['watermark_text']       = $wm['text'];
+        if (isset($wm['type']))    $updateData['watermark_mode']       = $wm['type'];
+        if (isset($wm['logoUrl'])) $updateData['watermark_logo']       = $wm['logoUrl'];
+        if (isset($wm['color']))   $updateData['watermark_text_color'] = $wm['color'];
+        if (isset($wm['opacity'])) $updateData['watermark_opacity']    = $wm['opacity'] / 100; // Convert 0-100 → 0-1 float
+
+        // Create or update
+        $user->settings()->updateOrCreate(
+            ['user_id' => $user->id],
+            $updateData
+        );
 
         return response()->json([
             'success' => true,

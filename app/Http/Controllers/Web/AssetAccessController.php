@@ -93,10 +93,49 @@ class AssetAccessController extends Controller
         $imagekitPath = $image->imagekit_file_path ?? null;
         if ($imagekitPath) {
             $imageKitService = app(\App\Services\Core\ImageKitService::class);
-            $watermarkText = $image->user->name ?? 'OpticVault';
-            $watermarkedUrl = $imageKitService->getWatermarkedUrl($imagekitPath, $watermarkText);
+            
+            // ─── CASCADE: Per-Image → User Global → User Name → Default ───
+            $image->load('settings');
+            $userSettings = \App\Models\UserSetting::where('user_id', $image->user_id)->first();
+            
+            $watermarkType = $image->settings?->watermark_type ?? $userSettings?->watermark_mode ?? 'text';
+            
+            // Text
+            $rawText = $image->settings?->watermark_text;
+            if (empty($rawText) || trim($rawText) === '') {
+                $rawText = $userSettings?->watermark_text;
+            }
+            if (empty($rawText) || trim($rawText) === '') {
+                $rawText = $image->user->name ?? 'OpalShot';
+            }
+            $watermarkText = '© ' . trim(str_replace('©', '', $rawText));
+            
+            // Font size, opacity, color
+            $fontSize = (int) ($image->settings?->watermark_font_size ?? 80);
+            $ikFontSize = max(20, $fontSize);
+            
+            $rawOpacity = $image->settings?->watermark_opacity;
+            if ($rawOpacity === null) {
+                $userOpacity = $userSettings?->watermark_opacity;
+                $opacity = ($userOpacity !== null) ? (int) ($userOpacity * 100) : 70;
+            } else {
+                $opacity = (int) $rawOpacity;
+            }
+            
+            $rawColor = $image->settings?->watermark_color;
+            if (empty($rawColor)) {
+                $userColor = $userSettings?->watermark_text_color;
+                $color = $userColor ? ltrim($userColor, '#') : 'FFFFFF';
+            } else {
+                $color = ltrim($rawColor, '#');
+            }
+            
+            $alphaHex = str_pad(dechex(round($opacity / 100 * 255)), 2, '0', STR_PAD_LEFT);
+            $colorWithAlpha = $color . $alphaHex;
+            
+            $watermarkedUrl = $imageKitService->getWatermarkedUrl($imagekitPath, $watermarkText, true, 30, $ikFontSize, $colorWithAlpha, $watermarkType);
 
-            \Illuminate\Support\Facades\Log::info("AssetAccess: Redirecting to ImageKit watermarked URL for image {$image->id}");
+            \Illuminate\Support\Facades\Log::info("AssetAccess: Redirecting to ImageKit watermarked URL for image {$image->id} with text='{$watermarkText}'");
             return redirect($watermarkedUrl);
         }
 
@@ -113,8 +152,22 @@ class AssetAccessController extends Controller
 
         // 4d. Last resort: generate on-the-fly via SecureShield (local/S3 images only)
         try {
+            // Resolve watermark text using the same cascade as ImageKit path
+            if (!isset($watermarkText)) {
+                $image->load('settings');
+                $userSettings = $userSettings ?? \App\Models\UserSetting::where('user_id', $image->user_id)->first();
+                $rawText = $image->settings?->watermark_text;
+                if (empty($rawText) || trim($rawText) === '') {
+                    $rawText = $userSettings?->watermark_text;
+                }
+                if (empty($rawText) || trim($rawText) === '') {
+                    $rawText = $image->user->name ?? 'OpalShot';
+                }
+                $watermarkText = '© ' . trim(str_replace('©', '', $rawText));
+            }
+
             $settings = [
-                'watermark_text'    => $image->user->name,
+                'watermark_text'    => $watermarkText,
                 'mode'              => 'signature',
                 'smart_positioning' => true,
                 'dynamic_blending'  => true,

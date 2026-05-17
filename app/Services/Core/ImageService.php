@@ -77,12 +77,22 @@ class ImageService
             ]);
 
             $user = $image->user;
-            $image->settings()->updateOrCreate(['image_id' => $image->id], [
+            $settingsData = [
                 'allow_download' => isset($data['allow_download']) ? filter_var($data['allow_download'], FILTER_VALIDATE_BOOLEAN) : true,
                 'watermark_on_download' => isset($data['watermark_on_download']) 
                     ? filter_var($data['watermark_on_download'], FILTER_VALIDATE_BOOLEAN) 
                     : (bool) ($user->dynamic_watermark ?? false),
-            ]);
+            ];
+
+            // Persist per-image watermark customization fields
+            $wmFields = ['watermark_font_size', 'watermark_opacity', 'watermark_color', 'watermark_type', 'watermark_text'];
+            foreach ($wmFields as $f) {
+                if (array_key_exists($f, $data)) {
+                    $settingsData[$f] = $data[$f];
+                }
+            }
+
+            $image->settings()->updateOrCreate(['image_id' => $image->id], $settingsData);
 
             return $image;
         });

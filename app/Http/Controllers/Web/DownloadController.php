@@ -39,35 +39,62 @@ class DownloadController extends Controller
 
         $image->load(['user', 'settings']);
 
+        // ─── CASCADE PRIORITY: Per-Image Settings → User Global Settings → Defaults ───
+        // Load user's global watermark settings as fallback
+        $userSettings = \App\Models\UserSetting::where('user_id', $image->user_id)->first();
+
         \Illuminate\Support\Facades\Log::info("Watermark Debug for image {$image->id}", [
-            'settings_exists' => $image->settings !== null,
-            'watermark_type' => $image->settings?->watermark_type,
-            'watermark_text' => $image->settings?->watermark_text,
+            'image_settings_exists' => $image->settings !== null,
+            'image_watermark_text' => $image->settings?->watermark_text,
+            'user_watermark_text' => $userSettings?->watermark_text,
             'user_name' => $image->user?->name,
         ]);
 
-        $watermarkType = $image->settings?->watermark_type ?? 'text';
+        // 1. Watermark Type: per-image → user global → default 'text'
+        $watermarkType = $image->settings?->watermark_type 
+            ?? $userSettings?->watermark_mode 
+            ?? 'text';
         
         if ($watermarkType === 'logo') {
-            $userSettings = \App\Models\UserSettings::where('user_id', $image->user_id)->first();
             $watermarkText = $userSettings?->watermark_logo_path ?: 'default_logo.png'; 
         } else {
+            // 2. Watermark Text: per-image → user global → user name → 'OpalShot'
             $rawText = $image->settings?->watermark_text;
-            // Use stored text if not empty, otherwise default to 'OpalShot'
-            $userText = (!empty($rawText) && trim($rawText) !== '') ? $rawText : 'OpalShot';
-            $watermarkText = '© ' . trim(str_replace('©', '', $userText));
+            if (empty($rawText) || trim($rawText) === '') {
+                $rawText = $userSettings?->watermark_text;
+            }
+            if (empty($rawText) || trim($rawText) === '') {
+                $rawText = $image->user?->name ?? 'OpalShot';
+            }
+            $watermarkText = '© ' . trim(str_replace('©', '', $rawText));
         }
 
-        // Read watermark customization from settings
+        // 3. Font Size: per-image → default 80
         $fontSize = (int) ($image->settings?->watermark_font_size ?? 80);
-        $opacity  = (int) ($image->settings?->watermark_opacity ?? 70);
+
+        // 4. Opacity: per-image → user global → default 70
+        $rawOpacity = $image->settings?->watermark_opacity;
+        if ($rawOpacity === null || $rawOpacity === '') {
+            // User global opacity is stored as 0-1 float, convert to 0-100 percent
+            $userOpacity = $userSettings?->watermark_opacity;
+            $opacity = ($userOpacity !== null) ? (int) ($userOpacity * 100) : 70;
+        } else {
+            $opacity = (int) $rawOpacity;
+        }
         
-        // Remove color customization if type is logo
+        // 5. Color: per-image → user global → default 'FFFFFF'
         if ($watermarkType === 'logo') {
             $color = 'FFFFFF'; 
-            $ikFontSize = max(50, $fontSize); // Logo might need different scaling
+            $ikFontSize = max(50, $fontSize);
         } else {
-            $color = $image->settings?->watermark_color ?? 'FFFFFF';
+            $rawColor = $image->settings?->watermark_color;
+            if (empty($rawColor)) {
+                // User global color is stored as '#FFFFFF', strip the '#'
+                $userColor = $userSettings?->watermark_text_color;
+                $color = $userColor ? ltrim($userColor, '#') : 'FFFFFF';
+            } else {
+                $color = ltrim($rawColor, '#');
+            }
             $ikFontSize = max(20, $fontSize);
         }
 
@@ -86,7 +113,7 @@ class DownloadController extends Controller
         // Generate signed watermarked URL via ImageKit with customization
         $url = $this->imageKit->getWatermarkedUrl($path, $watermarkText, true, 30, $ikFontSize, $colorWithAlpha, $watermarkType);
 
-        \Illuminate\Support\Facades\Log::info("Generated Watermark URL for image {$image->id}: type={$watermarkType}, fontSize={$ikFontSize}, opacity={$opacity}%, color=#{$colorWithAlpha}");
+        \Illuminate\Support\Facades\Log::info("Generated Watermark URL for image {$image->id}: type={$watermarkType}, text='{$watermarkText}', fontSize={$ikFontSize}, opacity={$opacity}%, color=#{$colorWithAlpha}");
 
         return response()->json(['url' => $url]);
     }
