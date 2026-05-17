@@ -100,15 +100,35 @@ class AssetAccessController extends Controller
             
             $watermarkType = $image->settings?->watermark_type ?? $userSettings?->watermark_mode ?? 'text';
             
-            // Text
-            $rawText = $image->settings?->watermark_text;
-            if (empty($rawText) || trim($rawText) === '') {
-                $rawText = $userSettings?->watermark_text;
+            // ─── LOGO VALIDATION: Fall back to text if logo path is invalid ───
+            $watermarkText = null;
+            if ($watermarkType === 'logo') {
+                $logoPath = $userSettings?->watermark_logo;
+                $isValidLogo = !empty($logoPath) 
+                    && $logoPath !== 'default_logo.png'
+                    && !str_starts_with($logoPath, 'blob:')
+                    && !str_starts_with($logoPath, 'http://localhost')
+                    && !str_starts_with($logoPath, 'data:');
+                
+                if ($isValidLogo) {
+                    $watermarkText = $logoPath;
+                } else {
+                    \Illuminate\Support\Facades\Log::info("AssetAccess: Logo fallback - invalid logo path '{$logoPath}', using text.");
+                    $watermarkType = 'text';
+                }
             }
-            if (empty($rawText) || trim($rawText) === '') {
-                $rawText = $image->user->name ?? 'OpalShot';
+            
+            if ($watermarkType === 'text') {
+                // Text
+                $rawText = $image->settings?->watermark_text;
+                if (empty($rawText) || trim($rawText) === '') {
+                    $rawText = $userSettings?->watermark_text;
+                }
+                if (empty($rawText) || trim($rawText) === '') {
+                    $rawText = $image->user->name ?? 'OpalShot';
+                }
+                $watermarkText = '© ' . trim(str_replace('©', '', $rawText));
             }
-            $watermarkText = '© ' . trim(str_replace('©', '', $rawText));
             
             // Font size, opacity, color
             $fontSize = (int) ($image->settings?->watermark_font_size ?? 80);

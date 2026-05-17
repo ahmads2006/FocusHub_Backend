@@ -55,9 +55,26 @@ class DownloadController extends Controller
             ?? $userSettings?->watermark_mode 
             ?? 'text';
         
+        // ─── LOGO VALIDATION: ImageKit l-image requires the logo to exist in ImageKit Media Library.
+        //     If logo path is invalid (blob URL, default placeholder, empty), gracefully fall back to text.
         if ($watermarkType === 'logo') {
-            $watermarkText = $userSettings?->watermark_logo_path ?: 'default_logo.png'; 
-        } else {
+            $logoPath = $userSettings?->watermark_logo;
+            $isValidLogo = !empty($logoPath) 
+                && $logoPath !== 'default_logo.png'
+                && !str_starts_with($logoPath, 'blob:')
+                && !str_starts_with($logoPath, 'http://localhost')
+                && !str_starts_with($logoPath, 'data:');
+            
+            if ($isValidLogo) {
+                $watermarkText = $logoPath;
+            } else {
+                // Fall back to text watermark — logo not available in ImageKit
+                \Illuminate\Support\Facades\Log::info("Logo watermark fallback: invalid logo path '{$logoPath}', using text watermark instead.");
+                $watermarkType = 'text';
+            }
+        }
+        
+        if ($watermarkType === 'text') {
             // 2. Watermark Text: per-image → user global → user name → 'OpalShot'
             $rawText = $image->settings?->watermark_text;
             if (empty($rawText) || trim($rawText) === '') {
