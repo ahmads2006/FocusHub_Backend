@@ -68,9 +68,9 @@ class DownloadController extends Controller
             if ($isValidLogo) {
                 $watermarkText = $logoPath;
             } else {
-                // Fall back to text watermark — logo not available in ImageKit
-                \Illuminate\Support\Facades\Log::info("Logo watermark fallback: invalid logo path '{$logoPath}', using text watermark instead.");
-                $watermarkType = 'text';
+                // Abort download if the user specified a logo watermark but no valid logo is available
+                \Illuminate\Support\Facades\Log::error("Download blocked: invalid logo path '{$logoPath}'.");
+                abort(400, 'لا يمكن تنزيل الصورة لأن  مسارها غير صالح. يرجى إعادة رفع اللوغو في الإعدادات. ');
             }
         }
         

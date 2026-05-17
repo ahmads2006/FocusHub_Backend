@@ -113,8 +113,8 @@ class AssetAccessController extends Controller
                 if ($isValidLogo) {
                     $watermarkText = $logoPath;
                 } else {
-                    \Illuminate\Support\Facades\Log::info("AssetAccess: Logo fallback - invalid logo path '{$logoPath}', using text.");
-                    $watermarkType = 'text';
+                    \Illuminate\Support\Facades\Log::error("AssetAccess: Download blocked - invalid logo path '{$logoPath}'.");
+                    abort(400, 'لا يمكن تنزيل الصورة مسارها غير صالح. يرجى إعادة رفع اللوغو في الإعدادات.');
                 }
             }
             
