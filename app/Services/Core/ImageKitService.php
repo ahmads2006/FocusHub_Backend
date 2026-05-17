@@ -67,39 +67,43 @@ class ImageKitService
      */
     public function getWatermarkedUrl(string $path, string $textOrLogo, bool $signed = true, int $expireMinutes = 10, int $fontSize = 600, string $color = 'FFFFFF', string $type = 'text'): string
     {
-        // ─── Extract opacity from 8-char color (e.g. FFFFFFB3) ───
-        // ImageKit's co- param only accepts 6-char hex; opacity goes in separate o- param
-        $hexColor = substr(ltrim($color, '#'), 0, 6) ?: 'FFFFFF';
-        $opacityPercentage = 70; // default
-
-        if (strlen(ltrim($color, '#')) >= 8) {
-            $alphaHex = substr(ltrim($color, '#'), 6, 2);
+        // ─── Parse color and opacity from the input ───
+        // Input $color may be 6-char (FFFFFF) or 8-char with alpha (FFFFFFB3)
+        $cleanColor = ltrim($color, '#');
+        $hexColor = substr($cleanColor, 0, 6) ?: 'FFFFFF';
+        
+        // Extract or default opacity (0-100)
+        if (strlen($cleanColor) >= 8) {
+            $alphaHex = substr($cleanColor, 6, 2);
             $alphaInt = hexdec($alphaHex);
-            $opacityPercentage = ($alphaInt > 0) ? (int) round(($alphaInt / 255) * 100) : 70;
+            $opacityPercent = ($alphaInt > 0) ? (int) round(($alphaInt / 255) * 100) : 70;
+        } else {
+            $opacityPercent = 70; // default
         }
-
-        // Clamp opacity to valid ImageKit range (1-100)
-        $opacityPercentage = max(1, min(100, $opacityPercentage));
+        $opacityPercent = max(1, min(100, $opacityPercent));
 
         if ($type === 'logo') {
-            // For logo, we use the imagekit format for image overlays: l-image,i-<image_path>
-            // We need to replace slashes in the path with @@ for ImageKit image overlays
+            // ─── IMAGE OVERLAY ───
+            // Replace slashes with @@ for ImageKit image overlay paths
             $logoPath = str_replace('/', '@@', ltrim($textOrLogo, '/'));
-            
-            // Adjust width based on fontSize (treating fontSize as a relative width for the logo)
             $logoWidth = max(50, min(800, (int) ($fontSize * 2)));
             
-            $rawTransformation = "l-image,i-{$logoPath},w-{$logoWidth},o-{$opacityPercentage},lfo-bottom_right,pa-40,l-end";
+            // For image overlays: use oa- (overlay alpha) for opacity
+            $rawTransformation = "l-image,i-{$logoPath},w-{$logoWidth},oa-{$opacityPercent},lfo-bottom_right,pa-40,l-end";
         } else {
-            // ─── Text Watermark ───
+            // ─── TEXT OVERLAY ───
             // Cap font size to ImageKit's practical limit (10-300)
             $safeFontSize = max(10, min(300, (int) $fontSize));
 
-            // ImageKit requires URL-safe base64 for the ie- parameter:
-            //   Standard base64 → replace + with -, / with _, strip = padding
+            // ImageKit requires URL-safe base64 for the ie- parameter
             $base64Text = rtrim(strtr(base64_encode($textOrLogo), '+/', '-_'), '=');
 
-            $rawTransformation = "l-text,ie-{$base64Text},fs-{$safeFontSize},co-{$hexColor},o-{$opacityPercentage},lfo-bottom_right,pa-40,l-end";
+            // For text overlays: opacity is embedded in co- as 8-char hex (RRGGBBAA)
+            // ImageKit does NOT support a separate o- param for text layers
+            $alphaHex = str_pad(dechex(round($opacityPercent / 100 * 255)), 2, '0', STR_PAD_LEFT);
+            $colorWithAlpha = $hexColor . $alphaHex;
+
+            $rawTransformation = "l-text,ie-{$base64Text},fs-{$safeFontSize},co-{$colorWithAlpha},lfo-bottom_right,pa-40,l-end";
         }
 
         Log::info("ImageKit Watermark Transform: type={$type}, raw={$rawTransformation}");
