@@ -92,14 +92,23 @@ class ImageController extends Controller
             $token = $request->get('token');
             if (!$token) throw $e;
 
-            // Search for an active shared link pointing to this image
+            // Search for an active shared link pointing to this image or its album
             // We use token_hash for secure database searching
             $tokenHash = hash('sha256', $token);
-            $isValid = \App\Models\SharedLink::where('token_hash', $tokenHash)
-                ->where('shareable_id', $image->id)
-                ->get()
-                ->filter(fn($link) => $link->is_active)
-                ->isNotEmpty();
+            $link = \App\Models\SharedLink::where('token_hash', $tokenHash)->first();
+            if (!$link) {
+                $persistentId = md5($tokenHash);
+                $link = \App\Models\SharedLink::where('persistent_id', $persistentId)->first();
+            }
+
+            $isValid = false;
+            if ($link && $link->is_active) {
+                if ($link->shareable_type === \App\Models\Image::class) {
+                    $isValid = ($link->shareable_id === $image->id);
+                } elseif ($link->shareable_type === \App\Models\Album::class) {
+                    $isValid = ($link->shareable_id === $image->album_id);
+                }
+            }
             
             if (!$isValid) throw $e;
         }

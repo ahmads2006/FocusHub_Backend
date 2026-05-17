@@ -11,6 +11,7 @@ upload_file "opalshot/app/Models/User.php" "$REMOTE_PATH/app/Models/User.php"
 upload_file "opalshot/app/Models/SharedLink.php" "$REMOTE_PATH/app/Models/SharedLink.php"
 
 Write-Host "Updating Logic & Controllers..."
+upload_file "opalshot/app/Http/Controllers/Api/ImageController.php" "$REMOTE_PATH/app/Http/Controllers/Api/ImageController.php"
 upload_file "opalshot/app/Http/Controllers/Api/V1/SharedLinkController.php" "$REMOTE_PATH/app/Http/Controllers/Api/V1/SharedLinkController.php"
 upload_file "opalshot/app/Http/Middleware/ValidateSharedLink.php" "$REMOTE_PATH/app/Http/Middleware/ValidateSharedLink.php"
 upload_file "opalshot/app/Services/Security/SharedLinkService.php" "$REMOTE_PATH/app/Services/Security/SharedLinkService.php"
