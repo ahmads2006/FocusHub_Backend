@@ -67,25 +67,42 @@ class ImageKitService
      */
     public function getWatermarkedUrl(string $path, string $textOrLogo, bool $signed = true, int $expireMinutes = 10, int $fontSize = 600, string $color = 'FFFFFF', string $type = 'text'): string
     {
+        // ─── Extract opacity from 8-char color (e.g. FFFFFFB3) ───
+        // ImageKit's co- param only accepts 6-char hex; opacity goes in separate o- param
+        $hexColor = substr(ltrim($color, '#'), 0, 6) ?: 'FFFFFF';
+        $opacityPercentage = 70; // default
+
+        if (strlen(ltrim($color, '#')) >= 8) {
+            $alphaHex = substr(ltrim($color, '#'), 6, 2);
+            $alphaInt = hexdec($alphaHex);
+            $opacityPercentage = ($alphaInt > 0) ? (int) round(($alphaInt / 255) * 100) : 70;
+        }
+
+        // Clamp opacity to valid ImageKit range (1-100)
+        $opacityPercentage = max(1, min(100, $opacityPercentage));
+
         if ($type === 'logo') {
             // For logo, we use the imagekit format for image overlays: l-image,i-<image_path>
             // We need to replace slashes in the path with @@ for ImageKit image overlays
             $logoPath = str_replace('/', '@@', ltrim($textOrLogo, '/'));
             
             // Adjust width based on fontSize (treating fontSize as a relative width for the logo)
-            // e.g., w-150 means 150px width. If user selected 80 (default), maybe map that to 150px.
-            $logoWidth = (int) ($fontSize * 2); 
-            
-            // Apply opacity
-            $opacity = hexdec(substr($color, 6, 2)); // Extract alpha from FFFFFFB3
-            if ($opacity === 0) $opacity = 255;
-            $opacityPercentage = round(($opacity / 255) * 100);
+            $logoWidth = max(50, min(800, (int) ($fontSize * 2)));
             
             $rawTransformation = "l-image,i-{$logoPath},w-{$logoWidth},o-{$opacityPercentage},lfo-bottom_right,pa-40,l-end";
         } else {
-            // Text Watermark
-            $rawTransformation = 'l-text,ie-' . urlencode(base64_encode($textOrLogo)) . ",fs-{$fontSize},co-{$color},lfo-bottom_right,pa-40,l-end";
+            // ─── Text Watermark ───
+            // Cap font size to ImageKit's practical limit (10-300)
+            $safeFontSize = max(10, min(300, (int) $fontSize));
+
+            // ImageKit requires URL-safe base64 for the ie- parameter:
+            //   Standard base64 → replace + with -, / with _, strip = padding
+            $base64Text = rtrim(strtr(base64_encode($textOrLogo), '+/', '-_'), '=');
+
+            $rawTransformation = "l-text,ie-{$base64Text},fs-{$safeFontSize},co-{$hexColor},o-{$opacityPercentage},lfo-bottom_right,pa-40,l-end";
         }
+
+        Log::info("ImageKit Watermark Transform: type={$type}, raw={$rawTransformation}");
 
         return $this->imagekit->url([
             'path' => $path,
@@ -95,7 +112,6 @@ class ImageKitService
                 [
                     'format' => 'auto',
                     'quality' => 'auto',
-                    'progressive' => 'true'
                 ],
                 [
                     'raw' => $rawTransformation
