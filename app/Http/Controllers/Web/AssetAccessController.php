@@ -228,7 +228,19 @@ class AssetAccessController extends Controller
                       ->orWhere('receiver_id', Auth::id());
                 })->exists();
 
-            if (!$isSharedInChat) {
+            $hasAlbumAccess = false;
+            if ($image->album) {
+                $album = $image->album;
+                if ($album->privacy === 'public') {
+                    $hasAlbumAccess = true;
+                } elseif (session()->has("shared_link_access_album_{$album->id}")) {
+                    $hasAlbumAccess = true;
+                } elseif (Auth::check() && (Auth::id() === $album->user_id || $album->collaborators()->where('user_id', Auth::id())->exists())) {
+                    $hasAlbumAccess = true;
+                }
+            }
+
+            if (!$isSharedInChat && !$hasAlbumAccess) {
                 abort(403, 'You do not have permission to view this image.');
             }
         }

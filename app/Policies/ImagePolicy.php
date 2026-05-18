@@ -17,6 +17,23 @@ class ImagePolicy
             return true;
         }
 
+        // If the image belongs to an album, check if the visitor is authorized to view that album
+        if ($image->album) {
+            $album = $image->album;
+            // 1. Public albums are visible to everyone
+            if ($album->privacy === 'public') {
+                return true;
+            }
+            // 2. Shared link access to the album
+            if (session()->has("shared_link_access_album_{$album->id}")) {
+                return true;
+            }
+            // 3. Album owner or collaborators
+            if ($user && ($user->id === $album->user_id || $album->collaborators()->where('user_id', $user->id)->exists())) {
+                return true;
+            }
+        }
+
         if (!$user) {
             return false;
         }
@@ -57,6 +74,23 @@ class ImagePolicy
         // Check for shared link temporary session access with download permission
         if (session("shared_link_access_{$image->id}") === 'download') {
             return \Illuminate\Auth\Access\Response::allow();
+        }
+
+        // Check for album access download permission
+        if ($image->album) {
+            $album = $image->album;
+            $hasAlbumAccess = false;
+            if ($album->privacy === 'public') {
+                $hasAlbumAccess = true;
+            } elseif (session()->has("shared_link_access_album_{$album->id}")) {
+                $hasAlbumAccess = true;
+            } elseif ($user && ($user->id === $album->user_id || $album->collaborators()->where('user_id', $user->id)->exists())) {
+                $hasAlbumAccess = true;
+            }
+
+            if ($hasAlbumAccess) {
+                return \Illuminate\Auth\Access\Response::allow();
+            }
         }
 
         // Public download is allowed only if the owner enabled it in general settings

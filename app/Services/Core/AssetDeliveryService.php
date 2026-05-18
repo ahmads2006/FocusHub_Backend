@@ -247,9 +247,25 @@ class AssetDeliveryService
             return $sessionAccess === 'download';
         }
 
-        // 4. Public assets are downloadable if allowed by owner
+        // 4. Check if the image belongs to an authorized album (public, shared link, collaborators, owner)
+        if ($image->album) {
+            $album = $image->album;
+            $hasAlbumAccess = false;
+            if ($album->privacy === 'public') {
+                $hasAlbumAccess = true;
+            } elseif (session()->has("shared_link_access_album_{$album->id}")) {
+                $hasAlbumAccess = true;
+            } elseif ($user && ($user->id === $album->user_id || $album->collaborators()->where('user_id', $user->id)->exists())) {
+                $hasAlbumAccess = true;
+            }
+
+            if ($hasAlbumAccess && ($image->settings?->allow_download ?? true)) {
+                return true;
+            }
+        }
+
+        // 5. Public assets are downloadable if allowed by owner
         if ($image->privacy === 'public' && ($image->settings?->allow_download ?? true)) {
-            
             return true;
         }
 
