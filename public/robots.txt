@@ -1,15 +1,41 @@
+# OpalShot — robots.txt (Backend / API Server)
+# Last updated: 2026-05-19
+
 User-agent: *
 
-# Allow search engines to index marketing and public portfolio pages
+# Allow search engines to index public marketing pages
 Allow: /
-Allow: /blog/
-Allow: /portfolio/
+Allow: /features
+Allow: /security
+Allow: /dashboard
+Allow: /login
+Allow: /register
 
-# Strictly block application layers and private client albums
-Disallow: /dashboard/
-Disallow: /s/
-Disallow: /api/
+# Block all private application routes
+Disallow: /albums
+Disallow: /chat
+Disallow: /studio
+Disallow: /profile
+Disallow: /settings
+Disallow: /notifications
 Disallow: /admin/
-Disallow: /*?*token=*
+Disallow: /selection/
+Disallow: /join/
 
+# Block shared/token-based routes (private client content)
+Disallow: /s/
+Disallow: /shared/
+Disallow: /*?token=
+Disallow: /*?shared_album=
+
+# Strictly block API layer
+Disallow: /api/
+
+# Block auth callbacks
+Disallow: /auth/callback
+
+# Crawl-delay (polite crawling)
+Crawl-delay: 2
+
+# Sitemaps
 Sitemap: https://opalshot.studio/sitemap.xml
