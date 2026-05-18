@@ -1,2 +1,15 @@
 User-agent: *
-Disallow:
+
+# Allow search engines to index marketing and public portfolio pages
+Allow: /
+Allow: /blog/
+Allow: /portfolio/
+
+# Strictly block application layers and private client albums
+Disallow: /dashboard/
+Disallow: /s/
+Disallow: /api/
+Disallow: /admin/
+Disallow: /*?*token=*
+
+Sitemap: https://opalshot.studio/sitemap.xml
