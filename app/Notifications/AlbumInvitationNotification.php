@@ -57,7 +57,7 @@ class AlbumInvitationNotification extends Notification implements ShouldQueue, S
             'inviter_id' => $this->inviter->id,
             'inviter_name' => $this->inviter->name,
             'message' => "قام {$this->inviter->name} بدعوتك للانضمام إلى الألبوم التعاوني: {$this->album->title}",
-            'action_url' => route('chat.hub', ['partner' => $this->inviter->id]),
+            'action_url' => rtrim(config('app.frontend_url', config('app.url')), '/') . '/chat?user=' . $this->inviter->id,
         ];
     }
 }

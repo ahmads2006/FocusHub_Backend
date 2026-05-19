@@ -52,7 +52,7 @@ class ChatMessageNotification extends Notification implements ShouldQueue, Shoul
             'sender_name' => $this->sender->name,
             'sender_avatar' => $this->sender->avatar,
             'message' => "لديك رسالة جديدة من {$this->sender->name}: \"{$this->body}\"",
-            'action_url' => route('chat.hub', ['partner' => $this->sender->id]),
+            'action_url' => rtrim(config('app.frontend_url', config('app.url')), '/') . '/chat?user=' . $this->sender->id,
         ];
     }
 }

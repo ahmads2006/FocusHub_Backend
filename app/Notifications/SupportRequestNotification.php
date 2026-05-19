@@ -50,7 +50,7 @@ class SupportRequestNotification extends Notification implements ShouldQueue, Sh
             'requester_name' => $this->requester->name,
             'requester_avatar' => $this->requester->avatar,
             'message' => "{$this->requester->name} يود التواصل مع الدعم الفني",
-            'action_url' => route('chat.hub'),
+            'action_url' => rtrim(config('app.frontend_url', config('app.url')), '/') . '/chat',
         ];
     }
 }
