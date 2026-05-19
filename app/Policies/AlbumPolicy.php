@@ -20,6 +20,17 @@ class AlbumPolicy
 
         // Check if user has temporary session access via shared link
         if (session()->has("shared_link_access_album_{$album->id}")) {
+            $linkId = session("shared_link_id_album_{$album->id}");
+            if ($linkId) {
+                $link = \App\Models\SharedLink::find($linkId);
+                if ($link && !$link->is_active) {
+                    session()->forget([
+                        "shared_link_access_album_{$album->id}",
+                        "shared_link_id_album_{$album->id}"
+                    ]);
+                    return false;
+                }
+            }
             return true;
         }
 

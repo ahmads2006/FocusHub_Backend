@@ -110,7 +110,16 @@ class ImageController extends Controller
                 }
             }
             
-            if (!$isValid) throw $e;
+            if ($isValid) {
+                $request->session()->put("shared_link_access_{$image->id}", $link->permission);
+                $request->session()->put("shared_link_watermark_{$image->id}", $link->require_watermark);
+                $request->session()->put("shared_link_id_{$image->id}", $link->id);
+                if ($link->shareable_type === \App\Models\Album::class) {
+                    $request->session()->put("shared_link_access_album_{$link->shareable_id}", $link->permission);
+                }
+            } else {
+                throw $e;
+            }
         }
         
         $image->load(['meta', 'user', 'tags', 'aiMetadata', 'settings']);

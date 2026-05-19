@@ -222,6 +222,7 @@ class ValidateSharedLink
         } elseif ($shareable instanceof \App\Models\Album) {
             // Track album access specifically for AlbumPolicy
             $request->session()->put("shared_link_access_album_{$shareable->id}", $link->permission);
+            $request->session()->put("shared_link_id_album_{$shareable->id}", $link->id);
 
             foreach ($shareable->photos as $photo) {
                 $this->setSessionAccess($request, $photo->id, $link);

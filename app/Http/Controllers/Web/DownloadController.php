@@ -24,9 +24,12 @@ class DownloadController extends Controller
      */
     public function download(Image $image)
     {
-        // Permission Check: If allow_download is false, only owner can download
-        if (!($image->settings?->allow_download ?? true)) {
-            if (Auth::id() !== $image->user_id) {
+        $hasSharedLinkDownload = session("shared_link_access_{$image->id}") === 'download';
+        $isOwner = Auth::check() && Auth::id() === $image->user_id;
+
+        // Permission Check: If allow_download is false, only owner or shared link downloaders can download
+        if (!$isOwner && !$hasSharedLinkDownload) {
+            if (!($image->settings?->allow_download ?? true)) {
                 abort(403, 'تنزيل هذه الصورة غير مسموح به من قبل المالك.');
             }
         }
@@ -146,15 +149,18 @@ class DownloadController extends Controller
         if (!$this->deliveryService->canAccessOriginal($image)) {
             abort(403, 'غير مصرح لك بتنزيل النسخة الأصلية من هذه الصورة.');
         }
-        
-        // Ensure shared link session doesn't interfere with this direct gallery download
-        session()->forget("shared_link_access_{$image->id}");
-        session()->forget("shared_link_watermark_{$image->id}");
 
         // 🛡️ WATERMARK ENFORCEMENT: If the owner enabled watermark_on_download
-        // and the requesting user is NOT the owner, force watermarked download.
+        // or the shared link requires watermark, force watermarked download (unless owner).
         $image->load('settings');
-        $hasWatermark = (bool) ($image->settings?->watermark_on_download ?? false);
+        
+        $hasWatermark = false;
+        if (session()->has("shared_link_watermark_{$image->id}")) {
+            $hasWatermark = (bool) session("shared_link_watermark_{$image->id}");
+        } else {
+            $hasWatermark = (bool) ($image->settings?->watermark_on_download ?? false);
+        }
+
         $isOwner = \Illuminate\Support\Facades\Auth::id() === $image->user_id;
 
         if ($hasWatermark && !$isOwner) {

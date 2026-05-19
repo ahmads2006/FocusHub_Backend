@@ -54,7 +54,7 @@ class PhotoResource extends JsonResource
             'labels' => array_values($labels),
             'tags' => $tags,
             'comments' => $comments,
-            'can_download' => $this->allow_download && $canDownload,
+            'can_download' => $canDownload,
             'allow_download' => $this->allow_download,
 
             'settings' => $this->whenLoaded('settings'),
