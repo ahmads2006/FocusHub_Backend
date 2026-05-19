@@ -100,7 +100,7 @@ class ImagePolicy
                     return \Illuminate\Auth\Access\Response::deny('Shared link is no longer active.');
                 }
             }
-            return \Illuminate\Auth\Access::Response::allow();
+            return \Illuminate\Auth\Access\Response::allow();
         }
 
         // 🛡️ Enforcement: If the owner disabled downloading, nobody else can download (even admins)
