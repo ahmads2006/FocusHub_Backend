@@ -191,6 +191,10 @@ class ValidateSharedLink
             ], 403);
         }
 
+        // ✅ CRITICAL: Tell the controller that password auth passed (or no password needed)
+        // Without this, the controller's own check for 'shared_link_authenticated' always fails!
+        $request->attributes->set('shared_link_authenticated', true);
+
         // If IP auth exists but session auth doesn't, sync it back to session for consistency
         if ($hasIpAuth && !$hasSessionAuth) {
             $request->session()->put($authKey, true);
