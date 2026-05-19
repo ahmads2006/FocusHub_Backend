@@ -105,14 +105,13 @@ class AuthController extends Controller
                 && $verification->device_token === $hashedCookie
                 && $verification->device_trusted_until
                 && $verification->device_trusted_until->isFuture()
-                && $verification->last_login_ip === $request->ip()
             ) {
                 $needsVerification = false;
             }
         }
 
-        // If not verified at all, send verification code
-        if (!$user->is_verified) {
+        // If not verified at all or needs 2FA, send verification code
+        if (!$user->is_verified || $needsVerification) {
             $user->sendVerificationEmail();
             $expiresAt = $request->boolean('remember') ? now()->addDays(30) : now()->addHours(24);
             $token = $user->createToken('api-token', ['*'], $expiresAt)->plainTextToken;
@@ -120,9 +119,10 @@ class AuthController extends Controller
             return response()->json([
                 'success' => true,
                 'requires_verification' => true,
-                'message' => __('messages.email_unverified'),
+                'needs_2fa' => true,
+                'message' => !$user->is_verified ? __('messages.email_unverified') : __('messages.2fa_required'),
                 'data' => [
-                    'user' => $this->formatUser($user),
+                    'user' => array_merge($this->formatUser($user), ['is_verified' => false]),
                     'token' => $token,
                 ],
             ]);
@@ -137,7 +137,7 @@ class AuthController extends Controller
             'data' => [
                 'user' => $this->formatUser($user),
                 'token' => $token,
-                'needs_2fa' => $needsVerification,
+                'needs_2fa' => false,
             ],
         ]);
     }
@@ -183,10 +183,9 @@ class AuthController extends Controller
             ], 422);
         }
 
-        $user->forceFill([
-            'is_verified' => true,
-            'verification_code' => null,
-        ])->save();
+        $user->is_verified = true;
+        $user->verification_code = null;
+        $user->save();
 
         $response = [
             'success' => true,
@@ -194,8 +193,9 @@ class AuthController extends Controller
         ];
 
         // Handle trusted device
+        $cookie = null;
         if ($request->boolean('trust_device')) {
-            $rawToken = Str::random(64);
+            $rawToken = \Illuminate\Support\Str::random(64);
             $hashedToken = hash('sha256', $rawToken);
 
             $user->verification()->update([
@@ -204,10 +204,16 @@ class AuthController extends Controller
                 'last_login_ip' => $request->ip(),
             ]);
 
-            $response['trusted_device_token'] = $rawToken;
+            // Set cookie for 30 days
+            $cookie = cookie('opticvault_trusted_device', $rawToken, 30 * 24 * 60, null, null, true, true, false, 'None');
         }
 
-        return response()->json($response);
+        $jsonResponse = response()->json($response);
+        if ($cookie) {
+            $jsonResponse->withCookie($cookie);
+        }
+
+        return $jsonResponse;
     }
 
     /**
@@ -217,12 +223,8 @@ class AuthController extends Controller
     {
         $user = $request->user();
 
-        if ($user->is_verified) {
-            return response()->json([
-                'success' => false,
-                'message' => __('messages.already_verified'),
-            ], 400);
-        }
+        // We allow resend even if is_verified is true, because they might be verifying a new device (2FA).
+        // The check.verified middleware ensures only users needing verification or 2FA hit this anyway.
 
         $user->sendVerificationEmail();
 

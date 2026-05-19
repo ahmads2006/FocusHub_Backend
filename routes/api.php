@@ -105,7 +105,7 @@ Route::prefix('v1')->group(function () {
     // ══════════════════════════════════════════
     // 2. 🔒 AUTHENTICATED ROUTES
     // ══════════════════════════════════════════
-    Route::middleware(['auth:sanctum', 'check.banned', 'throttle:api'])->group(function () {
+    Route::middleware(['auth:sanctum', 'check.banned', 'check.verified', 'throttle:api'])->group(function () {
 
         // ─── 👤 Profile ──────────────────────────
         Route::prefix('profile')->group(function () {

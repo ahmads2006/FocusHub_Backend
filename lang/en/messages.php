@@ -98,5 +98,6 @@ return [
     'password_reset' => 'Password reset successfully. You can login now.',
     'profile_updated' => 'Profile updated successfully.',
     'handle_cooldown' => 'You can only change your username once every 30 days. You have :days days remaining.',
-    'chat_already_claimed' => 'This conversation is already claimed by another admin.'
+    'chat_already_claimed' => 'This conversation is already claimed by another admin.',
+    '2fa_required' => 'Verification code is required to login from this device.'
 ];
