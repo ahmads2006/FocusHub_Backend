@@ -508,13 +508,29 @@ class MongoChatController extends Controller
             $createdAt = \Carbon\Carbon::parse($createdAt);
         }
 
+        $imageUrl = null;
+        $thumbUrl = null;
+
+        if (!empty($msg->image_id)) {
+            $imageUrl = $msg->image?->url ?? $msg->image_url ?? null;
+            if ($msg->image) {
+                try {
+                    $thumbUrl = app(AssetDeliveryService::class)->getUrl($msg->image, 'thumbnail');
+                } catch (\Throwable $e) {
+                    $thumbUrl = $msg->thumb_url ?? $imageUrl;
+                }
+            } else {
+                $thumbUrl = $msg->thumb_url ?? $imageUrl;
+            }
+        }
+
         return [
             'id'         => $msg->id,
             'body'       => $msg->body,
             'image_id'   => $msg->image_id,
             'album_id'   => $msg->album_id,
-            'image_url'  => $msg->image_id ? $msg->image?->url : null,
-            'thumb_url'  => $msg->image_id ? app(AssetDeliveryService::class)->getUrl($msg->image, 'thumbnail') : null,
+            'image_url'  => $imageUrl,
+            'thumb_url'  => $thumbUrl,
             'is_mine'    => $msg->sender_id == $userId,
             'is_read'    => (bool) $msg->is_read,
             'created_at' => $createdAt->format('H:i'),
