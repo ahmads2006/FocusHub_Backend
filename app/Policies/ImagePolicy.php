@@ -86,21 +86,51 @@ class ImagePolicy
             return \Illuminate\Auth\Access\Response::allow();
         }
 
-        // Check for shared link temporary session access with download permission
-        if (session("shared_link_access_{$image->id}") === 'download') {
-            $linkId = session("shared_link_id_{$image->id}");
-            if ($linkId) {
-                $link = \App\Models\SharedLink::find($linkId);
-                if ($link && !$link->is_active) {
-                    session()->forget([
-                        "shared_link_access_{$image->id}",
-                        "shared_link_watermark_{$image->id}",
-                        "shared_link_id_{$image->id}"
-                    ]);
-                    return \Illuminate\Auth\Access\Response::deny('Shared link is no longer active.');
+        // If the request has an active shared link session, it MUST dictate the permission.
+        $hasImageSharedLink = session()->has("shared_link_access_{$image->id}");
+        $hasAlbumSharedLink = $image->album_id && session()->has("shared_link_access_album_{$image->album_id}");
+
+        if ($hasImageSharedLink || $hasAlbumSharedLink) {
+            if ($hasImageSharedLink) {
+                $linkId = session("shared_link_id_{$image->id}");
+                if ($linkId) {
+                    $link = \App\Models\SharedLink::find($linkId);
+                    if ($link && !$link->is_active) {
+                        session()->forget([
+                            "shared_link_access_{$image->id}",
+                            "shared_link_watermark_{$image->id}",
+                            "shared_link_id_{$image->id}"
+                        ]);
+                        return \Illuminate\Auth\Access\Response::deny('Shared link is no longer active.');
+                    }
+                }
+                
+                if (session("shared_link_access_{$image->id}") === 'download') {
+                    return \Illuminate\Auth\Access\Response::allow();
+                } else {
+                    return \Illuminate\Auth\Access\Response::deny('Download is restricted for this shared link.');
                 }
             }
-            return \Illuminate\Auth\Access\Response::allow();
+
+            if ($hasAlbumSharedLink) {
+                $linkId = session("shared_link_id_album_{$image->album_id}");
+                if ($linkId) {
+                    $link = \App\Models\SharedLink::find($linkId);
+                    if ($link && !$link->is_active) {
+                        session()->forget([
+                            "shared_link_access_album_{$image->album_id}",
+                            "shared_link_id_album_{$image->album_id}"
+                        ]);
+                        return \Illuminate\Auth\Access\Response::deny('Shared album link is no longer active.');
+                    }
+                }
+
+                if (session("shared_link_access_album_{$image->album_id}") === 'download') {
+                    return \Illuminate\Auth\Access\Response::allow();
+                } else {
+                    return \Illuminate\Auth\Access\Response::deny('Download is restricted for this shared album link.');
+                }
+            }
         }
 
         // 🛡️ Enforcement: If the owner disabled downloading, nobody else can download (even admins)

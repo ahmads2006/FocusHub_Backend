@@ -241,19 +241,24 @@ class AssetDeliveryService
             }
         }
 
-        // 3. Check if a valid shared link session exists for this image
-        $sessionAccess = session("shared_link_access_{$image->id}");
-        if ($sessionAccess !== null) {
-            return $sessionAccess === 'download';
+        // 3. If there is a shared link session for the image or the album, it must dictate permission.
+        $hasImageSharedLink = session()->has("shared_link_access_{$image->id}");
+        $hasAlbumSharedLink = $image->album_id && session()->has("shared_link_access_album_{$image->album_id}");
+
+        if ($hasImageSharedLink || $hasAlbumSharedLink) {
+            if ($hasImageSharedLink) {
+                return session("shared_link_access_{$image->id}") === 'download';
+            }
+            if ($hasAlbumSharedLink) {
+                return session("shared_link_access_album_{$image->album_id}") === 'download';
+            }
         }
 
-        // 4. Check if the image belongs to an authorized album (public, shared link, collaborators, owner)
+        // 4. Check if the image belongs to an authorized album (public, collaborators, owner)
         if ($image->album) {
             $album = $image->album;
             $hasAlbumAccess = false;
             if ($album->privacy === 'public') {
-                $hasAlbumAccess = true;
-            } elseif (session()->has("shared_link_access_album_{$album->id}")) {
                 $hasAlbumAccess = true;
             } elseif ($user && ($user->id === $album->user_id || $album->collaborators()->where('user_id', $user->id)->exists())) {
                 $hasAlbumAccess = true;

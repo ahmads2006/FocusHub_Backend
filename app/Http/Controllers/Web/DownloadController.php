@@ -26,15 +26,7 @@ class DownloadController extends Controller
     {
         $this->validateTokenAndSetSession($image);
 
-        $hasSharedLinkDownload = session("shared_link_access_{$image->id}") === 'download';
-        $isOwner = Auth::check() && Auth::id() === $image->user_id;
-
-        // Permission Check: If allow_download is false, only owner or shared link downloaders can download
-        if (!$isOwner && !$hasSharedLinkDownload) {
-            if (!($image->settings?->allow_download ?? true)) {
-                abort(403, 'تنزيل هذه الصورة غير مسموح به من قبل المالك.');
-            }
-        }
+        $this->authorize('download', $image);
 
         $path = $image->storage?->imagekit_file_path ?? $image->storage?->path;
         
@@ -148,6 +140,8 @@ class DownloadController extends Controller
         \Illuminate\Support\Facades\Log::info("downloadOriginal() called for image {$image->id}");
 
         $this->validateTokenAndSetSession($image);
+
+        $this->authorize('download', $image);
 
         // Only accessible if user has permission
         if (!$this->deliveryService->canAccessOriginal($image)) {

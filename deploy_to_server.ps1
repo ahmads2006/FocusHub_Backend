@@ -15,6 +15,9 @@ upload_file "opalshot/app/Http/Controllers/Api/ImageController.php" "$REMOTE_PAT
 upload_file "opalshot/app/Http/Controllers/Api/V1/SharedLinkController.php" "$REMOTE_PATH/app/Http/Controllers/Api/V1/SharedLinkController.php"
 upload_file "opalshot/app/Http/Middleware/ValidateSharedLink.php" "$REMOTE_PATH/app/Http/Middleware/ValidateSharedLink.php"
 upload_file "opalshot/app/Services/Security/SharedLinkService.php" "$REMOTE_PATH/app/Services/Security/SharedLinkService.php"
+upload_file "opalshot/app/Http/Controllers/Api/V1/GalleryController.php" "$REMOTE_PATH/app/Http/Controllers/Api/V1/GalleryController.php"
+upload_file "opalshot/app/Http/Controllers/Web/DownloadController.php" "$REMOTE_PATH/app/Http/Controllers/Web/DownloadController.php"
+upload_file "opalshot/app/Services/Core/AssetDeliveryService.php" "$REMOTE_PATH/app/Services/Core/AssetDeliveryService.php"
 
 Write-Host "Updating Policies & Notifications..."
 upload_file "opalshot/app/Policies/ImagePolicy.php" "$REMOTE_PATH/app/Policies/ImagePolicy.php"

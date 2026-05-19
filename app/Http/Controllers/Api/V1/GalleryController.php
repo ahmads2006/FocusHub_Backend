@@ -28,13 +28,14 @@ class GalleryController extends Controller
     {
         $selectedTag = $request->query('tag');
         $searchQuery = $request->query('q');
+        $timeframe   = $request->query('timeframe');
         $perPage     = min($request->query('per_page', 50), 100);
 
         $query = Image::where('privacy', 'public')
             ->with(['settings', 'user.profile', 'storage', 'meta', 'album', 'tags'])
             ->withCount(['likes', 'bookmarks']);
 
-        // ── AI-Powered Smart Search ──
+        // ── Search Filter ──
         if ($searchQuery) {
             $search = trim($searchQuery);
             $query->where(function ($q) use ($search) {
@@ -52,10 +53,83 @@ class GalleryController extends Controller
                             ->orWhere('name', 'LIKE', "%{$search}%");
                     });
             });
+        }
 
-            // 🚀 SMART LOADING: Load only what's needed for the gallery view
-            // 'storage' is CRITICAL for AssetDeliveryService to generate ImageKit URLs.
-            // 'user' is needed for the photographer's name/avatar.
+        // ── Tag Filter ──
+        if ($selectedTag && $selectedTag !== 'all') {
+            $query->where(function ($q) use ($selectedTag) {
+                $q->whereRaw('JSON_CONTAINS(labels, ?)', [json_encode($selectedTag)])
+                  ->orWhereHas('tags', function ($t) use ($selectedTag) {
+                      $t->where('name->en', $selectedTag)
+                        ->orWhere('name->ar', $selectedTag)
+                        ->orWhere('name', $selectedTag);
+                  });
+            });
+        }
+
+        // ── Timeframe Filter ──
+        if ($timeframe && $timeframe !== 'all') {
+            if ($timeframe === 'today') {
+                $query->whereDate('created_at', today());
+            } elseif ($timeframe === 'week') {
+                $query->where('created_at', '>=', now()->startOfWeek());
+            } elseif ($timeframe === 'month') {
+                $query->where('created_at', '>=', now()->startOfMonth());
+            }
+        }
+
+        $user = Auth::user();
+        $hasFilters = !empty($searchQuery) || ($selectedTag && $selectedTag !== 'all') || ($timeframe && $timeframe !== 'all');
+
+        if ($user && !$hasFilters) {
+            try {
+                $recommendationEngine = app(RecommendationEngine::class);
+                $feedIds = $recommendationEngine->getForYouFeedIds($user, 500, true);
+            } catch (\Exception $e) {
+                $feedIds = [];
+            }
+
+            $page       = \Illuminate\Pagination\Paginator::resolveCurrentPage() ?: 1;
+            $totalCount = count($feedIds);
+            $slicedIds  = array_slice($feedIds, ($page - 1) * $perPage, $perPage);
+
+            if (!empty($slicedIds)) {
+                $placeholders = implode(',', array_fill(0, count($slicedIds), '?'));
+                $models = Image::whereIn('id', $slicedIds)
+                    ->where('privacy', 'public')
+                    ->where(function($q) use ($user) {
+                        $q->where('moderation_status', 'approved')
+                          ->orWhere(function($sq) use ($user) {
+                              $sq->where('user_id', $user->id)
+                                 ->where('moderation_status', '!=', 'rejected');
+                          });
+                    })
+                    ->with(['settings', 'user.profile', 'storage', 'meta', 'album'])
+                    ->withCount(['likes', 'bookmarks'])
+                    ->orderByRaw("FIELD(id, {$placeholders})", $slicedIds)
+                    ->get();
+            } else {
+                // Fallback to latest images if no personalized feed
+                $models = $query->latest()->paginate($perPage)->getCollection();
+                $totalCount = $query->count();
+            }
+
+            $images = new \Illuminate\Pagination\LengthAwarePaginator(
+                $models, $totalCount, $perPage, $page,
+                ['path' => \Illuminate\Pagination\Paginator::resolveCurrentPath(), 'query' => $request->query()]
+            );
+        } else {
+            // Apply moderation filter to public images
+            if ($user) {
+                $query->where(function($q) use ($user) {
+                    $q->where('moderation_status', 'approved')
+                      ->orWhere('user_id', $user->id);
+                });
+            } else {
+                $query->where('moderation_status', 'approved');
+            }
+
+            // Load optimized relations
             $query->with([
                 'user.profile',
                 'storage:id,image_id,disk,path,imagekit_file_id,imagekit_file_path',
@@ -65,55 +139,9 @@ class GalleryController extends Controller
             ]);
 
             $images = $query->latest()->paginate($perPage);
-        } elseif ($selectedTag) {
-            $query->whereRaw('JSON_CONTAINS(labels, ?)', [json_encode($selectedTag)]);
-            $images = $query->latest()->paginate($perPage);
-        } else {
-            // Personalized For You for authenticated users
-            $user = Auth::user();
-            if ($user) {
-                try {
-                    $recommendationEngine = app(RecommendationEngine::class);
-                    $feedIds = $recommendationEngine->getForYouFeedIds($user, 500, true);
-                } catch (\Exception $e) {
-                    $feedIds = [];
-                }
-
-                $page       = \Illuminate\Pagination\Paginator::resolveCurrentPage() ?: 1;
-                $totalCount = count($feedIds);
-                $slicedIds  = array_slice($feedIds, ($page - 1) * $perPage, $perPage);
-
-                if (!empty($slicedIds)) {
-                    $placeholders = implode(',', array_fill(0, count($slicedIds), '?'));
-                    $models = Image::whereIn('id', $slicedIds)
-                        ->where('privacy', 'public')
-                        ->where(function($q) use ($user) {
-                            $q->where('moderation_status', 'approved')
-                              ->orWhere(function($sq) use ($user) {
-                                  $sq->where('user_id', $user->id)
-                                     ->where('moderation_status', '!=', 'rejected');
-                              });
-                        })
-                        ->with(['settings', 'user.profile', 'storage', 'meta', 'album'])
-                        ->withCount(['likes', 'bookmarks'])
-                        ->orderByRaw("FIELD(id, {$placeholders})", $slicedIds)
-                        ->get();
-                } else {
-                    // Fallback to latest images if no personalized feed
-                    $models = $query->latest()->paginate($perPage)->getCollection();
-                    $totalCount = $query->count();
-                }
-
-                $images = new \Illuminate\Pagination\LengthAwarePaginator(
-                    $models, $totalCount, $perPage, $page,
-                    ['path' => \Illuminate\Pagination\Paginator::resolveCurrentPath(), 'query' => $request->query()]
-                );
-            } else {
-                $images = $query->latest()->paginate($perPage);
-            }
         }
 
-        // ⚡ PERFORMANCE: Hide heavy computed appends that are not needed for gallery cards
+        // ── Performance: Hide heavy computed appends that are not needed for gallery cards ──
         $images->each(function ($image) {
             $image->makeHidden(['srcset', 'original_url', 'ai_caption', 'analyzer_name', 'can_edit', 'can_delete']);
         });
@@ -144,8 +172,9 @@ class GalleryController extends Controller
                 'liked_image_ids'      => $likedImageIds,
                 'bookmarked_image_ids' => $bookmarkedImageIds,
                 'filters'              => [
-                    'tag'    => $selectedTag,
-                    'search' => $searchQuery,
+                    'tag'       => $selectedTag,
+                    'search'    => $searchQuery,
+                    'timeframe' => $timeframe,
                 ],
             ],
         ]);
