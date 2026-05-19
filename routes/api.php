@@ -202,10 +202,7 @@ Route::prefix('v1')->group(function () {
             Route::get('/{album}/status', [App\Http\Controllers\Api\AlbumUploadController::class, 'getAlbumStatus']);
         });
 
-        // ─── 🎨 Gallery ─────────────────────────
-        Route::get('/gallery/tags/popular', [App\Http\Controllers\Api\V1\GalleryController::class, 'popularTags']);
-        Route::get('/gallery/tags/autocomplete', [App\Http\Controllers\Api\V1\GalleryController::class, 'autocompleteTags']);
-        Route::get('/gallery', [App\Http\Controllers\Api\V1\GalleryController::class, 'index']);
+
 
         // ─── 🛠️ Utilities & Helpers ─────────────────
         Route::prefix('utils')->group(function () {
@@ -398,5 +395,13 @@ Route::prefix('v1')->group(function () {
     // 5. 📡 BROADCASTING AUTH (WebSockets)
     // ══════════════════════════════════════════
     \Illuminate\Support\Facades\Broadcast::routes(['middleware' => ['auth:sanctum']]);
+
+    // ══════════════════════════════════════════
+    // 6. 🎨 PUBLIC GALLERY
+    // ══════════════════════════════════════════
+    Route::get('/gallery/tags/popular', [App\Http\Controllers\Api\V1\GalleryController::class, 'popularTags']);
+    Route::get('/gallery/tags/autocomplete', [App\Http\Controllers\Api\V1\GalleryController::class, 'autocompleteTags']);
+    Route::get('/gallery', [App\Http\Controllers\Api\V1\GalleryController::class, 'index']);
+
 });
 

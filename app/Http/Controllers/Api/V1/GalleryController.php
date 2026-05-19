@@ -132,7 +132,7 @@ class GalleryController extends Controller
             // Load optimized relations
             $query->with([
                 'user.profile',
-                'storage:id,image_id,disk,path,imagekit_file_id,imagekit_file_path',
+                'storage:id,image_id,path,imagekit_file_id,imagekit_file_path',
                 'meta:id,image_id,technical_specs',
                 'settings',
                 'tags'

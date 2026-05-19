@@ -25,12 +25,21 @@ class CheckVerified
             return $this->blockRequest($request, __('messages.email_unverified'));
         }
 
-        // 2. Session-based 2FA check (for current valid login in web contexts, though we use Sanctum APIs)
+        // 2. Sanctum token-based 2FA check (for stateless API clients using Bearer tokens)
+        if ($request->bearerToken()) {
+            $token = $user->currentAccessToken();
+            if ($token && in_array('2fa-unverified', $token->abilities)) {
+                return $this->blockRequest($request, __('messages.2fa_required') ?? 'رمز التحقق مطلوب لتسجيل الدخول من جهاز جديد');
+            }
+            return $next($request);
+        }
+
+        // 3. Session-based 2FA check (for current valid login in web contexts, though we use Sanctum APIs)
         if (session('2fa_verified')) {
             return $next($request);
         }
 
-        // 3. Trusted Device Cookie check (30 days 2FA)
+        // 4. Trusted Device Cookie check (30 days 2FA)
         $token = $request->cookie('opticvault_trusted_device');
         if ($token) {
             $hashed = hash('sha256', $token);

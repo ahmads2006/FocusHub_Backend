@@ -52,7 +52,7 @@ class AuthController extends Controller
         }
 
         // Create Sanctum token
-        $token = $user->createToken('api-token')->plainTextToken;
+        $token = $user->createToken('api-token', ['2fa-unverified'])->plainTextToken;
 
         return response()->json([
             'success' => true,
@@ -114,7 +114,7 @@ class AuthController extends Controller
         if (!$user->is_verified || $needsVerification) {
             $user->sendVerificationEmail();
             $expiresAt = $request->boolean('remember') ? now()->addDays(30) : now()->addHours(24);
-            $token = $user->createToken('api-token', ['*'], $expiresAt)->plainTextToken;
+            $token = $user->createToken('api-token', ['2fa-unverified'], $expiresAt)->plainTextToken;
 
             return response()->json([
                 'success' => true,
@@ -186,6 +186,13 @@ class AuthController extends Controller
         $user->is_verified = true;
         $user->verification_code = null;
         $user->save();
+
+        // Update token abilities to verified status
+        $token = $request->user()->currentAccessToken();
+        if ($token) {
+            $token->abilities = ['*'];
+            $token->save();
+        }
 
         $response = [
             'success' => true,
@@ -346,10 +353,16 @@ class AuthController extends Controller
 
         $user->load(['profile', 'roles', 'verification', 'userStatus']);
 
+        $formattedUser = $this->formatUser($user);
+        $token = $request->user()->currentAccessToken();
+        if ($token && in_array('2fa-unverified', $token->abilities)) {
+            $formattedUser['is_verified'] = false;
+        }
+
         return response()->json([
             'success' => true,
-            'user' => $this->formatUser($user),
-            'data' => $this->formatUser($user), // Keep for backward compatibility if needed
+            'user' => $formattedUser,
+            'data' => $formattedUser, // Keep for backward compatibility if needed
         ]);
     }
 
