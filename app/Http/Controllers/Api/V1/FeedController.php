@@ -81,6 +81,15 @@ class FeedController extends Controller
     public function like(Image $image): JsonResponse
     {
         $user   = Auth::user();
+
+        // Block interaction if image is private and viewer is not the owner
+        if ($image->privacy === 'private' && $image->user_id !== $user->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'عذراً، لا يمكن التفاعل مع الصور الخاصة.',
+            ], 403);
+        }
+
         $result = $this->engine->toggleLike($user, $image);
 
         if ($result['action'] === 'like' && $image->user_id !== $user->id) {
@@ -107,6 +116,14 @@ class FeedController extends Controller
     public function bookmark(Image $image): JsonResponse
     {
         $user = Auth::user();
+
+        // Block interaction if image is private and viewer is not the owner
+        if ($image->privacy === 'private' && $image->user_id !== $user->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'عذراً، لا يمكن حفظ الصور الخاصة.',
+            ], 403);
+        }
 
         if ($user->bookmarks()->where('image_id', $image->id)->exists()) {
             $user->bookmarks()->where('image_id', $image->id)->delete();
