@@ -24,6 +24,8 @@ class DownloadController extends Controller
      */
     public function download(Image $image)
     {
+        $this->validateTokenAndSetSession($image);
+
         $hasSharedLinkDownload = session("shared_link_access_{$image->id}") === 'download';
         $isOwner = Auth::check() && Auth::id() === $image->user_id;
 
@@ -145,6 +147,8 @@ class DownloadController extends Controller
     {
         \Illuminate\Support\Facades\Log::info("downloadOriginal() called for image {$image->id}");
 
+        $this->validateTokenAndSetSession($image);
+
         // Only accessible if user has permission
         if (!$this->deliveryService->canAccessOriginal($image)) {
             abort(403, 'غير مصرح لك بتنزيل النسخة الأصلية من هذه الصورة.');
@@ -171,5 +175,39 @@ class DownloadController extends Controller
         $url = $this->deliveryService->getUrl($image, 'original');
 
         return response()->json(['url' => $url]);
+    }
+
+    /**
+     * Helper to validate sharing token and inject into session
+     */
+    private function validateTokenAndSetSession(Image $image): void
+    {
+        $token = request()->get('token');
+        if ($token) {
+            $tokenHash = hash('sha256', $token);
+            $link = \App\Models\SharedLink::where('token_hash', $tokenHash)->first();
+            if (!$link) {
+                $persistentId = md5($tokenHash);
+                $link = \App\Models\SharedLink::where('persistent_id', $persistentId)->first();
+            }
+
+            $isValid = false;
+            if ($link && $link->is_active) {
+                if ($link->shareable_type === \App\Models\Image::class) {
+                    $isValid = ($link->shareable_id === $image->id);
+                } elseif ($link->shareable_type === \App\Models\Album::class) {
+                    $isValid = ($link->shareable_id === $image->album_id);
+                }
+            }
+
+            if ($isValid) {
+                session()->put("shared_link_access_{$image->id}", $link->permission);
+                session()->put("shared_link_watermark_{$image->id}", $link->require_watermark);
+                session()->put("shared_link_id_{$image->id}", $link->id);
+                if ($link->shareable_type === \App\Models\Album::class) {
+                    session()->put("shared_link_access_album_{$link->shareable_id}", $link->permission);
+                }
+            }
+        }
     }
 }

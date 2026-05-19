@@ -84,16 +84,12 @@ class ImageController extends Controller
     public function show(Request $request, Image $image)
     {
         // 🛡️ MULTI-LAYER AUTHORIZATION
-        // 1. Check if user is normally authorized (owner, public, etc.)
-        try {
-            $this->authorize('view', $image);
-        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
-            // 2. Check for a valid sharing token if normal auth fails
-            $token = $request->get('token');
-            if (!$token) throw $e;
-
-            // Search for an active shared link pointing to this image or its album
-            // We use token_hash for secure database searching
+        // 1. If a token is supplied, validate it first to set the session permissions.
+        // This is crucial because public images don't trigger AuthorizationException on view,
+        // but they still need to apply link-specific permissions (like download permissions).
+        $token = $request->get('token');
+        
+        if ($token) {
             $tokenHash = hash('sha256', $token);
             $link = \App\Models\SharedLink::where('token_hash', $tokenHash)->first();
             if (!$link) {
@@ -109,7 +105,7 @@ class ImageController extends Controller
                     $isValid = ($link->shareable_id === $image->album_id);
                 }
             }
-            
+
             if ($isValid) {
                 $request->session()->put("shared_link_access_{$image->id}", $link->permission);
                 $request->session()->put("shared_link_watermark_{$image->id}", $link->require_watermark);
@@ -117,10 +113,11 @@ class ImageController extends Controller
                 if ($link->shareable_type === \App\Models\Album::class) {
                     $request->session()->put("shared_link_access_album_{$link->shareable_id}", $link->permission);
                 }
-            } else {
-                throw $e;
             }
         }
+
+        // 2. Perform the view authorization.
+        $this->authorize('view', $image);
         
         $image->load(['meta', 'user', 'tags', 'aiMetadata', 'settings']);
         
