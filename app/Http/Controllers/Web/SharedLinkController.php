@@ -22,11 +22,26 @@ class SharedLinkController extends Controller
 
     public function generateShareOnceLink(Image $image)
     {
-        if (\Illuminate\Support\Facades\Auth::id() !== $image->user_id) {
+        $userId = \Illuminate\Support\Facades\Auth::id();
+        if ($image->privacy !== 'public' && $userId !== $image->user_id) {
             abort(403, 'غير مصرح لك بمشاركة هذه الصورة.');
         }
 
-        $link = $this->service->generate($image, null, null, 1);
+        $image->loadMissing('settings');
+        $allowDownload = (bool)($image->settings?->allow_download ?? false);
+        $permission = $allowDownload ? 'download' : 'view';
+        $watermarkOnDownload = $image->settings?->watermark_on_download ?? null;
+
+        $link = $this->service->generate(
+            $image,
+            null,
+            null,
+            1,
+            $permission,
+            true,
+            $watermarkOnDownload,
+            'رابط لمرة واحدة'
+        );
         $url = $this->service->getFullUrl($link);
 
         return response()->json([
@@ -52,7 +67,10 @@ class SharedLinkController extends Controller
         $modelClass = $request->shareable_type;
         $model = $modelClass::findOrFail($request->shareable_id);
 
-        if (\Illuminate\Support\Facades\Auth::id() !== $model->user_id) {
+        $userId = \Illuminate\Support\Facades\Auth::id();
+        $isPublic = ($model instanceof Image && $model->privacy === 'public') || ($model instanceof Album && $model->privacy === 'public');
+
+        if (!$isPublic && $userId !== $model->user_id) {
             abort(403, 'غير مصرح لك بمشاركة هذا العنصر.');
         }
 

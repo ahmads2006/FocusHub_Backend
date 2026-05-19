@@ -152,6 +152,11 @@ class ImagePolicy
      */
     public function share(User $user, Image $image): \Illuminate\Auth\Access\Response
     {
+        // Anyone can share public images
+        if ($image->privacy === 'public') {
+            return \Illuminate\Auth\Access\Response::allow();
+        }
+
         // Owner of the image can always share
         if ($user->id === $image->user_id) {
             return \Illuminate\Auth\Access\Response::allow();

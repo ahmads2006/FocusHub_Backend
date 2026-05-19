@@ -31,7 +31,23 @@ class SharedLinkController extends Controller
     {
         $this->authorize('share', $image);
 
-        $link = $this->service->generate($image, null, null, 1);
+        // Load settings relationship to inherit download and watermark preferences
+        $image->loadMissing('settings');
+        
+        $allowDownload = (bool)($image->settings?->allow_download ?? false);
+        $permission = $allowDownload ? 'download' : 'view';
+        $watermarkOnDownload = $image->settings?->watermark_on_download ?? null;
+
+        $link = $this->service->generate(
+            $image,
+            null,
+            null,
+            1, // max_access = 1 (Self-destruct after one view)
+            $permission,
+            true,
+            $watermarkOnDownload,
+            'رابط لمرة واحدة'
+        );
         $url  = $this->service->getFullUrl($link);
 
         return response()->json([
