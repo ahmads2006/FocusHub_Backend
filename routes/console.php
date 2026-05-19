@@ -51,3 +51,6 @@ Schedule::call(function () {
         $invitation->delete();
     }
 })->hourly();
+
+// Clean up users who registered but didn't verify their account within an hour
+Schedule::command('users:cleanup-unverified')->hourly();
