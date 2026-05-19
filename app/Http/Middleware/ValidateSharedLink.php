@@ -120,9 +120,11 @@ class ValidateSharedLink
             $request->session()->put($authKey, true);
         }
 
-        // 🛡️ SECURITY ENFORCEMENT: Session locking & Token rotation.
+        // 🛡️ SECURITY ENFORCEMENT: Device locking & Token rotation.
         // Mandatory for Albums and Private Images. Disabled ONLY for Public Images.
-        $sessionId = $request->session()->getId();
+        // We use a stable browser fingerprint instead of Laravel's session ID because 
+        // cross-domain cookies and AdBlockers can cause the session ID to fluctuate on every request.
+        $sessionId = md5($request->ip() . $request->userAgent());
         $isOwner = auth()->check() && $link->shareable && isset($link->shareable->user_id) && $link->shareable->user_id === auth()->id();
 
         $isPublicImage = $link->shareable instanceof \App\Models\Image && $link->shareable->privacy === 'public';
