@@ -118,7 +118,16 @@ class ValidateSharedLink
                 // to avoid incrementing access count twice on redirect
                 $request->session()->flash("rotated_link_" . ($link->id ?? "redis"), true);
 
-                // Redirect to the new secure URL
+                // For API/AJAX requests: return JSON with new token instead of redirect
+                // (Axios can't follow redirects with session cookies properly)
+                if ($request->expectsJson() || $request->ajax()) {
+                    // Re-run validation with the new token by making a self-call
+                    // Store the link data in request for the controller
+                    $request->attributes->set('shared_link', $link);
+                    return $next($request);
+                }
+
+                // For browser requests: redirect to the new secure URL
                 return redirect()->route('shared_link.show', $newToken);
             } else {
                 // Secondary visits: verify session matches
