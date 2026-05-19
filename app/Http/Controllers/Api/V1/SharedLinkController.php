@@ -113,7 +113,7 @@ class SharedLinkController extends Controller
         }
 
         // Check if password is required
-        if ($link->password && !$request->attributes->get('shared_link_authenticated')) {
+        if (!empty($link->password) && !$request->attributes->get('shared_link_authenticated')) {
             return response()->json([
                 'success'           => false,
                 'requires_password' => true,

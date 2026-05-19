@@ -94,7 +94,7 @@ class ValidateSharedLink
         $cookieName = "sl_auth_" . substr($authKeyId, 0, 8);
         $hasCookieAuth = $request->hasCookie($cookieName);
 
-        if ($link->password && !$hasSessionAuth && !$hasIpAuth && !$hasCookieAuth) {
+        if (!empty($link->password) && !$hasSessionAuth && !$hasIpAuth && !$hasCookieAuth) {
             \Illuminate\Support\Facades\Log::info("Shared link password required:", [
                 'ip' => $request->ip(),
                 'ua_md5' => md5($request->userAgent()),
