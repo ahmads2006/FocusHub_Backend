@@ -274,7 +274,11 @@ class MongoChatController extends Controller
         }
 
         try {
-            event(new MessageSent($messageModel));
+            $authUser = Auth::user();
+            event(new MessageSent($messageModel, [
+                'name'   => $authUser?->name ?? 'User',
+                'avatar' => $authUser?->avatar ?? null,
+            ]));
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::error('Broadcast error: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
         }

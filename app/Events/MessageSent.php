@@ -3,58 +3,70 @@
 namespace App\Events;
 
 use App\Models\Message;
-use App\Models\User;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
-use Illuminate\Queue\SerializesModels;
 
 class MessageSent implements ShouldBroadcastNow
 {
-    use Dispatchable, InteractsWithSockets, SerializesModels;
-
-    public Message|\App\Models\Mongo\ChatMessage $message;
-
-    public function __construct(Message|\App\Models\Mongo\ChatMessage $message)
-    {
-        $this->message = $message;
-    }
+    use Dispatchable, InteractsWithSockets;
 
     /**
-     * The private channel the event broadcasts on.
-     * Only the receiver can listen to this channel.
+     * Pre-built payload to broadcast.
+     * We do NOT use SerializesModels because the ChatMessage is a MongoDB model
+     * and lazy-loading its cross-database relations during broadcast fails
+     * with "Call to a member function prepare() on null".
      */
-    public function broadcastOn(): array
-    {
-        return [
-            new \Illuminate\Broadcasting\PrivateChannel('chat.' . $this->message->receiver_id),
-            new \Illuminate\Broadcasting\PrivateChannel('chat.' . $this->message->sender_id),
-        ];
-    }
+    public array $payload;
+    private string $receiverId;
+    private string $senderId;
 
-    /**
-     * Data to broadcast with the event.
-     */
-    public function broadcastWith(): array
+    public function __construct(Message|\App\Models\Mongo\ChatMessage $message, ?array $senderData = null)
     {
-        // Ensure sender is loaded
-        $sender = $this->message->sender;
-        $senderName = $sender?->name ?? 'User';
-        $senderAvatar = $sender?->avatar ?? null;
+        // Resolve sender data NOW while DB connections are available
+        if ($senderData) {
+            $senderName = $senderData['name'] ?? 'User';
+            $senderAvatar = $senderData['avatar'] ?? null;
+        } else {
+            try {
+                $sender = $message->sender;
+                $senderName = $sender?->name ?? 'User';
+                $senderAvatar = $sender?->avatar ?? null;
+            } catch (\Throwable $e) {
+                $senderName = 'User';
+                $senderAvatar = null;
+            }
+        }
 
-        return [
-            'id'          => $this->message->id,
-            'sender_id'   => $this->message->sender_id,
-            'receiver_id' => $this->message->receiver_id,
-            'body'        => $this->message->body,
-            'created_at'  => is_string($this->message->created_at) ? $this->message->created_at : $this->message->created_at->toISOString(),
+        $this->receiverId = (string) $message->receiver_id;
+        $this->senderId = (string) $message->sender_id;
+
+        $this->payload = [
+            'id'          => (string) $message->id,
+            'sender_id'   => $this->senderId,
+            'receiver_id' => $this->receiverId,
+            'body'        => $message->body,
+            'created_at'  => is_string($message->created_at) ? $message->created_at : $message->created_at->toISOString(),
             'sender'      => [
-                'id'     => $this->message->sender_id,
+                'id'     => $this->senderId,
                 'name'   => $senderName,
                 'avatar' => $senderAvatar,
             ],
-            'conversation_id' => $this->message->conversation_id ?? null,
+            'conversation_id' => $message->conversation_id ?? null,
         ];
+    }
+
+    public function broadcastOn(): array
+    {
+        return [
+            new PrivateChannel('chat.' . $this->receiverId),
+            new PrivateChannel('chat.' . $this->senderId),
+        ];
+    }
+
+    public function broadcastWith(): array
+    {
+        return $this->payload;
     }
 }
