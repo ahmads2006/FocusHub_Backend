@@ -3,7 +3,7 @@
 use Illuminate\Support\Facades\Broadcast;
 
 Broadcast::channel('App.Models.User.{id}', function ($user, $id) {
-    return (int) $user->id === (int) $id;
+    return (string) $user->id === (string) $id;
 });
 
 // ── Group Chat Presence Channel ──────────────────────────
@@ -25,9 +25,9 @@ Broadcast::channel('group-chat.{conversationId}', function ($user, $conversation
 
 // ── Direct Chat Private Channel ──────────────────────────
 Broadcast::channel('chat.{id}', function ($user, $id) {
-    return (int) $user->id === (int) $id;
+    return (string) $user->id === (string) $id;
 });
 // ── Support Private Channel ──────────────────────────
 Broadcast::channel('support.{id}', function ($user, $id) {
-    return (int) $user->id === (int) $id;
+    return (string) $user->id === (string) $id;
 });

@@ -28,8 +28,8 @@ class MessageSent implements ShouldBroadcastNow
     public function broadcastOn(): array
     {
         return [
-            new \Illuminate\Broadcasting\PrivateChannel('App.Models.User.' . $this->message->receiver_id),
-            new \Illuminate\Broadcasting\PrivateChannel('App.Models.User.' . $this->message->sender_id),
+            new \Illuminate\Broadcasting\PrivateChannel('chat.' . $this->message->receiver_id),
+            new \Illuminate\Broadcasting\PrivateChannel('chat.' . $this->message->sender_id),
         ];
     }
 
@@ -40,8 +40,8 @@ class MessageSent implements ShouldBroadcastNow
     {
         // Ensure sender is loaded
         $sender = $this->message->sender;
-        $senderName = $sender->name ?? 'User';
-        $senderAvatar = $sender->avatar ?? null;
+        $senderName = $sender?->name ?? 'User';
+        $senderAvatar = $sender?->avatar ?? null;
 
         return [
             'id'          => $this->message->id,

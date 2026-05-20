@@ -13,6 +13,8 @@ upload_file "opalshot/app/Models/SharedLink.php" "$REMOTE_PATH/app/Models/Shared
 Write-Host "Updating Logic & Controllers..."
 upload_file "opalshot/app/Http/Controllers/Api/ImageController.php" "$REMOTE_PATH/app/Http/Controllers/Api/ImageController.php"
 upload_file "opalshot/app/Http/Controllers/Api/V1/SharedLinkController.php" "$REMOTE_PATH/app/Http/Controllers/Api/V1/SharedLinkController.php"
+upload_file "opalshot/app/Http/Controllers/Api/V1/MongoChatController.php" "$REMOTE_PATH/app/Http/Controllers/Api/V1/MongoChatController.php"
+upload_file "opalshot/app/Events/MessageSent.php" "$REMOTE_PATH/app/Events/MessageSent.php"
 upload_file "opalshot/app/Http/Middleware/ValidateSharedLink.php" "$REMOTE_PATH/app/Http/Middleware/ValidateSharedLink.php"
 upload_file "opalshot/app/Services/Security/SharedLinkService.php" "$REMOTE_PATH/app/Services/Security/SharedLinkService.php"
 upload_file "opalshot/app/Http/Controllers/Api/V1/GalleryController.php" "$REMOTE_PATH/app/Http/Controllers/Api/V1/GalleryController.php"
@@ -26,6 +28,7 @@ upload_file "opalshot/app/Notifications/SharedLinkLeakDetected.php" "$REMOTE_PAT
 
 Write-Host "Updating Bootstrap..."
 upload_file "opalshot/bootstrap/app.php" "$REMOTE_PATH/bootstrap/app.php"
+upload_file "opalshot/routes/channels.php" "$REMOTE_PATH/routes/channels.php"
 
 Write-Host "Updating Kernel..."
 upload_file "opalshot/app/Http/Kernel.php" "$REMOTE_PATH/app/Http/Kernel.php"

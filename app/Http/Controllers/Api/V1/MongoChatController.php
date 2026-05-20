@@ -275,7 +275,9 @@ class MongoChatController extends Controller
 
         try {
             event(new MessageSent($messageModel));
-        } catch (\Throwable $e) {}
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('Broadcast error: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
+        }
 
         return response()->json([
             'success' => true,
@@ -512,10 +514,11 @@ class MongoChatController extends Controller
         $thumbUrl = null;
 
         if (!empty($msg->image_id)) {
-            $imageUrl = $msg->image?->url ?? $msg->image_url ?? null;
-            if ($msg->image) {
+            $image = \App\Models\Image::find($msg->image_id);
+            $imageUrl = $image?->url ?? $msg->image_url ?? null;
+            if ($image) {
                 try {
-                    $thumbUrl = app(AssetDeliveryService::class)->getUrl($msg->image, 'thumbnail');
+                    $thumbUrl = app(AssetDeliveryService::class)->getUrl($image, 'thumbnail');
                 } catch (\Throwable $e) {
                     $thumbUrl = $msg->thumb_url ?? $imageUrl;
                 }
