@@ -89,10 +89,6 @@ class ImageKitService
             // Calculate a scale factor based on fontSize (e.g., fontSize 40 = 10% of image width)
             $scaleFactor = max(0.02, min(0.5, round($fontSize / 400, 3)));
 
-            
-
-
-
             // For image overlays: use proportional width (bw_mul_...) and fixed margins
             $rawTransformation = "l-image,i-{$logoPath},w-bw_mul_{$scaleFactor},o-{$opacityPercent},lfo-bottom_left,lx-15,ly-15,l-end";
         } else {
@@ -104,11 +100,11 @@ class ImageKitService
             $alphaHex = str_pad(dechex(round($opacityPercent / 100 * 255)), 2, '0', STR_PAD_LEFT);
             $colorWithAlpha = $hexColor . $alphaHex;
 
-            // Calculate proportional font size (e.g., fontSize 40 = 4% of image width)
-            $textScale = max(0.01, min(0.2, round($fontSize / 1000, 3)));
+            // ImageKit requires absolute font size for text overlay
+            $ikFontSize = max(20, (int)$fontSize);
 
-            // Use proportional font size and fixed padding
-            $rawTransformation = "l-text,ie-{$base64Text},fs-bw_mul_{$textScale},co-{$colorWithAlpha},lfo-bottom_left,pa-15,l-end";
+            // Use absolute font size and fixed padding
+            $rawTransformation = "l-text,ie-{$base64Text},fs-{$ikFontSize},co-{$colorWithAlpha},lfo-bottom_left,pa-15,l-end";
         }
 
         Log::info("ImageKit Watermark Transform: type={$type}, raw={$rawTransformation}");

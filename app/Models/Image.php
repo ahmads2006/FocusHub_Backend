@@ -297,12 +297,18 @@ class Image extends Model
 
     public function getCanDownloadAttribute(): bool
     {
+        // 🛡️ Allow fallthrough to Gate if we are in an active shared link session
+        $hasSharedLinkSession = request()->hasSession() && (
+            session()->has("shared_link_access_{$this->id}") || 
+            ($this->album_id && session()->has("shared_link_access_album_{$this->album_id}"))
+        );
+
         // 🛡️ Owner's restriction is absolute — checked BEFORE Gate (which auto-allows super_admin)
         $ownerAllowed = (bool) ($this->settings?->allow_download ?? false);
         
         // If owner disabled downloads, nobody except the owner themselves can download
         $currentUser = auth()->user();
-        if (!$ownerAllowed && (!$currentUser || $currentUser->id !== $this->user_id)) {
+        if (!$hasSharedLinkSession && !$ownerAllowed && (!$currentUser || $currentUser->id !== $this->user_id)) {
             return false;
         }
 
