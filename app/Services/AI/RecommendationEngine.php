@@ -133,7 +133,7 @@ class RecommendationEngine
 
         // Base query constraints for UNLIKED items (Discovery Phase)
         $unlikedConstraints = function ($q) use ($user, $hiddenIds, $includeOwnImages) {
-            $q->where('privacy', 'public')
+            $q->publicGallery()
                 ->where(function($sq) use ($user) {
                     $sq->where('moderation_status', 'approved')
                        ->orWhere(function($ssq) use ($user) {
@@ -247,7 +247,7 @@ class RecommendationEngine
             // Tier 2a: Personalized Old Content (Images seen in last 20 days but match user interests)
             $personalizedOldIds = [];
             if (!empty($topTags)) {
-                $personalizedOldIds = Image::where('privacy', 'public')
+                $personalizedOldIds = Image::publicGallery()
                     ->where('moderation_status', 'approved')
                     ->whereNotIn('id', $finalIds)
                     ->withAnyTags($topTags)
@@ -264,7 +264,7 @@ class RecommendationEngine
             // Tier 2b: General High-Quality Fallback (If still needed)
             if (count($finalIds) < $limit) {
                 $stillNeeded = $limit - count($finalIds);
-                $extraIds = Image::where('privacy', 'public')
+                $extraIds = Image::publicGallery()
                     ->where('moderation_status', 'approved')
                     ->whereNotIn('id', $finalIds)
                     ->withCount('likes')
@@ -337,7 +337,7 @@ class RecommendationEngine
         $placeholders = implode(',', array_fill(0, count($slicedIds), '?'));
 
         return Image::whereIn('id', $slicedIds)
-            ->where('privacy', 'public')
+            ->publicGallery()
             ->where(function($q) use ($user) {
                 $q->where('moderation_status', 'approved')
                   ->orWhere(function($sq) use ($user) {
@@ -359,7 +359,7 @@ class RecommendationEngine
         $cacheKey = "feed:trending:" . ($includeOwnImages ? 'all' : 'others') . ":limit_{$limit}";
 
         return Cache::remember($cacheKey, 60, function () use ($limit, $includeOwnImages) {
-            $query = Image::where('privacy', 'public')
+            $query = Image::publicGallery()
                 ->where('moderation_status', 'approved') // Added: Only show approved images for performance & safety
                 ->with(['storage', 'settings', 'user'])
                 ->withCount('likes');

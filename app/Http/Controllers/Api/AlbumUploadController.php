@@ -93,37 +93,28 @@ class AlbumUploadController extends Controller
                 }
             }
 
-            if (!$album) {
-                $album = Album::withoutGlobalScopes()
-                    ->where('user_id', $user->id)
-                    ->whereIn('title', ['Quick Uploads', 'General Uploads'])
-                    ->first();
 
-                if (!$album) {
-                    $album = Album::create([
-                        'user_id'   => $user->id,
-                        'title'     => 'Quick Uploads',
-                    ]);
-                }
-            }
 
             // 🛡️ PRIVACY/ALBUM CONFLICT VALIDATION
             // Prevent uploading private photos to public albums and vice versa
             $photoPrivacy = $request->privacy ?: 'public';
-            $albumPrivacy = $album->privacy ?? 'public'; // Uses accessor from AlbumSettings
 
-            if ($photoPrivacy === 'private' && $albumPrivacy === 'public') {
-                return response()->json([
-                    'message' => 'Cannot upload a private photo to a public album. Please change the photo privacy to public or choose a private album.',
-                    'error_code' => 'privacy_conflict',
-                ], 422);
-            }
+            if ($album) {
+                $albumPrivacy = $album->privacy ?? 'public'; // Uses accessor from AlbumSettings
 
-            if ($photoPrivacy === 'public' && $albumPrivacy === 'private') {
-                return response()->json([
-                    'message' => 'Cannot upload a public photo to a private album. Please change the photo privacy to private or choose a public album.',
-                    'error_code' => 'privacy_conflict',
-                ], 422);
+                if ($photoPrivacy === 'private' && $albumPrivacy === 'public') {
+                    return response()->json([
+                        'message' => 'Cannot upload a private photo to a public album. Please change the photo privacy to public or choose a private album.',
+                        'error_code' => 'privacy_conflict',
+                    ], 422);
+                }
+
+                if ($photoPrivacy === 'public' && $albumPrivacy === 'private') {
+                    return response()->json([
+                        'message' => 'Cannot upload a public photo to a private album. Please change the photo privacy to private or choose a public album.',
+                        'error_code' => 'privacy_conflict',
+                    ], 422);
+                }
             }
 
             // 2. Process each file through the full ImageService pipeline (S3 + DB + AI)
@@ -135,7 +126,7 @@ class AlbumUploadController extends Controller
                 }
 
                 $data = [
-                    'album_id'    => $album->id,
+                    'album_id'    => $album?->id,
                     'title'       => $request->title ?: pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME),
                     'description' => $request->description,
                     'privacy'     => $photoPrivacy,

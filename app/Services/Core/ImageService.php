@@ -68,6 +68,7 @@ class ImageService
                 'size'      => $file->getSize(),
                 'privacy'   => $data['privacy'] ?? 'public',
                 'is_visible' => false,
+                'moderation_status' => 'approved',
             ]);
 
             $image->moderation()->updateOrCreate(['image_id' => $image->id], [
@@ -282,6 +283,7 @@ class ImageService
                     'file_type' => $file->getClientOriginalExtension(),
                     'size'      => $file->getSize(),
                     'privacy'   => $data['privacy'] ?? 'public',
+                    'moderation_status' => $moderationResult['status'] ?? 'approved',
                 ]);
 
                 // Bridge safety cache to let the asynchronous Tagging job know safety was already verified

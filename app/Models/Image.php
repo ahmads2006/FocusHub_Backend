@@ -34,7 +34,7 @@ class Image extends Model
 
         // Filter by moderation visibility via denormalized column (v22.0 Performance)
         static::addGlobalScope('visible', function (\Illuminate\Database\Eloquent\Builder $builder) {
-            $builder->where('images.is_visible', true);
+                        $builder->whereHas('moderation', fn($q) => $q->where('is_visible', true));
         });
 
         static::created(function (Image $image) {
@@ -196,6 +196,21 @@ class Image extends Model
     public function bookmarks(): HasMany
     {
         return $this->hasMany(Bookmark::class);
+    }
+
+    /**
+     * Scope a query to only include images that are truly public
+     * (i.e. privacy is public AND they don't belong to a private album).
+     */
+    public function scopePublicGallery($query)
+    {
+        return $query->where('privacy', 'public')
+            ->where(function($q) {
+                $q->whereNull('album_id')
+                  ->orWhereHas('album', function($aq) {
+                      $aq->public();
+                  });
+            });
     }
 
     public function bookmarkedBy(): \Illuminate\Database\Eloquent\Relations\BelongsToMany

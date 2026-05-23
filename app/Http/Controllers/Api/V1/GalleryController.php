@@ -31,7 +31,7 @@ class GalleryController extends Controller
         $timeframe   = $request->query('timeframe');
         $perPage     = min($request->query('per_page', 50), 100);
 
-        $query = Image::where('privacy', 'public')
+        $query = Image::publicGallery()
             ->with(['settings', 'user.profile', 'storage', 'meta', 'album', 'tags'])
             ->withCount(['likes', 'bookmarks']);
 
@@ -96,7 +96,7 @@ class GalleryController extends Controller
             if (!empty($slicedIds)) {
                 $placeholders = implode(',', array_fill(0, count($slicedIds), '?'));
                 $models = Image::whereIn('id', $slicedIds)
-                    ->where('privacy', 'public')
+                    ->publicGallery()
                     ->where(function($q) use ($user) {
                         $q->where('moderation_status', 'approved')
                           ->orWhere(function($sq) use ($user) {
