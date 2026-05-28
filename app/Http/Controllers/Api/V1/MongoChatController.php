@@ -235,8 +235,8 @@ class MongoChatController extends Controller
 
         $image = null;
         if ($request->image_id) {
-            $image = Image::find($request->image_id);
-            if ($image->user_id !== $userId) {
+            $image = Image::withoutGlobalScopes()->find($request->image_id);
+            if ($image && $image->user_id != $userId) {
                 return response()->json(['success' => false, 'message' => __('chat.only_share_own_photos')], 403);
             }
         }

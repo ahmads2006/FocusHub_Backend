@@ -57,7 +57,7 @@ Route::middleware(['signed'])->get('/assets/preview/{image}', [\App\Http\Control
 // ────────────────────────────────────────────────
 // Fallback for all other stray Web Routes
 // ────────────────────────────────────────────────
-if (app()->environment('local', 'development')) {
+if (app()->environment('local', 'development', 'testing')) {
     Route::get('/preview/mail/{locale?}', function ($locale = 'ar') {
         app()->setLocale($locale);
         return new \App\Mail\VerificationCodeMail('123456', 'Ahmad Test');
