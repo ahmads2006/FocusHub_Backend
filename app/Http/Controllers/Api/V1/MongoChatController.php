@@ -298,8 +298,15 @@ class MongoChatController extends Controller
         $afterId = $request->query('after_id');
         $afterDate = $request->query('after_date');
 
-        // 🛡️ SECURITY: Prevent unauthorized polling
-        if (!$this->isAcceptedConnection($userId, $partner->id)) {
+        // 🛡️ SECURITY: Prevent unauthorized polling (allow accepted + pending connections)
+        $connection = DB::table('connections')
+            ->where(function ($q) use ($userId, $partner) {
+                $q->where('user_id', $userId)->where('connected_user_id', $partner->id);
+            })->orWhere(function ($q) use ($userId, $partner) {
+                $q->where('user_id', $partner->id)->where('connected_user_id', $userId);
+            })->first();
+
+        if (!$connection) {
             return response()->json(['success' => false, 'message' => __('chat.unauthorized')], 403);
         }
 

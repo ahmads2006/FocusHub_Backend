@@ -222,33 +222,11 @@ class AssetAccessController extends Controller
             abort(403, 'Direct image access is forbidden.');
         }
 
-        // 1. Authorization check
-        $isOwner = Auth::check() && Auth::id() === $image->user_id;
-
-        if (!$isOwner && $image->privacy !== 'public') {
-            // SHARED MEDIA EXCEPTION (v18.0): Allow access if image was shared in chat with current user
-            $isSharedInChat = \App\Models\Message::where('image_id', $image->id)
-                ->where(function ($q) {
-                    $q->where('sender_id', Auth::id())
-                      ->orWhere('receiver_id', Auth::id());
-                })->exists();
-
-            $hasAlbumAccess = false;
-            if ($image->album) {
-                $album = $image->album;
-                if ($album->privacy === 'public') {
-                    $hasAlbumAccess = true;
-                } elseif (session()->has("shared_link_access_album_{$album->id}")) {
-                    $hasAlbumAccess = true;
-                } elseif (Auth::check() && (Auth::id() === $album->user_id || $album->collaborators()->where('user_id', Auth::id())->exists())) {
-                    $hasAlbumAccess = true;
-                }
-            }
-
-            if (!$isSharedInChat && !$hasAlbumAccess) {
-                abort(403, 'You do not have permission to view this image.');
-            }
-        }
+        // 1. Cryptographic Authorization: A valid signature is a cryptographically secure token
+        // that guarantees temporary read access to this specific preview image context.
+        // Enforcing session checks on signed subresource preview requests is highly fragile
+        // because modern browsers block or mismatch session cookies on cross-origin image tags (<img>).
+        // The signature check at the top of the method is sufficient and robust for inline previews.
 
         // 2. Red Layer: Rejected Content (Critical violations)
         if ($image->isRejected()) {

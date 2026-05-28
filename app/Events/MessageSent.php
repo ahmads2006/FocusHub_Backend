@@ -48,6 +48,9 @@ class MessageSent implements ShouldBroadcastNow
             'receiver_id' => $this->receiverId,
             'body'        => $message->body,
             'created_at'  => is_string($message->created_at) ? $message->created_at : $message->created_at->toISOString(),
+            'image_id'    => $message->image_id ?? null,
+            'image_url'   => $message->image_url ?? null,
+            'thumb_url'   => $message->thumb_url ?? null,
             'sender'      => [
                 'id'     => $this->senderId,
                 'name'   => $senderName,
