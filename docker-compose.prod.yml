@@ -30,7 +30,7 @@ services:
     - ./routes:/var/www/html/routes
     - ./resources:/var/www/html/resources
     - ./database:/var/www/html/database
-    - ./app.php:/var/www/html/bootstrap/app.php
+    - ./bootstrap/app.php:/var/www/html/bootstrap/app.php
   php-scheduler:
     command:
     - php
@@ -54,7 +54,7 @@ services:
     - ./routes:/var/www/html/routes
     - ./resources:/var/www/html/resources
     - ./database:/var/www/html/database
-    - ./app.php:/var/www/html/bootstrap/app.php
+    - ./bootstrap/app.php:/var/www/html/bootstrap/app.php
   php-worker:
     command:
     - php
@@ -83,7 +83,7 @@ services:
     - ./routes:/var/www/html/routes
     - ./resources:/var/www/html/resources
     - ./database:/var/www/html/database
-    - ./app.php:/var/www/html/bootstrap/app.php
+    - ./bootstrap/app.php:/var/www/html/bootstrap/app.php
   redis:
     command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
     healthcheck:
@@ -119,7 +119,7 @@ services:
     - opticvault_network
     - opticvault_default
     ports:
-    - 8080:8080
+    - 127.0.0.1:8080:8080
     restart: unless-stopped
     volumes:
     - ./storage:/var/www/html/storage
@@ -129,7 +129,7 @@ services:
     - ./routes:/var/www/html/routes
     - ./resources:/var/www/html/resources
     - ./database:/var/www/html/database
-    - ./app.php:/var/www/html/bootstrap/app.php
+    - ./bootstrap/app.php:/var/www/html/bootstrap/app.php
 volumes:
   redis-data:
     driver: local

@@ -189,7 +189,7 @@ class Album extends Model
     {
         return $query->whereHas('settings', function ($q) {
             $q->where('privacy', 'public');
-        });
+        })->orWhere('privacy', 'public');
     }
 
     public function scopeOwnedBy($query, User $user)

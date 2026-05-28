@@ -217,6 +217,11 @@ class AssetAccessController extends Controller
             abort(403, 'Unauthorized access or expired link.');
         }
 
+        // 🛡️ ANTI-THEFT: Block direct access when user tries to open the link in a new tab or browser address bar
+        if ($request->header('Sec-Fetch-Dest') === 'document') {
+            abort(403, 'Direct image access is forbidden.');
+        }
+
         // 1. Authorization check
         $isOwner = Auth::check() && Auth::id() === $image->user_id;
 
@@ -255,7 +260,53 @@ class AssetAccessController extends Controller
         // Generate Signed preview URL for safe/owner views if it's in the cloud
         if ($imagekitPath) {
             $imageKitService = app(\App\Services\Core\ImageKitService::class);
-            $url = $imageKitService->generateSignedUrl($imagekitPath, [['format' => 'webp', 'quality' => 'auto']], 30);
+            
+            // Read context-based dimensions
+            $context = $request->input('context', 'gallery');
+            $width = null;
+            $height = null;
+
+            switch ($context) {
+                case 'avatar':
+                case 'icon':
+                    $width = 150;
+                    $height = 150;
+                    break;
+                case 'thumbnail':
+                case 'square':
+                    $width = 400;
+                    $height = 400;
+                    break;
+                case 'card':
+                    $width = 400;
+                    $height = 300;
+                    break;
+                case 'list':
+                    $width = 200;
+                    $height = 150;
+                    break;
+                case 'placeholder':
+                    $width = 20;
+                    $height = 20;
+                    break;
+                case 'gallery':
+                case 'preview':
+                default:
+                    $width = 800;
+                    break;
+            }
+
+            $transformations = [['format' => 'webp', 'quality' => 'auto']];
+            if ($width) {
+                $transformations[0]['width'] = (string)$width;
+            }
+            if ($height) {
+                $transformations[0]['height'] = (string)$height;
+                $transformations[0]['crop'] = 'at_max';
+            }
+
+            // Expiry is set to 1 minute — enough for browser redirect to load image, short enough to prevent sharing
+            $url = $imageKitService->generateSignedUrl($imagekitPath, $transformations, 1);
             return redirect($url);
         }
 

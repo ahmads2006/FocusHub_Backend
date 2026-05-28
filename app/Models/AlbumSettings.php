@@ -24,6 +24,16 @@ class AlbumSettings extends Model
         'is_collaborative' => 'boolean',
     ];
 
+    protected static function booted(): void
+    {
+        static::saved(function (AlbumSettings $settings) {
+            if ($settings->isDirty('privacy') && $settings->album) {
+                $newPrivacy = $settings->privacy === 'public' ? 'public' : 'private';
+                $settings->album->images()->update(['privacy' => $newPrivacy]);
+            }
+        });
+    }
+
     public function album(): BelongsTo
     {
         return $this->belongsTo(Album::class);

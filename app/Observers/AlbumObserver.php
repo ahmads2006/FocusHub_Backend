@@ -18,5 +18,15 @@ class AlbumObserver
                 ->where('is_name_custom', false)
                 ->update(['name' => '📁 ' . $album->title]);
         }
+
+        if ($album->isDirty('is_private')) {
+            $newPrivacy = $album->is_private ? 'private' : 'public';
+            
+            // Sync settings to keep consistent
+            $album->settings()->updateOrCreate([], ['privacy' => $newPrivacy]);
+            
+            // Sync all image privacy
+            $album->images()->update(['privacy' => $newPrivacy]);
+        }
     }
 }

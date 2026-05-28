@@ -30,12 +30,12 @@ RUN echo "expose_php = Off" > /usr/local/etc/php/conf.d/security.ini && \
     echo "ServerTokens Prod\nServerSignature Off" >> /etc/apache2/conf-available/security.conf && \
     a2enconf security
 
-# تثبيت وكيل New Relic (APM)
-RUN curl -L https://download.newrelic.com/php_agent/release/newrelic-php5-12.6.0.34-linux.tar.gz | tar -C /tmp -zx \
+# تثبيت وكيل New Relic (APM) - optional, won't fail the build
+RUN (curl -L https://download.newrelic.com/php_agent/release/newrelic-php5-11.4.0.17-linux.tar.gz | tar -C /tmp -zx \
     && export NR_INSTALL_USE_CP_NOT_LN=1 \
     && export NR_INSTALL_SILENT=1 \
     && /tmp/newrelic-php5-*/newrelic-install install \
-    && rm -rf /tmp/newrelic-php5-* /tmp/nrinstall*
+    && rm -rf /tmp/newrelic-php5-* /tmp/nrinstall*) || echo "New Relic install skipped"
 
 # إعدادات تسجيل اللوجات لـ New Relic
 COPY docker/php/newrelic.ini /usr/local/etc/php/conf.d/newrelic-logging.ini

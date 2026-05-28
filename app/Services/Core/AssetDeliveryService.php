@@ -34,25 +34,15 @@ class AssetDeliveryService
         // 🚀 PERFORMANCE LAYER: Use ImageKit for ALL cloud images to benefit from CDN & Optimization.
         // NOTE: We only use ImageKit if the image is actually in the cloud and we're not in local env.
         if ($isInCloud && !app()->environment('local')) {
-            $imageKit = app(\App\Services\Core\ImageKitService::class);
-            $path = $image->storage?->imagekit_file_path ?? $image->storage?->path ?? $image->path;
-
-            if ($path) {
-                $path = ltrim($path, '/');
-                if (str_starts_with(strtolower($path), 'opticvault/')) {
-                    $path = substr($path, strlen('opticvault/'));
-                }
-            }
-
-            $isGif = strtolower(pathinfo($path, PATHINFO_EXTENSION)) === 'gif';
-
-            // Define base transformations for optimization
-            // 🎞️ GIF PROTECTOR: If it's a GIF, we MUST NOT use 'format: auto' as it often flattens the animation.
-            $baseTransformations = $isGif 
-                ? [['quality' => 'auto']] // Keep original format for GIFs
-                : [['format' => 'auto', 'quality' => 'auto', 'progressive' => 'true']];
-
             if (in_array($context, ['original', 'source'])) {
+                $path = $image->storage?->imagekit_file_path ?? $image->storage?->path ?? $image->path;
+                if ($path) {
+                    $path = ltrim($path, '/');
+                    if (str_starts_with(strtolower($path), 'opticvault/')) {
+                        $path = substr($path, strlen('opticvault/'));
+                    }
+                }
+
                 // 💎 RAW FILE ACCESS: Bypass ImageKit to get the literal raw file from DigitalOcean/S3.
                 $disk = $image->storage?->disk ?: 's3';
                 return $shouldSign 
@@ -60,69 +50,15 @@ class AssetDeliveryService
                     : Storage::disk($disk)->url($image->storage?->path ?? $image->path);
             }
 
-            $width = null;
-            $height = null;
-
-            switch ($context) {
-                case 'avatar':
-                case 'icon':
-                    $width = 150;
-                    $height = 150;
-                    break;
-
-                case 'thumbnail':
-                case 'square':
-                    $width = 400;
-                    $height = 400;
-                    break;
-
-                case 'card':
-                    $width = 400;
-                    $height = 300;
-                    break;
-
-                case 'list':
-                    $width = 200;
-                    $height = 150;
-                    break;
-
-                case 'gallery':
-                case 'preview':
-                    $width = 800;
-                    break;
-
-                case 'srcset':
-                    $sizes = [400, 800, 1200, 1600];
-                    $srcset = [];
-                    foreach ($sizes as $s) {
-                        $srcset[] = $imageKit->getOptimizedUrl($path, $s) . " {$s}w";
-                    }
-                    return implode(', ', $srcset);
-
-                case 'placeholder':
-                    $width = 20;
-                    $height = 20;
-                    break;
-
-                default:
-                    $width = 800;
-                    break;
+            if (in_array($context, ['gallery', 'preview', 'thumbnail', 'avatar', 'icon', 'square', 'card', 'list', 'placeholder'])) {
+                return $this->generateSecurePreviewUrl($image, $context);
             }
-
-            if ($shouldSign) {
-                $transformations = array_merge($baseTransformations, [
-                    array_filter(['width' => (string)$width, 'height' => (string)$height, 'crop' => 'at_max'])
-                ]);
-                return $imageKit->generateSignedUrl($path, $transformations);
-            }
-
-            return $imageKit->getOptimizedUrl($path, $width, $height);
         }
 
         // 📁 FALLBACK: If not in cloud or in local env, use secure server-side routes or local path.
         if ($this->canAccessOriginal($image) || $isPublic) {
-            if (in_array($context, ['gallery', 'preview', 'thumbnail', 'avatar', 'icon', 'square'])) {
-                return $this->generateSecurePreviewUrl($image);
+            if (in_array($context, ['gallery', 'preview', 'thumbnail', 'avatar', 'icon', 'square', 'card', 'list', 'placeholder'])) {
+                return $this->generateSecurePreviewUrl($image, $context);
             }
             if (in_array($context, ['original', 'source'])) {
                 return $this->generateSecureOriginalUrl($image);
@@ -194,31 +130,19 @@ class AssetDeliveryService
 
     /**
      * Generate a pre-signed temporary URL for inline preview display in <img> tags.
-     * TTL: 10 minutes. For cloud disks, the URL points directly to S3/Spaces
-     * with an embedded signature — the browser loads from the CDN, not the backend.
+     * TTL: 10 minutes. Always routes through the secure backend route to hide the direct cloud URLs.
      */
-    protected function generateSecurePreviewUrl(Image $image): string
+    protected function generateSecurePreviewUrl(Image $image, string $context = 'gallery'): string
     {
-        $location = $this->resolveStorageLocation($image);
-
-        if ($location) {
-            [$disk, $path] = $location;
-
-            // ☁️ Cloud disk: generate a pre-signed URL directly from S3/Spaces
-            if ($disk === 's3') {
-                try {
-                    return Storage::disk($disk)->temporaryUrl($path, now()->addMinutes(10));
-                } catch (\RuntimeException $e) {
-                    // Driver doesn't support temporaryUrl (e.g. local), fall through
-                }
-            }
-        }
-
-        // 📁 Fallback: internal signed route for local/public disk
+        // 📁 Always use the internal signed route for secure preview
         return URL::temporarySignedRoute(
             'assets.preview',
             now()->addMinutes(10),
-            ['image' => $image->id, 'v' => optional($image->updated_at)->timestamp ?? time()]
+            [
+                'image' => $image->id, 
+                'context' => $context,
+                'v' => optional($image->updated_at)->timestamp ?? time()
+            ]
         );
     }
 

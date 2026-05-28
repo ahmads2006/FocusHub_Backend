@@ -12,12 +12,16 @@ class ImageModeration extends Model
 
     protected $table = 'image_moderation';
 
+    protected $attributes = [
+        'is_visible' => true,
+    ];
+
     protected static function booted()
     {
         static::saved(function ($moderation) {
             $moderation->image()->update([
                 'moderation_status' => $moderation->status,
-                'is_visible' => $moderation->is_visible
+                'is_visible' => $moderation->is_visible ?? true
             ]);
         });
     }

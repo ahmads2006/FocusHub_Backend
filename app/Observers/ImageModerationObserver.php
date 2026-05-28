@@ -25,7 +25,7 @@ class ImageModerationObserver
             \Illuminate\Support\Facades\DB::table('images')
                 ->where('id', $moderation->image_id)
                 ->update([
-                    'is_visible' => $moderation->is_visible,
+                    'is_visible' => $moderation->is_visible ?? true,
                     'moderation_status' => $moderation->status,
                 ]);
         }

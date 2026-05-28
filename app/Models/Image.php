@@ -199,16 +199,30 @@ class Image extends Model
     }
 
     /**
-     * Scope a query to only include images that are truly public
-     * (i.e. privacy is public AND they don't belong to a private album).
+     * Scope a query to only include images that are truly public.
+     * Images are public when:
+     *   1. privacy = 'public' AND no album (album_id IS NULL)
+     *   2. privacy = 'public' AND belongs to a public album
+     *   3. privacy = 'public' AND belongs to a ghost/virtual album (e.g. "Quick Uploads")
+     *      → Ghost albums exist for internal grouping only; they should NOT restrict visibility.
      */
     public function scopePublicGallery($query)
     {
+        // Ghost album titles that are used for auto-grouping only,
+        // not real user-created albums with intentional privacy.
+        $ghostTitles = ['Quick Uploads', 'General Uploads'];
+
         return $query->where('privacy', 'public')
-            ->where(function($q) {
+            ->where(function($q) use ($ghostTitles) {
+                // 1. No album at all
                 $q->whereNull('album_id')
+                  // 2. Belongs to a genuinely public album
                   ->orWhereHas('album', function($aq) {
                       $aq->public();
+                  })
+                  // 3. Belongs to a ghost/virtual album → treat as no album
+                  ->orWhereHas('album', function($aq) use ($ghostTitles) {
+                      $aq->withoutGlobalScopes()->whereIn('title', $ghostTitles);
                   });
             });
     }
