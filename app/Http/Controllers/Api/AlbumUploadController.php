@@ -88,7 +88,7 @@ class AlbumUploadController extends Controller
                         'title'       => $normalizedTitle,
                         'slug'        => Str::slug($normalizedTitle) . '-' . Str::random(5),
                         'description' => $request->description,
-                        'is_public'   => ($request->privacy === 'public'),
+                        'privacy'     => $request->privacy ?: 'private',
                     ]);
                 }
             }
