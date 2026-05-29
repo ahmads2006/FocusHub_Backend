@@ -1,5 +1,10 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+@php
+    $locale = app()->getLocale() ?? 'en';
+    $dir = $locale === 'ar' ? 'rtl' : 'ltr';
+    $ogLocale = $locale === 'ar' ? 'ar_AR' : 'en_US';
+@endphp
+<html lang="{{ $locale }}" dir="{{ $dir }}">
 
 <head>
     <meta charset="utf-8">
@@ -10,8 +15,8 @@
     <!-- Open Graph (WhatsApp, Facebook) -->
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="OpalShot">
-    <meta property="og:locale" content="ar_AR">
-    <meta property="og:locale:alternate" content="en_US">
+    <meta property="og:locale" content="{{ $ogLocale }}">
+    <meta property="og:locale:alternate" content="{{ $locale === 'ar' ? 'en_US' : 'ar_AR' }}">
     <meta property="og:title" content="{{ $title }} | OpalShot">
     <meta property="og:description" content="{{ $description }}">
     <meta property="og:image" content="{{ $imageUrl }}">
@@ -52,7 +57,11 @@
 </head>
 
 <body>
-    <p>جاري فتح الألبوم... <br><a href="{!! $redirectUrl !!}">اضغط هنا إذا لم يتم توجيهك تلقائياً</a></p>
+    @if($locale === 'ar')
+        <p>جاري فتح الألبوم... <br><a href="{!! $redirectUrl !!}">اضغط هنا إذا لم يتم توجيهك تلقائياً</a></p>
+    @else
+        <p>Opening album... <br><a href="{!! $redirectUrl !!}">Click here if you are not redirected automatically</a></p>
+    @endif
 </body>
 
 </html>

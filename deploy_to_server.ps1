@@ -43,6 +43,7 @@ upload_file "app/Notifications/SharedLinkLeakDetected.php" "$REMOTE_PATH/app/Not
 Write-Host "Updating Bootstrap..."
 upload_file "bootstrap/app.php" "$REMOTE_PATH/bootstrap/app.php"
 upload_file "routes/channels.php" "$REMOTE_PATH/routes/channels.php"
+upload_file "resources/views/meta_proxy.blade.php" "$REMOTE_PATH/resources/views/meta_proxy.blade.php"
 
 if (Test-Path "$BASE/app/Http/Kernel.php") {
     Write-Host "Updating Kernel..."
