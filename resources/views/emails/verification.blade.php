@@ -1,7 +1,6 @@
 @php
     $isAr = app()->getLocale() == 'ar';
     $dir = $isAr ? 'rtl' : 'ltr';
-    $codeSpacing = implode(' ', str_split($code ?? '000000'));
 @endphp
 <!DOCTYPE html>
 <html lang="{{ app()->getLocale() }}" dir="{{ $dir }}">
@@ -184,7 +183,7 @@
         <!-- Code Box -->
         <div class="code-box">
             <div class="code-label">ONE-TIME PASSWORD</div>
-            <div class="code-value">{{ $codeSpacing }}</div>
+            <div class="code-value">{{ $code ?? '000000' }}</div>
             <div class="code-expiry">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.6">
                     <circle cx="12" cy="12" r="10"></circle>

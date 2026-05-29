@@ -40,7 +40,7 @@
                         </div>
                         <div class="code-box">
                             <div class="code-label">Verification Code</div>
-                            <div class="code">{{ implode(' ', str_split($otp ?? '000000')) }}</div>
+                            <div class="code">{{ $otp ?? '000000' }}</div>
                         </div>
                         <div class="warning">
                             {{ app()->getLocale() == 'ar' ? 'تحذير: سيؤدي هذا الإجراء إلى حذف الألبوم وجميع صوره بشكل دائم من خوادمنا ولن يمكن التراجع عنه.' : 'Warning: This action will permanently delete the album and all its images from our servers. This cannot be undone.' }}
