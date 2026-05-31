@@ -314,7 +314,10 @@ class AlbumController extends Controller
             return response()->json(['success' => false, 'message' => __('messages.already_collaborator')], 409);
         }
 
-        $album->collaborators()->attach($userToAdd->id, ['role' => $validated['role']]);
+        $album->collaborators()->attach($userToAdd->id, [
+            'role'   => $validated['role'],
+            'status' => 'accepted'
+        ]);
         
         // Log Activity manually since pivot attach doesn't trigger model events
         activity()
@@ -329,8 +332,15 @@ class AlbumController extends Controller
             'sender_id'   => Auth::id(),
             'receiver_id' => $userToAdd->id,
             'album_id'    => $album->id,
-            'body'        => "لقد قمت بدعوتك للانضمام إلى الألبوم المشترك: {$album->title}.",
+            'body'        => "لقد قمت بإضافتك إلى الألبوم المشترك: {$album->title}.",
         ]);
+
+        // Sync group conversation
+        try {
+            $this->syncGroupConversation($album);
+        } catch (\Exception $e) {
+            \Log::error("Failed to sync group conversation: " . $e->getMessage());
+        }
 
         return response()->json([
             'success' => true,
