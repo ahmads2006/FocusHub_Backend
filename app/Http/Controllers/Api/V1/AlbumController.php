@@ -37,7 +37,7 @@ class AlbumController extends Controller
 
         $sharedAlbums = $user->collaborativeAlbums()
             ->where('title', '!=', 'Quick Uploads')
-            ->with(['settings', 'images' => function($q) {
+            ->with(['settings', 'owner', 'images' => function($q) {
                 $q->latest()->limit(5);
             }])
             ->withCount('images')
