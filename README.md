@@ -1,12 +1,12 @@
 <p align="center">
-  <img src="https://img.shields.io/badge/OpticVault-API%20v2.5-blueviolet?style=for-the-badge&logo=laravel&logoColor=white" alt="OpticVault API">
+  <img src="https://img.shields.io/badge/opalshot-API%20v2.5-blueviolet?style=for-the-badge&logo=laravel&logoColor=white" alt="opalshot API">
   <img src="https://img.shields.io/badge/Laravel-11.x-FF2D20?style=for-the-badge&logo=laravel&logoColor=white" alt="Laravel 11">
   <img src="https://img.shields.io/badge/New%20Relic-Observability-008C99?style=for-the-badge&logo=new-relic&logoColor=white" alt="New Relic">
   <img src="https://img.shields.io/badge/MongoDB-Powered-47A248?style=for-the-badge&logo=mongodb&logoColor=white" alt="MongoDB">
   <img src="https://img.shields.io/badge/Redis-Powered-DC382D?style=for-the-badge&logo=redis&logoColor=white" alt="Redis">
 </p>
 
-<h1 align="center">🛡️ OpticVault — Secure Cloud Photography Platform</h1>
+<h1 align="center">🛡️ opalshot — Secure Cloud Photography Platform</h1>
 
 <p align="center">
   <b>منصة تصوير سحابية احترافية مبنية على معمارية حديثة مع ذكاء اصطناعي متكامل، نظام محادثات NoSQL، ورصد أداء فائق.</b>
@@ -16,7 +16,7 @@
 
 ## 📌 نظرة عامة (Overview)
 
-**OpticVault** هو نظام باك إند متكامل لمنصة تصوير احترافية يقدم:
+**opalshot** هو نظام باك إند متكامل لمنصة تصوير احترافية يقدم:
 
 - 📷 **إدارة الصور والألبومات** مع دعم كامل للخصوصية (عام / خاص / مخفي) ونظام تعاون (Collaborators).
 - 🤖 **ذكاء اصطناعي** متطور للإشراف، التصنيف التلقائي، ومحرك توصيات (Anti-Clustering & Diversity).
@@ -30,7 +30,7 @@
 ## 🏗️ الهيكلية المعمارية (Architecture)
 
 ```
-OpticVault/
+opalshot/
 ├── app/
 │   ├── Http/
 │   │   ├── Controllers/
@@ -114,7 +114,7 @@ OpticVault/
 docker-compose -f docker-compose.prod.yml up -d --build
 
 # تفعيل التحسينات
-docker exec opticvault-app php artisan optimize
+docker exec opalshot-app php artisan optimize
 ```
 
 ---
@@ -122,8 +122,51 @@ docker exec opticvault-app php artisan optimize
 <p align="center">
   <b>صُنع بـ ❤️ بواسطة فريق opalshot</b><br>
   <sub>مشروع تخرج — 2026</sub>
-</p>
-            # إعدادات الأمان
+  
+
+
+
+---
+
+## 📡 نقاط الـ API (API Endpoints) - V1
+
+> [!IMPORTANT]
+> للحصول على توثيق كامل وشامل لجميع الـ Endpoints، يرجى مراجعة ملف [**API Documentation**](./api_documentation.md).
+
+### مقتطف من المسارات الأساسية:
+- `POST /api/v1/auth/login` - الدخول الموحد.
+- `GET  /api/v1/feed/home` - التغذية الذكية (AI Powered).
+- `GET  /api/v1/chat/conversations` - المحادثات (MongoDB).
+- `POST /api/v1/images/{id}/protect` - تفعيل حماية SecureShield.
+- `POST /api/v1/upload/batch` - الرفع الجماعي (Bulk Upload).
+
+---
+
+## 🔧 التكوين والنشر (Configuration & Deployment)
+
+### إعدادات الأمان
+
+### إدارة المستخدمين (User Management)
+```
+GET    /api/v1/users                # قائمة المستخدمين
+GET    /api/v1/users/{id}           # تفاصيل المستخدم
+PUT    /api/v1/users/{id}           # تحديث المستخدم
+POST   /api/v1/users/{id}/deactivate  # إلغاء تفعيل
+POST   /api/v1/users/{id}/suspend     # إيقاف حساب
+```
+
+### إدارة الألبومات (Albums)
+```
+GET    /api/v1/albums              # قائمة الألبومات
+GET    /api/v1/albums/{id}           # تفاصيل الألبوم
+PUT    /api/v1/albums/{id}           # تحديث الألبوم
+POST   /api/v1/albums/{id}/add-image # إضافة صور للألبوم
+```
+
+### إدارة الصور (Images)
+```
+GET    /api/v1/images/search          # بحث متقدم بالـ API
+POST   /api/v1/images/{id}/delete      # حذف صورة
 GET    /api/v1/me/storage-stats       # إحصائيات التخزين
 ```
 

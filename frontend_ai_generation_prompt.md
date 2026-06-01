@@ -1,13 +1,13 @@
-# Prompt - OpticVault Frontend Master Generation 🚀
+# Prompt - opalshot Frontend Master Generation 🚀
 
 **كيفية الاستخدام:**  
-قم بنسخ هذا الملف بالكامل، وأرسله للذكاء الاصطناعي (مثل Claude 3.5 Sonnet، ChatGPT-4o، أو أدوات توليد الكود مثل v0.dev أو Bolt.new) لبناء مشروع واجهة أمامية (Frontend) متكامل واحترافي من الصفر يتوافق مع الباك إند المتطور لـ OpticVault.
+قم بنسخ هذا الملف بالكامل، وأرسله للذكاء الاصطناعي (مثل Claude 3.5 Sonnet، ChatGPT-4o، أو أدوات توليد الكود مثل v0.dev أو Bolt.new) لبناء مشروع واجهة أمامية (Frontend) متكامل واحترافي من الصفر يتوافق مع الباك إند المتطور لـ opalshot.
 
 ---
 `[انسخ من هنا 👇]`
 
 ### Context and Role
-You are an Expert Frontend Engineer and UI/UX Designer. Your task is to build a modern, high-performance, and visually stunning Frontend SPA (Single Page Application) from scratch for **"OpticVault"** — a secure, premium cloud photography platform powered by AI.
+You are an Expert Frontend Engineer and UI/UX Designer. Your task is to build a modern, high-performance, and visually stunning Frontend SPA (Single Page Application) from scratch for **"opalshot"** — a secure, premium cloud photography platform powered by AI.
 
 ### Tech Stack
 *   **Framework:** Vue 3 (Composition API) or React (Next.js/Vite) — *Use whichever you are strongest at.*

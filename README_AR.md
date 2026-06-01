@@ -1,7 +1,7 @@
-# 🛡️ OpticVault — منصة التصوير السحابي الآمنة
+# 🛡️ opalshot — منصة التصوير السحابي الآمنة
 
 <p align="center">
-  <img src="https://img.shields.io/badge/OpticVault-API%20v2.5-blueviolet?style=for-the-badge&logo=laravel&logoColor=white" alt="OpticVault API">
+  <img src="https://img.shields.io/badge/opalshot-API%20v2.5-blueviolet?style=for-the-badge&logo=laravel&logoColor=white" alt="opalshot API">
   <img src="https://img.shields.io/badge/Laravel-11.x-FF2D20?style=for-the-badge&logo=laravel&logoColor=white" alt="Laravel 11">
   <img src="https://img.shields.io/badge/New%20Relic-Observability-008C99?style=for-the-badge&logo=new-relic&logoColor=white" alt="New Relic">
   <img src="https://img.shields.io/badge/MongoDB-Powered-47A248?style=for-the-badge&logo=mongodb&logoColor=white" alt="MongoDB">
@@ -14,7 +14,7 @@
 ---
 
 ## 📌 نظرة عامة
-**OpticVault** هو مشروع متكامل يوفر بيئة استضافة صور آمنة تضمن للمصورين حماية حقوقهم وإدارة أعمالهم بكفاءة عالية. يتميز النظام بالسرعة الفائقة بفضل وجود طبقات كاش متقدمة وتكامل مع أفضل خدمات الـ CDN، بالإضافة إلى نظام محادثات متطور ورصد شامل للأخطاء والأداء.
+**opalshot** هو مشروع متكامل يوفر بيئة استضافة صور آمنة تضمن للمصورين حماية حقوقهم وإدارة أعمالهم بكفاءة عالية. يتميز النظام بالسرعة الفائقة بفضل وجود طبقات كاش متقدمة وتكامل مع أفضل خدمات الـ CDN، بالإضافة إلى نظام محادثات متطور ورصد شامل للأخطاء والأداء.
 
 ---
 
@@ -66,7 +66,7 @@
 docker-compose -f docker-compose.prod.yml up -d --build
 
 # تنفيذ عمليات تحسين الأداء
-docker exec opticvault-app php artisan optimize
+docker exec opalshot-app php artisan optimize
 ```
 
 ---
