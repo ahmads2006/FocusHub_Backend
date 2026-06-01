@@ -297,13 +297,28 @@ class SharedLinkController extends Controller
         if ($zip->open($zipFilePath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) === true) {
             $tempFiles = [];
             foreach ($items as $index => $image) {
-                $disk = $image->storage->disk ?? 'public';
-                $path = $image->storage->path ?? null;
+                $path = $image->storage->path ?? $image->path ?? null;
+                if (!$path) continue;
 
-                if ($path && Storage::disk($disk)->exists($path)) {
-                    $stream = Storage::disk($disk)->readStream($path);
+                $preferredDisk = $image->storage->disk ?? 'public';
+                if ($preferredDisk === 'spaces') {
+                    $preferredDisk = 's3';
+                }
+
+                $activeDisk = null;
+                $disksToCheck = array_unique([$preferredDisk, 'public', 'local', 's3']);
+                
+                foreach ($disksToCheck as $d) {
+                    if (Storage::disk($d)->exists($path)) {
+                        $activeDisk = $d;
+                        break;
+                    }
+                }
+
+                if ($activeDisk) {
+                    $stream = Storage::disk($activeDisk)->readStream($path);
                     if ($stream) {
-                        $tempFile = tempnam(sys_get_temp_dir(), 'album_img_');
+                        $tempFile = tempnam($tempDir, 'album_img_');
                         $out      = fopen($tempFile, 'wb');
                         stream_copy_to_stream($stream, $out);
                         fclose($out);
