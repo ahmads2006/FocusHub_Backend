@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AdminController;
 use App\Http\Controllers\Api\ScannerController;
+use App\Http\Controllers\Api\V1\PerformanceMetricsController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -71,6 +72,14 @@ Route::post('/auth/facebook/deletion', [\App\Http\Controllers\Api\Auth\FacebookD
 // ╚══════════════════════════════════════════════════════════════════╝
 
 Route::prefix('v1')->group(function () {
+    // ══════════════════════════════════════════
+    // 0. 📈 PERFORMANCE METRICS (Public ingest)
+    // ══════════════════════════════════════════
+    Route::prefix('metrics')->middleware('throttle:api')->group(function () {
+        Route::post('/web-vitals', [PerformanceMetricsController::class, 'ingestWebVitals']);
+        Route::post('/prefetch', [PerformanceMetricsController::class, 'ingestPrefetch']);
+    });
+
     // Health Check (Admin Only)
     Route::get('/health', [App\Http\Controllers\Api\SystemHealthController::class, 'index'])
         ->middleware(['auth:sanctum', 'role:super-admin']);
@@ -326,6 +335,9 @@ Route::prefix('v1')->group(function () {
     // 3. 🛡️ ADMIN API (V1)
     // ══════════════════════════════════════════
     Route::prefix('admin')->middleware(['auth:sanctum', 'check.banned', 'role:super-admin'])->group(function () {
+        // Performance Monitoring
+        Route::get('/performance/summary', [PerformanceMetricsController::class, 'summary']);
+        Route::get('/performance/worst-pages', [PerformanceMetricsController::class, 'worstPages']);
 
         // Dashboard Stats
         Route::get('/stats', function () {

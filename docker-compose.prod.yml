@@ -1,4 +1,8 @@
 networks:
+  # Deployment note:
+  # The backend metrics rollout uses `docker compose ... ps -q app`
+  # in `deploy_to_server.ps1` to resolve the active app container ID
+  # before running `php artisan migrate --force`.
   opticvault_default:
     name: opticvault_default
   opticvault_network:

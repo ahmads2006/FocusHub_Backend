@@ -6,78 +6,60 @@ $SCRIPT_DIR = Split-Path -Parent $MyInvocation.MyCommand.Path
 $BASE = $SCRIPT_DIR
 $PROJECT_ROOT = Split-Path $SCRIPT_DIR -Parent
 $KEY_PATH = Join-Path -Path $PROJECT_ROOT -ChildPath $KEY
+
 function upload_file {
     param($local, $remote)
-    $localPath = $local -replace '/', '\\'
+    $localPath = $local -replace '/', '\'
     $fullPath = Join-Path -Path $BASE -ChildPath $localPath
+    if (-not (Test-Path $fullPath)) {
+        throw "Local file not found: $fullPath"
+    }
+    Write-Host "Uploading $local"
     scp -i $KEY_PATH "$fullPath" "root@${IP}:${remote}"
+    if ($LASTEXITCODE -ne 0) {
+        throw "SCP failed for $local"
+    }
 }
 
-Write-Host "Updating Core Models..."
-upload_file "app/Models/User.php" "$REMOTE_PATH/app/Models/User.php"
-upload_file "app/Models/SharedLink.php" "$REMOTE_PATH/app/Models/SharedLink.php"
-upload_file "app/Models/Image.php" "$REMOTE_PATH/app/Models/Image.php"
-upload_file "app/Services/AI/RecommendationEngine.php" "$REMOTE_PATH/app/Services/AI/RecommendationEngine.php"
+Write-Host "Deploying performance metrics backend files only..."
 
-Write-Host "Updating Logic & Controllers..."
-upload_file "app/Http/Controllers/Api/AlbumUploadController.php" "$REMOTE_PATH/app/Http/Controllers/Api/AlbumUploadController.php"
-upload_file "app/Http/Controllers/Api/ImageController.php" "$REMOTE_PATH/app/Http/Controllers/Api/ImageController.php"
-upload_file "app/Http/Controllers/Api/V1/SharedLinkController.php" "$REMOTE_PATH/app/Http/Controllers/Api/V1/SharedLinkController.php"
-upload_file "app/Http/Controllers/Api/V1/MongoChatController.php" "$REMOTE_PATH/app/Http/Controllers/Api/V1/MongoChatController.php"
-upload_file "app/Events/MessageSent.php" "$REMOTE_PATH/app/Events/MessageSent.php"
-upload_file "app/Http/Middleware/ValidateSharedLink.php" "$REMOTE_PATH/app/Http/Middleware/ValidateSharedLink.php"
-upload_file "app/Services/Security/SharedLinkService.php" "$REMOTE_PATH/app/Services/Security/SharedLinkService.php"
-upload_file "app/Http/Controllers/Api/V1/GalleryController.php" "$REMOTE_PATH/app/Http/Controllers/Api/V1/GalleryController.php"
-upload_file "app/Http/Controllers/Web/DownloadController.php" "$REMOTE_PATH/app/Http/Controllers/Web/DownloadController.php"
-upload_file "app/Http/Controllers/Web/AssetAccessController.php" "$REMOTE_PATH/app/Http/Controllers/Web/AssetAccessController.php"
-upload_file "app/Services/Core/AssetDeliveryService.php" "$REMOTE_PATH/app/Services/Core/AssetDeliveryService.php"
-upload_file "app/Services/AI/ContentSafetyService.php" "$REMOTE_PATH/app/Services/AI/ContentSafetyService.php"
-upload_file "app/Services/Core/ImageService.php" "$REMOTE_PATH/app/Services/Core/ImageService.php"
-upload_file "app/Services/AI/RecommendationEngine.php" "$REMOTE_PATH/app/Services/AI/RecommendationEngine.php"
+$filesToDeploy = @(
+    "app/Models/PerformanceMetric.php",
+    "app/Http/Controllers/Api/V1/PerformanceMetricsController.php",
+    "database/migrations/2026_06_02_162500_create_performance_metrics_table.php",
+    "routes/api.php"
+)
 
-Write-Host "Updating Policies & Notifications..."
-upload_file "app/Policies/ImagePolicy.php" "$REMOTE_PATH/app/Policies/ImagePolicy.php"
-upload_file "app/Policies/AlbumPolicy.php" "$REMOTE_PATH/app/Policies/AlbumPolicy.php"
-upload_file "app/Notifications/SharedLinkLeakDetected.php" "$REMOTE_PATH/app/Notifications/SharedLinkLeakDetected.php"
-
-Write-Host "Updating Bootstrap..."
-upload_file "bootstrap/app.php" "$REMOTE_PATH/bootstrap/app.php"
-upload_file "routes/channels.php" "$REMOTE_PATH/routes/channels.php"
-upload_file "resources/views/meta_proxy.blade.php" "$REMOTE_PATH/resources/views/meta_proxy.blade.php"
-upload_file "resources/views/emails/verification.blade.php" "$REMOTE_PATH/resources/views/emails/verification.blade.php"
-upload_file "resources/views/emails/album-delete-otp.blade.php" "$REMOTE_PATH/resources/views/emails/album-delete-otp.blade.php"
-
-if (Test-Path "$BASE/app/Http/Kernel.php") {
-    Write-Host "Updating Kernel..."
-    upload_file "app/Http/Kernel.php" "$REMOTE_PATH/app/Http/Kernel.php"
-} else {
-    Write-Host "Kernel.php not found. Skipping Kernel update."
+foreach ($file in $filesToDeploy) {
+    upload_file $file "$REMOTE_PATH/$file"
 }
 
-Write-Host "Updating Security & Logs..."
-upload_file "app/Http/Middleware/RequestLogger.php" "$REMOTE_PATH/app/Http/Middleware/RequestLogger.php"
-upload_file "app/Helpers/SecurityHelper.php" "$REMOTE_PATH/app/Helpers/SecurityHelper.php"
+Write-Host "Running migration + cache refresh inside app container..."
+$remoteCmd = @"
+set -e
+cd $REMOTE_PATH
+APP_CONTAINER=`$(docker compose -f docker-compose.prod.yml ps -q app | head -n 1)
+if [ -z "`$APP_CONTAINER" ]; then
+  echo "App container not found"
+  exit 1
+fi
+docker exec `$APP_CONTAINER php artisan migrate --force
+docker exec `$APP_CONTAINER php artisan optimize:clear
+docker exec `$APP_CONTAINER php artisan route:clear
+docker exec `$APP_CONTAINER php artisan config:clear
+docker exec `$APP_CONTAINER php artisan route:list --path=api/v1/metrics
+docker exec `$APP_CONTAINER php artisan route:list --path=api/v1/admin/performance
+"@
 
-Write-Host "Updating Image Policy..."
-upload_file "app/Policies/ImagePolicy.php" "$REMOTE_PATH/app/Policies/ImagePolicy.php"
+ssh -i $KEY_PATH root@$IP $remoteCmd
+if ($LASTEXITCODE -ne 0) {
+    throw "Remote migration/validation command failed."
+}
 
-Write-Host "Updating Album Policy..."
-upload_file "app/Policies/AlbumPolicy.php" "$REMOTE_PATH/app/Policies/AlbumPolicy.php"
+Write-Host "Restarting worker/scheduler/reverb services..."
+ssh -i $KEY_PATH root@$IP "cd $REMOTE_PATH && docker compose -f docker-compose.prod.yml restart php-worker php-scheduler reverb"
+if ($LASTEXITCODE -ne 0) {
+    throw "Service restart failed."
+}
 
-Write-Host "Updating ProfileController..."
-Write-Host "Updating ProfileController..."
-upload_file "app/Http/Controllers/Api/V1/ProfileController.php" "$REMOTE_PATH/app/Http/Controllers/Api/V1/ProfileController.php"
-
-Write-Host "Updating User Profile..."
-upload_file "app/Models/User.php" "$REMOTE_PATH/app/Models/User.php"
-
-Write-Host "Uploading new migrations..."
-upload_file "database/migrations/2026_05_14_181300_add_token_hash_to_shared_links.php" "$REMOTE_PATH/database/migrations/2026_05_14_181300_add_token_hash_to_shared_links.php"
-
-Write-Host "Running migrations on server..."
-ssh -i $KEY_PATH root@$IP "docker exec opalshot-app-1 php artisan migrate --force"
-
-Write-Host "Restarting containers to clear cache..."
-ssh -i $KEY_PATH root@$IP "cd $REMOTE_PATH && docker-compose -f docker-compose.prod.yml restart app php-worker php-scheduler reverb"
-
-Write-Host "Deployment complete."
+Write-Host "✅ Backend deployment completed successfully."
