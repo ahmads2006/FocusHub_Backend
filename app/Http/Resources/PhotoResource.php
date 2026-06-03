@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Helpers\MediaHelper;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -30,6 +31,10 @@ class PhotoResource extends JsonResource
             ? $this->comments->values()->all()
             : [];
 
+        $frame = MediaHelper::resolveGalleryFrame(
+            $this->relationLoaded('meta') ? $this->meta : null
+        );
+
         return [
             'id' => $this->id,
             'user_id' => $this->user_id,
@@ -47,6 +52,12 @@ class PhotoResource extends JsonResource
             'url_tiny' => $this->url_tiny,
             'original_url' => $canDownload ? $this->resource->original_url : null,
             'srcset' => $this->srcset,
+
+            // Gallery layout: reserve real frame space before images load
+            'width' => $frame['width'],
+            'height' => $frame['height'],
+            'orientation' => $frame['orientation'],
+            'aspect_ratio' => $frame['aspect_ratio'],
 
             'created_at' => optional($this->created_at)->toIso8601String(),
             'updated_at' => optional($this->updated_at)->toIso8601String(),

@@ -23,20 +23,18 @@ function upload_file {
 
 Write-Host "Deploying updated backend files..."
 
+# Gallery frame / aspect-ratio API (backend only)
 $filesToDeploy = @(
-    "app/Policies/ImagePolicy.php",
-    "app/Models/Image.php",
-    "app/Services/Core/AssetDeliveryService.php",
-    "app/Services/Core/ImageService.php",
-    "app/Http/Controllers/Api/V1/SharedLinkController.php",
-    "routes/api.php"
+    "app/Helpers/MediaHelper.php",
+    "app/Http/Resources/PhotoResource.php",
+    "app/Models/Image.php"
 )
 
 foreach ($file in $filesToDeploy) {
     upload_file $file "$REMOTE_PATH/$file"
 }
 
-Write-Host "Running migration + cache refresh inside app container..."
+Write-Host "Refreshing Laravel cache inside app container..."
 $remoteCmd = @"
 set -e
 cd $REMOTE_PATH
@@ -45,12 +43,10 @@ if [ -z "`$APP_CONTAINER" ]; then
   echo "App container not found"
   exit 1
 fi
-docker exec `$APP_CONTAINER php artisan migrate --force
 docker exec `$APP_CONTAINER php artisan optimize:clear
-docker exec `$APP_CONTAINER php artisan route:clear
 docker exec `$APP_CONTAINER php artisan config:clear
-docker exec `$APP_CONTAINER php artisan route:list --path=api/v1/metrics
-docker exec `$APP_CONTAINER php artisan route:list --path=api/v1/admin/performance
+docker exec `$APP_CONTAINER php artisan route:clear
+docker exec `$APP_CONTAINER php artisan view:clear
 "@
 
 ssh -i $KEY_PATH root@$IP $remoteCmd

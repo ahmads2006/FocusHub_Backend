@@ -413,15 +413,6 @@ class Image extends Model
      */
     public function getOrientationAttribute(): string
     {
-        // Try to get dimensions from meta
-        $specs = $this->meta?->technical_specs ?? $this->meta?->specs ?? [];
-        $width = $specs['width'] ?? 0;
-        $height = $specs['height'] ?? 0;
-
-        if ($width > 0 && $height > 0) {
-            return MediaHelper::getOrientation($width, $height);
-        }
-
-        return 'landscape'; // Default fallback
+        return MediaHelper::resolveGalleryFrame($this->meta)['orientation'];
     }
 }
