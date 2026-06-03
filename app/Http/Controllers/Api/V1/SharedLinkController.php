@@ -347,4 +347,70 @@ class SharedLinkController extends Controller
 
         return response()->json(['success' => false, 'message' => __('messages.zip_failed')], 500);
     }
+
+    /**
+     * Show a specific image within a shared link.
+     */
+    public function showImage(Request $request, string $token, Image $image): JsonResponse
+    {
+        $link = $request->attributes->get('shared_link');
+
+        if (!$link) {
+            return response()->json(['success' => false, 'message' => __('messages.invalid_link')], 404);
+        }
+
+        // Validate the image belongs to the shared link context
+        $isValid = false;
+        if ($link->shareable_type === Image::class) {
+            $isValid = ($link->shareable_id === $image->id);
+        } elseif ($link->shareable_type === Album::class) {
+            $isValid = ($link->shareable_id === $image->album_id);
+        }
+
+        if (!$isValid) {
+            return response()->json(['success' => false, 'message' => __('messages.unauthorized')], 403);
+        }
+
+        $image->load(['meta', 'user', 'tags', 'settings'])->loadCount(['likes', 'bookmarks']);
+
+        // Fetch other images in the same album as related photos
+        $related = collect();
+        if ($image->album_id) {
+            $related = Image::withoutGlobalScopes()
+                ->where('album_id', $image->album_id)
+                ->where('id', '!=', $image->id)
+                ->with(['tags', 'settings'])
+                ->latest()
+                ->take(12)
+                ->get();
+        }
+
+        // Fallback or fill with public tag-matching images
+        if ($related->count() < 12) {
+            $tagNames = $image->tags->pluck('name')->toArray();
+            $moreQuery = Image::where('id', '!=', $image->id)
+                ->where('privacy', 'public')
+                ->with(['tags', 'settings'])
+                ->withCount('analytics');
+
+            if (!empty($tagNames)) {
+                $moreQuery->withAnyTags($tagNames);
+            }
+
+            $more = $moreQuery->take(12 - $related->count())->get();
+            $related = $related->concat($more);
+        }
+
+        // Ensure URLs are set
+        $related->each(function($img) {
+            $img->append(['url', 'original_url']);
+        });
+
+        return response()->json([
+            'image' => (new \App\Http\Resources\PhotoResource($image))->resolve(),
+            'related' => \App\Http\Resources\PhotoResource::collection($related)->resolve(),
+            'has_related' => $related->isNotEmpty(),
+            'match_base' => count($image->tags)
+        ]);
+    }
 }
