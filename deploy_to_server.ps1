@@ -23,11 +23,13 @@ function upload_file {
 
 Write-Host "Deploying updated backend files..."
 
-# Gallery frame / aspect-ratio API (backend only)
+# Gallery per-image dimensions (backend)
 $filesToDeploy = @(
     "app/Helpers/MediaHelper.php",
     "app/Http/Resources/PhotoResource.php",
-    "app/Models/Image.php"
+    "app/Models/Image.php",
+    "app/Services/Core/ImageService.php",
+    "app/Console/Commands/BackfillImageDimensions.php"
 )
 
 foreach ($file in $filesToDeploy) {
@@ -47,6 +49,7 @@ docker exec `$APP_CONTAINER php artisan optimize:clear
 docker exec `$APP_CONTAINER php artisan config:clear
 docker exec `$APP_CONTAINER php artisan route:clear
 docker exec `$APP_CONTAINER php artisan view:clear
+docker exec `$APP_CONTAINER php artisan gallery:backfill-dimensions --limit=500
 "@
 
 ssh -i $KEY_PATH root@$IP $remoteCmd

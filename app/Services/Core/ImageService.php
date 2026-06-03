@@ -154,7 +154,8 @@ class ImageService
                 $specs['aperture'] = isset($exif['FNumber']) ? 'f/' . $exif['FNumber'] : 'N/A';
             }
         } catch (\Exception $e) {}
-        return $specs;
+
+        return \App\Helpers\MediaHelper::mergeDimensionsIntoSpecs($specs, $path);
     }
 
     protected function sanitizeFromPath(string $path, bool $isGif = false): string
@@ -522,7 +523,10 @@ class ImageService
             Log::warning("EXIF extraction skipped: " . $e->getMessage());
         }
 
-        return $specs;
+        return \App\Helpers\MediaHelper::mergeDimensionsIntoSpecs(
+            $specs,
+            $file->getRealPath()
+        );
     }
 
     /**

@@ -104,6 +104,24 @@ class MediaHelper
         return is_array($specs) ? $specs : [];
     }
 
+    /**
+     * Store real pixel dimensions from the uploaded/processed file into technical_specs.
+     */
+    public static function mergeDimensionsIntoSpecs(array $specs, string $filePath): array
+    {
+        if (!is_readable($filePath)) {
+            return $specs;
+        }
+
+        $size = @getimagesize($filePath);
+        if ($size && !empty($size[0]) && !empty($size[1])) {
+            $specs['width']  = (int) $size[0];
+            $specs['height'] = (int) $size[1];
+        }
+
+        return $specs;
+    }
+
     private static function gcd(int $a, int $b): int
     {
         $a = abs($a);
