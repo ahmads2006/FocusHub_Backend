@@ -346,7 +346,7 @@ class RecommendationEngine
                   });
             })
             ->with(['settings', 'user', 'labelData', 'storage', 'album', 'album.collaborators'])
-            ->withCount('likes')
+            ->withCount(['likes', 'bookmarks'])
             ->orderByRaw("FIELD(id, {$placeholders})", $slicedIds)
             ->get();
     }

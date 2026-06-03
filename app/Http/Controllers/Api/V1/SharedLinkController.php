@@ -127,6 +127,7 @@ class SharedLinkController extends Controller
             $images = Image::withoutGlobalScopes()
                 ->where('album_id', $shareable->id)
                 ->with(['storage', 'settings', 'user', 'meta', 'tags'])
+                ->withCount(['likes', 'bookmarks'])
                 ->get();
             
             return response()->json([
@@ -149,6 +150,7 @@ class SharedLinkController extends Controller
         if ($shareable instanceof Image) {
             $shareable = Image::withoutGlobalScopes()
                 ->with(['storage', 'settings', 'user', 'meta', 'tags'])
+                ->withCount(['likes', 'bookmarks'])
                 ->findOrFail($shareable->id);
 
             return response()->json([

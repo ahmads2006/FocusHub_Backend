@@ -20,7 +20,7 @@ class ImageController extends Controller
 
     public function index(Request $request)
     {
-        $query = Image::query();
+        $query = Image::query()->withCount(['likes', 'bookmarks']);
 
         if ($request->has('album_id')) {
             $album = \App\Models\Album::findOrFail($request->album_id);
@@ -119,7 +119,7 @@ class ImageController extends Controller
         // 2. Perform the view authorization.
         $this->authorize('view', $image);
         
-        $image->load(['meta', 'user', 'tags', 'aiMetadata', 'settings']);
+        $image->load(['meta', 'user', 'tags', 'aiMetadata', 'settings'])->loadCount(['likes', 'bookmarks']);
         
         // Get related images based on tags
         $tagNames = $image->tags->pluck('name')->toArray();

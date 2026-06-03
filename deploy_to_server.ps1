@@ -21,13 +21,13 @@ function upload_file {
     }
 }
 
-Write-Host "Deploying performance metrics backend files only..."
+Write-Host "Deploying updated likes count backend files..."
 
 $filesToDeploy = @(
-    "app/Models/PerformanceMetric.php",
-    "app/Http/Controllers/Api/V1/PerformanceMetricsController.php",
-    "database/migrations/2026_06_02_162500_create_performance_metrics_table.php",
-    "routes/api.php"
+    "app/Http/Controllers/Api/ImageController.php",
+    "app/Http/Controllers/Api/V1/SharedLinkController.php",
+    "app/Services/AI/RecommendationEngine.php",
+    "app/Models/Album.php"
 )
 
 foreach ($file in $filesToDeploy) {
