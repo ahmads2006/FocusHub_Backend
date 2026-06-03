@@ -350,49 +350,91 @@ class ProfileController extends Controller
             ->count();
 
         $tab = $request->get('tab', 'public');
-        if (!$isOwner) $tab = 'public';
+        if (!$isOwner && $tab !== 'albums') $tab = 'public';
 
         $images = collect();
+        $albums = collect();
         if ($isOwner || $isPublic) {
-            $query = $user->images()->with(['labelData', 'storage', 'settings'])->withCount(['likes', 'bookmarks']);
-
-            if ($tab === 'private' && $isOwner) {
-                $query->where('privacy', 'private');
-                if (!$isOwner) {
-                    $query->whereHas('moderation', fn($q) => $q->where('status', \App\Models\Image::STATUS_APPROVED));
-                }
-            } elseif ($tab === 'saved' && $isOwner) {
-                $images = $user->bookmarkedImages()
-                    ->where(function ($q) use ($user) {
-                        $q->where('images.privacy', 'public')
-                          ->orWhere('images.user_id', $user->id);
-                    })
-                    ->whereHas('moderation', fn($q) => $q->where('status', \App\Models\Image::STATUS_APPROVED))
-                    ->with(['user', 'labelData', 'storage', 'settings', 'aiMetadata'])
-                    ->withCount(['likes', 'bookmarks'])
-                    ->latest('bookmarks.created_at')
-                    ->paginate($request->get('per_page', 50));
-            } elseif ($tab === 'liked' && $isOwner) {
-                $images = \App\Models\Image::whereHas('likes', fn($q) => $q->where('user_id', $user->id))
-                    ->where(function ($q) use ($user) {
-                        $q->where('images.privacy', 'public')
-                          ->orWhere('images.user_id', $user->id);
-                    })
-                    ->whereHas('moderation', fn($q) => $q->where('status', \App\Models\Image::STATUS_APPROVED))
-                    ->with(['user', 'labelData', 'storage', 'settings', 'aiMetadata'])
-                    ->withCount(['likes', 'bookmarks'])
+            if ($tab === 'albums') {
+                $albums = \App\Models\Album::where('user_id', $user->id)
+                    ->public()
+                    ->with(['user', 'settings'])
+                    ->withCount('photos')
                     ->latest()
                     ->paginate($request->get('per_page', 50));
+
+                $albums->getCollection()->each(function ($album) {
+                    $firstPhoto = $album->photos()
+                        ->where('privacy', 'public')
+                        ->whereHas('moderation', fn($q) => $q->where('status', \App\Models\Image::STATUS_APPROVED))
+                        ->first();
+                    $album->cover_url = $album->cover_image ?: ($firstPhoto ? $firstPhoto->url : null);
+                });
             } else {
-                $query->where('privacy', 'public');
-                if (!$isOwner) {
-                    $query->whereHas('moderation', fn($q) => $q->where('status', \App\Models\Image::STATUS_APPROVED));
+                $query = $user->images()->with(['labelData', 'storage', 'settings'])->withCount(['likes', 'bookmarks']);
+
+                if ($tab === 'private' && $isOwner) {
+                    $query->where('privacy', 'private');
+                    if (!$isOwner) {
+                        $query->whereHas('moderation', fn($q) => $q->where('status', \App\Models\Image::STATUS_APPROVED));
+                    }
+                } elseif ($tab === 'saved' && $isOwner) {
+                    $images = $user->bookmarkedImages()
+                        ->where(function ($q) use ($user) {
+                            $q->where('images.privacy', 'public')
+                              ->orWhere('images.user_id', $user->id);
+                        })
+                        ->whereHas('moderation', fn($q) => $q->where('status', \App\Models\Image::STATUS_APPROVED))
+                        ->with(['user', 'labelData', 'storage', 'settings', 'aiMetadata'])
+                        ->withCount(['likes', 'bookmarks'])
+                        ->latest('bookmarks.created_at')
+                        ->paginate($request->get('per_page', 50));
+                } elseif ($tab === 'liked' && $isOwner) {
+                    $images = \App\Models\Image::whereHas('likes', fn($q) => $q->where('user_id', $user->id))
+                        ->where(function ($q) use ($user) {
+                            $q->where('images.privacy', 'public')
+                              ->orWhere('images.user_id', $user->id);
+                        })
+                        ->whereHas('moderation', fn($q) => $q->where('status', \App\Models\Image::STATUS_APPROVED))
+                        ->with(['user', 'labelData', 'storage', 'settings', 'aiMetadata'])
+                        ->withCount(['likes', 'bookmarks'])
+                        ->latest()
+                        ->paginate($request->get('per_page', 50));
+                } else {
+                    $query->where('privacy', 'public');
+                    if (!$isOwner) {
+                        $query->whereHas('moderation', fn($q) => $q->where('status', \App\Models\Image::STATUS_APPROVED));
+                    }
+                }
+
+                if ($images->isEmpty() && isset($query)) {
+                    $images = $query->latest()->paginate($request->get('per_page', 50));
                 }
             }
+        }
 
-            if ($images->isEmpty() && isset($query)) {
-                $images = $query->latest()->paginate($request->get('per_page', 50));
-            }
+        if ($tab === 'albums') {
+            return response()->json([
+                'success' => true,
+                'data'    => [
+                    'user'        => [
+                        'id'                => $user->id,
+                        'name'              => $user->name,
+                        'avatar'            => $user->avatar,
+                        'is_badge_verified' => (bool) $user->is_badge_verified,
+                        'is_public_profile' => $isPublic,
+                    ],
+                    'is_owner'             => $isOwner,
+                    'is_following'         => $isFollowing,
+                    'stats'                => [
+                        'likes'       => $totalLikes,
+                        'photos'      => $totalPhotos,
+                        'connections' => $totalConnections,
+                    ],
+                    'albums'               => $albums->toArray(),
+                    'active_tab'           => $tab,
+                ],
+            ]);
         }
 
         $formattedImages = \App\Http\Resources\PhotoResource::collection($images);
