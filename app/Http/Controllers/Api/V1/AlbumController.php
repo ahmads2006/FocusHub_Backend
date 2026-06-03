@@ -876,6 +876,45 @@ class AlbumController extends Controller
     }
 
     /**
+     * Display a public album with its approved public images.
+     */
+    public function showPublic(Album $album): JsonResponse
+    {
+        if ($album->privacy !== 'public') {
+            return response()->json([
+                'success' => false,
+                'message' => __('messages.album_unauthorized'),
+            ], 403);
+        }
+
+        $album->load(['settings', 'user']);
+
+        $images = $album->images()
+            ->where('privacy', 'public')
+            ->whereHas('moderation', fn($q) => $q->where('status', \App\Models\Image::STATUS_APPROVED))
+            ->with(['user', 'storage', 'settings'])
+            ->withCount(['likes', 'bookmarks'])
+            ->latest()
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'data'    => [
+                'id' => $album->id,
+                'title' => $album->title,
+                'description' => $album->description,
+                'privacy' => $album->privacy,
+                'images' => $images,
+                'owner' => [
+                    'id' => $album->user->id,
+                    'name' => $album->user->name,
+                    'avatar' => $album->user->avatar,
+                ]
+            ],
+        ]);
+    }
+
+    /**
      * Get numeric weight for a role (lower is more powerful).
      */
     private function getRoleWeight($role): int

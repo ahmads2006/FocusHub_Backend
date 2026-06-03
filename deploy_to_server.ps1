@@ -28,7 +28,9 @@ $filesToDeploy = @(
     "app/Http/Controllers/Api/V1/SharedLinkController.php",
     "app/Services/AI/RecommendationEngine.php",
     "app/Models/Album.php",
-    "app/Http/Controllers/Api/V1/ProfileController.php"
+    "app/Http/Controllers/Api/V1/ProfileController.php",
+    "app/Http/Controllers/Api/V1/AlbumController.php",
+    "routes/api.php"
 )
 
 foreach ($file in $filesToDeploy) {

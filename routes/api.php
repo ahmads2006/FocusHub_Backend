@@ -414,6 +414,7 @@ Route::prefix('v1')->group(function () {
     Route::get('/gallery/tags/popular', [App\Http\Controllers\Api\V1\GalleryController::class, 'popularTags']);
     Route::get('/gallery/tags/autocomplete', [App\Http\Controllers\Api\V1\GalleryController::class, 'autocompleteTags']);
     Route::get('/gallery', [App\Http\Controllers\Api\V1\GalleryController::class, 'index']);
+    Route::get('/albums/{album}/public', [App\Http\Controllers\Api\V1\AlbumController::class, 'showPublic']);
 
 });
 
