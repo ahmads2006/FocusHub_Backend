@@ -158,6 +158,12 @@ class AssetDeliveryService
             return true;
         }
 
+        // 🛡️ Enforcement: If the owner/uploader disabled downloading, nobody else can download
+        $canGlobalDownload = (bool)($image->settings?->allow_download ?? false);
+        if (!$canGlobalDownload) {
+             return false;
+        }
+
         // 2. Collaborators access
         if ($user && $image->album && $image->album->is_collaborative) {
             if ($image->album->collaborators()->where('users.id', $user->id)->exists()) {

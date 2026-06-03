@@ -413,4 +413,51 @@ class SharedLinkController extends Controller
             'match_base' => count($image->tags)
         ]);
     }
+
+    /**
+     * Download a specific image within a shared link.
+     */
+    public function downloadImage(Request $request, string $token, Image $image): JsonResponse
+    {
+        $link = $request->attributes->get('shared_link');
+
+        if (!$link) {
+            return response()->json(['success' => false, 'message' => __('messages.invalid_link')], 404);
+        }
+
+        // Validate the image belongs to the shared link context
+        $isValid = false;
+        if ($link->shareable_type === Image::class) {
+            $isValid = ($link->shareable_id === $image->id);
+        } elseif ($link->shareable_type === Album::class) {
+            $isValid = ($link->shareable_id === $image->album_id);
+        }
+
+        if (!$isValid) {
+            return response()->json(['success' => false, 'message' => __('messages.unauthorized')], 403);
+        }
+
+        // Check permission
+        if ($link->permission !== 'download') {
+            return response()->json(['success' => false, 'message' => __('messages.unauthorized_download')], 403);
+        }
+
+        // Setup session variables so ImagePolicy and AssetAccessController can authorize the guest download properly
+        session()->put("shared_link_access_{$image->id}", $link->permission);
+        session()->put("shared_link_watermark_{$image->id}", $link->require_watermark);
+        session()->put("shared_link_id_{$image->id}", $link->id);
+        if ($link->shareable_type === Album::class) {
+            session()->put("shared_link_access_album_{$link->shareable_id}", $link->permission);
+        }
+
+        // Instantiate DownloadController and call download / downloadOriginal
+        $downloadController = app(\App\Http\Controllers\Web\DownloadController::class);
+        $useOriginal = $request->query('original') === 'true';
+
+        if ($useOriginal) {
+            return $downloadController->downloadOriginal($image);
+        } else {
+            return $downloadController->download($image);
+        }
+    }
 }

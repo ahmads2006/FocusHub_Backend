@@ -402,6 +402,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/share/{token}', [App\Http\Controllers\Api\V1\SharedLinkController::class, 'show'])->name('shared_link.show');
         Route::get('/share/{token}/download', [App\Http\Controllers\Api\V1\SharedLinkController::class, 'downloadAlbum']);
         Route::get('/share/{token}/images/{image}', [App\Http\Controllers\Api\V1\SharedLinkController::class, 'showImage'])->name('shared_link.image');
+        Route::get('/share/{token}/images/{image}/download', [App\Http\Controllers\Api\V1\SharedLinkController::class, 'downloadImage'])->name('shared_link.image.download');
     });
 
     // ══════════════════════════════════════════

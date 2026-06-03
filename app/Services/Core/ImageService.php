@@ -173,7 +173,7 @@ class ImageService
         return $tempPath;
     }
 
-    /**
+    /*
      * The Full-Stack "Extract -> Sanitize -> Upload" Pipeline
     {
         try {
@@ -399,6 +399,7 @@ class ImageService
             throw $e;
         }
     }
+     */
 
     /**
      * Delete an image from cloud/local storage and database

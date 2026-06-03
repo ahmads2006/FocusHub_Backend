@@ -21,15 +21,14 @@ function upload_file {
     }
 }
 
-Write-Host "Deploying updated likes count backend files..."
+Write-Host "Deploying updated backend files..."
 
 $filesToDeploy = @(
-    "app/Http/Controllers/Api/ImageController.php",
+    "app/Policies/ImagePolicy.php",
+    "app/Models/Image.php",
+    "app/Services/Core/AssetDeliveryService.php",
+    "app/Services/Core/ImageService.php",
     "app/Http/Controllers/Api/V1/SharedLinkController.php",
-    "app/Services/AI/RecommendationEngine.php",
-    "app/Models/Album.php",
-    "app/Http/Controllers/Api/V1/ProfileController.php",
-    "app/Http/Controllers/Api/V1/AlbumController.php",
     "routes/api.php"
 )
 
