@@ -347,13 +347,40 @@ Route::prefix('v1')->group(function () {
                 $storageBytes = (float) \App\Models\Image::withoutGlobalScopes()->sum('size');
                 $storageLimitBytes = 250 * 1024 * 1024 * 1024; // 250 GB limit
 
+                $sevenDaysAgo = \Carbon\Carbon::now()->subDays(6)->startOfDay();
+                $countsByDay = \App\Models\Image::withoutGlobalScopes()
+                    ->where('created_at', '>=', $sevenDaysAgo)
+                    ->select(
+                        \Illuminate\Support\Facades\DB::raw('DATE(created_at) as date'),
+                        \Illuminate\Support\Facades\DB::raw('count(*) as count')
+                    )
+                    ->groupBy('date')
+                    ->pluck('count', 'date');
+
+                $uploadActivity = [];
+                for ($i = 6; $i >= 0; $i--) {
+                    $date = \Carbon\Carbon::now()->subDays($i)->toDateString();
+                    $uploadActivity[] = [
+                        'day'   => \Carbon\Carbon::parse($date)->format('D'),
+                        'count' => (int) ($countsByDay[$date] ?? 0),
+                    ];
+                }
+
+                $totalUsers = \App\Models\User::count();
+                $totalPhotographers = \App\Models\User::where('role', 'photographer')->count();
+                $totalAdmins = \App\Models\User::whereIn('role', ['super-admin', 'super_admin', 'admin'])->count();
+
                 return response()->json([
-                    'totalUsers'         => \App\Models\User::count(),
-                    'totalPhotographers' => \App\Models\User::where('role', 'photographer')->count(),
+                    'totalUsers'         => $totalUsers,
+                    'totalPhotographers' => $totalPhotographers,
+                    'totalAdmins'        => $totalAdmins,
+                    'totalRegularUsers'  => max(0, $totalUsers - $totalPhotographers - $totalAdmins),
                     'totalAlbums'        => \App\Models\Album::count(),
                     'totalImages'        => \App\Models\Image::count(),
                     'storageBytes'       => $storageBytes,
                     'storageLimitBytes'  => $storageLimitBytes,
+                    'pendingAppeals'     => \App\Models\ImageAppeal::where('status', 'pending')->count(),
+                    'uploadActivity'     => $uploadActivity,
                     'moderationStats'    => [
                         'safe'    => \App\Models\Image::withoutGlobalScopes()->whereHas('moderation', fn($q) => $q->where('status', 'approved'))->count(),
                         'pending' => \App\Models\Image::withoutGlobalScopes()->whereHas('moderation', fn($q) => $q->whereIn('status', ['pending_review', 'under_review']))->count(),
