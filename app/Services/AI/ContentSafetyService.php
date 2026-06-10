@@ -62,7 +62,10 @@ class ContentSafetyService
         $cachedResult = \Illuminate\Support\Facades\Cache::get("moderation_hash:{$fileHash}");
         if ($cachedResult) {
             Log::info("AI Safety: Skipping scan. Returning Redis-cached result for hash {$fileHash}");
-            return array_merge($cachedResult, ['metadata' => array_merge($metadata, ['cached_redis' => true])]);
+            $cachedMetadata = is_array($cachedResult['metadata'] ?? null) ? $cachedResult['metadata'] : [];
+            return array_merge($cachedResult, [
+                'metadata' => array_merge($cachedMetadata, $metadata, ['cached_redis' => true]),
+            ]);
         }
 
         // LAYER 1 (Python Local Heuristics) REMOVED.

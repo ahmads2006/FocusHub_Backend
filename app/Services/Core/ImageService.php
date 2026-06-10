@@ -6,6 +6,7 @@ use App\Models\Image;
 use App\Jobs\AnalyzeImageLabelsJob;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Facades\Storage;
 use ImageKit\ImageKit;
 use App\Services\AI\ContentSafetyService;
@@ -140,8 +141,14 @@ class ImageService
             // 5. Cleanup
             if (file_exists($cleanFile)) @unlink($cleanFile);
 
-            // 6. Labels (Keep labels job if needed, or run sync)
-            \App\Jobs\AnalyzeImageLabelsJob::dispatchSync($image->id);
+            // 6. Persist AI tags captured during the safety scan (yellow-zone images included)
+            $this->persistLabelsFromModeration($image, $moderationResult);
+
+            // 7. Fallback tagging job only when moderation metadata had no tags
+            $image->refresh();
+            if (empty($image->labels)) {
+                \App\Jobs\AnalyzeImageLabelsJob::dispatchSync($image->id);
+            }
 
         } catch (\Exception $e) {
             Log::error("Direct Image Processing Failed: " . $e->getMessage());
@@ -149,7 +156,91 @@ class ImageService
             throw $e;
         }
 
-        return $image->load(['moderation', 'user', 'storage', 'settings']);
+        return $image->load(['moderation', 'user', 'storage', 'settings', 'tags']);
+    }
+
+    /**
+     * Save tags from the initial AI safety scan into labels/tags tables.
+     * Yellow-zone images already get tags here (e.g. revolver, leather, weapon).
+     */
+    public function persistLabelsFromModeration(Image $image, ?array $moderationResult = null): bool
+    {
+        if (!empty($image->labels)) {
+            return false;
+        }
+
+        if ($moderationResult === null) {
+            $image->loadMissing('moderation');
+            $metadata = is_array($image->moderation?->ai_metadata)
+                ? $image->moderation->ai_metadata
+                : [];
+            $moderationResult = [
+                'status'       => $image->moderation?->status,
+                'is_sensitive' => (bool) $image->moderation?->is_sensitive,
+                'driver'       => $metadata['driver'] ?? null,
+                'metadata'     => $metadata,
+            ];
+        }
+
+        $metadata = $moderationResult['metadata'] ?? [];
+        $tags = $metadata['tags'] ?? $metadata['extracted_tags'] ?? [];
+
+        if (!is_array($tags)) {
+            return false;
+        }
+
+        $tags = array_values(array_unique(array_filter(
+            $tags,
+            fn ($tag) => is_string($tag) && trim($tag) !== ''
+        )));
+
+        if (empty($tags)) {
+            return false;
+        }
+
+        $category = $metadata['category'] ?? null;
+        if (is_string($category) && $category !== '' && $category !== 'other' && !in_array($category, $tags, true)) {
+            array_unshift($tags, $category);
+            $tags = array_values(array_unique($tags));
+        }
+
+        $caption = $metadata['caption'] ?? null;
+        $updates = ['labels' => $tags];
+        if (is_string($caption) && $caption !== '') {
+            $updates['ai_description'] = $caption;
+            if (empty($image->description)) {
+                $updates['description'] = $caption;
+            }
+        }
+        $image->update($updates);
+
+        try {
+            $image->syncTags($tags);
+        } catch (\Throwable $e) {
+            Log::warning("persistLabelsFromModeration: syncTags failed for {$image->id}: " . $e->getMessage());
+        }
+
+        $image->aiMetadata()->updateOrCreate([], [
+            'driver_name'      => $moderationResult['driver'] ?? $metadata['driver'] ?? 'unknown',
+            'extracted_tags'   => $tags,
+            'quality_grade'    => $metadata['quality_grade'] ?? 'high_quality',
+            'category'         => $category ?? 'other',
+            'caption'          => $caption,
+            'is_sensitive'     => (bool) ($moderationResult['is_sensitive'] ?? false),
+            'confidence_score' => (float) ($metadata['confidence_score'] ?? 1.0),
+        ]);
+
+        if (($moderationResult['status'] ?? '') !== Image::STATUS_REJECTED) {
+            try {
+                Redis::setex("opticvault:safety:{$image->id}", 3600, 'safe_verified');
+            } catch (\Throwable $e) {
+                Log::warning("persistLabelsFromModeration: Redis cache failed for {$image->id}: " . $e->getMessage());
+            }
+        }
+
+        Log::info("persistLabelsFromModeration: Saved " . count($tags) . " tags for image {$image->id}");
+
+        return true;
     }
 
     protected function extractSpecsFromPath(string $path): array

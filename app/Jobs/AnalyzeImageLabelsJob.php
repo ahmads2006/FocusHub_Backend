@@ -34,7 +34,7 @@ class AnalyzeImageLabelsJob implements ShouldQueue
      */
     public function handle(ImageIntelligenceService $intelligence): void
     {
-        $image = Image::with('storage')->find($this->imageId);
+        $image = Image::withoutGlobalScopes()->with('storage')->find($this->imageId);
         
 
         if (!$image) {

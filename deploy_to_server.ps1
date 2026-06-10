@@ -30,6 +30,9 @@ $filesToDeploy = @(
     "app/Models/Image.php",
     "app/Services/Core/ImageService.php",
     "app/Console/Commands/BackfillImageDimensions.php",
+    "app/Console/Commands/BackfillModerationLabels.php",
+    "app/Console/Commands/AnalyzeExistingImages.php",
+    "app/Jobs/AnalyzeImageLabelsJob.php",
     "app/Http/Controllers/Api/V1/ModerationController.php",
     "app/Http/Controllers/Web/Admin/ModerationController.php",
     "app/Models/Scopes/ShadowPrivacyScope.php",
@@ -43,6 +46,7 @@ $filesToDeploy = @(
     "app/Http/Controllers/Api/AlbumUploadController.php",
     "app/Services/AI/CloudinaryKeyRotator.php",
     "app/Services/AI/MediaAnalyzerManager.php",
+    "app/Services/AI/ContentSafetyService.php",
     "app/Services/AI/Drivers/CloudinaryAnalyzer.php",
     "app/Services/AI/Drivers/ImaggaAnalyzer.php",
     "app/Console/Commands/CloudinaryKeyStatus.php",
@@ -74,6 +78,7 @@ docker exec `$APP_CONTAINER php artisan config:clear
 docker exec `$APP_CONTAINER php artisan route:clear
 docker exec `$APP_CONTAINER php artisan view:clear
 docker exec `$APP_CONTAINER php artisan migrate --force
+docker exec `$APP_CONTAINER php artisan images:backfill-moderation-labels --limit=200
 "@
 
 ssh -i $KEY_PATH root@$IP $remoteCmd
