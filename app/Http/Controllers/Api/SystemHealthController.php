@@ -20,6 +20,7 @@ class SystemHealthController extends Controller
             'redis' => $this->checkRedis(),
             'queue' => $this->checkQueue(),
             'logs' => $this->getRecentLogs(),
+            'cloudinary' => (new \App\Services\AI\CloudinaryKeyRotator())->getStatus(),
         ];
 
         return response()->json($health);

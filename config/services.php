@@ -43,9 +43,14 @@ return [
     ],
 
     'cloudinary' => [
+        // Legacy single-key credentials (backward compatible fallback)
         'cloud_name' => env('CLOUDINARY_CLOUD_NAME'),
         'api_key' => env('CLOUDINARY_API_KEY'),
         'api_secret' => env('CLOUDINARY_API_SECRET'),
+
+        // Multi-account rotation pool (JSON array)
+        // Format: [{"cloud_name":"x","api_key":"y","api_secret":"z"}, ...]
+        'accounts' => env('CLOUDINARY_ACCOUNTS'),
     ],
 
     'imagekit' => [

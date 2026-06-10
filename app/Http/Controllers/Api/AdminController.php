@@ -180,4 +180,45 @@ class AdminController extends Controller
 
         return response()->json(['message' => __('Album deleted.')]);
     }
+
+    /**
+     * Reset Cloudinary key(s) in the rotation pool
+     */
+    public function resetCloudinaryKeys(Request $request): JsonResponse
+    {
+        $rotator = new \App\Services\AI\CloudinaryKeyRotator();
+        $apiKey = $request->input('api_key');
+        $index = $request->input('index');
+        $cloudName = $request->input('cloud_name');
+
+        if ($apiKey || $index !== null || $cloudName) {
+            $accounts = $rotator->getAccounts();
+            $targetKey = null;
+
+            if ($apiKey) {
+                $targetKey = $apiKey;
+            } elseif ($index !== null) {
+                $targetKey = $accounts[$index]['api_key'] ?? null;
+            } elseif ($cloudName) {
+                foreach ($accounts as $acc) {
+                    if (($acc['cloud_name'] ?? '') === $cloudName) {
+                        $targetKey = $acc['api_key'] ?? null;
+                        break;
+                    }
+                }
+            }
+
+            if ($targetKey) {
+                $rotator->resetKey($targetKey);
+                return response()->json([
+                    'message' => __('Cloudinary key reset successfully.')
+                ]);
+            }
+        }
+
+        $rotator->resetAllKeys();
+        return response()->json([
+            'message' => __('All Cloudinary keys have been reset.')
+        ]);
+    }
 }

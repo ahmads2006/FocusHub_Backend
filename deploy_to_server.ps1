@@ -35,7 +35,14 @@ $filesToDeploy = @(
     "lang/en/messages.php",
     "app/Providers/AppServiceProvider.php",
     "app/Policies/ImagePolicy.php",
-    "app/Http/Controllers/Api/AlbumUploadController.php"
+    "app/Http/Controllers/Api/AlbumUploadController.php",
+    "app/Services/AI/CloudinaryKeyRotator.php",
+    "app/Services/AI/Drivers/CloudinaryAnalyzer.php",
+    "app/Console/Commands/CloudinaryKeyStatus.php",
+    "app/Http/Controllers/Api/SystemHealthController.php",
+    "app/Http/Controllers/Api/AdminController.php",
+    "routes/api.php",
+    "config/services.php"
 )
 
 foreach ($file in $filesToDeploy) {

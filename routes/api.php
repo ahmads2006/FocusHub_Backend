@@ -421,6 +421,9 @@ Route::prefix('v1')->group(function () {
         Route::delete('/albums/{album}', [AdminController::class, 'deleteAlbum']);
         Route::put('/images/{image}/privacy', [AdminController::class, 'setImagePrivacy']);
         Route::delete('/images/{image}', [AdminController::class, 'deleteImage']);
+
+        // Cloudinary Key Rotation Control
+        Route::post('/cloudinary/reset', [AdminController::class, 'resetCloudinaryKeys']);
     });
 
     // 🔗 SHARED LINKS (Public with Token)

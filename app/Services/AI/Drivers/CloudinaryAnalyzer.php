@@ -2,6 +2,7 @@
 
 namespace App\Services\AI\Drivers;
 
+use App\Services\AI\CloudinaryKeyRotator;
 use App\Services\AI\Contracts\MediaAnalyzerInterface;
 use App\Services\AI\DTOs\AnalysisResult;
 use App\Services\AI\DTOs\ImageAnalysisResult;
@@ -27,20 +28,41 @@ class CloudinaryAnalyzer implements MediaAnalyzerInterface
         'abstract'     => ['abstract', 'pattern', 'texture', 'art', 'painting', 'design', 'geometric'],
     ];
 
+    protected CloudinaryKeyRotator $keyRotator;
+
+    public function __construct(?CloudinaryKeyRotator $keyRotator = null)
+    {
+        $this->keyRotator = $keyRotator ?? new CloudinaryKeyRotator();
+    }
+
     public function getName(): string
     {
         return 'cloudinary';
     }
 
+    // ─────────────────────────────────────────────────────────────────────────
+    //  ANALYZE (Post-Upload — Model-based)
+    // ─────────────────────────────────────────────────────────────────────────
+
     public function analyze(Model $media, string $mediaType = 'image'): AnalysisResult
     {
-        $cloudName = config('services.cloudinary.cloud_name');
-        $apiKey = config('services.cloudinary.api_key');
-        $apiSecret = config('services.cloudinary.api_secret');
+        // 1. Get available credentials via key rotation
+        $credentials = $this->keyRotator->getAvailableCredentials();
 
-        if (!$cloudName || !$apiKey) {
-            throw new AnalyzerException("Cloudinary credentials not configured.");
+        if (!$credentials) {
+            // ALL accounts exhausted — return empty result so caller can degrade gracefully.
+            // The MediaAnalyzerManager will catch QuotaExceededException and try next driver,
+            // OR the caller can handle the empty tags.
+            throw new QuotaExceededException(
+                "All Cloudinary accounts are exhausted. No available quota remaining.",
+                driverName: 'cloudinary',
+                retryAfterSeconds: 86400 // Suggest retry in 24 hours
+            );
         }
+
+        $cloudName = $credentials['cloud_name'];
+        $apiKey    = $credentials['api_key'];
+        $apiSecret = $credentials['api_secret'];
 
         try {
             // Priority 1: Storage Disk (resilient to missing relationships by checking raw storage relation)
@@ -61,39 +83,7 @@ class CloudinaryAnalyzer implements MediaAnalyzerInterface
                 }
             }
 
-            $timestamp = time();
-            $paramsToSign = [
-                'auto_tagging' => '0.6',
-                'categorization' => 'aws_rek_tagging',
-                'quality_analysis' => 'true',
-                'timestamp' => $timestamp,
-            ];
-            
-            ksort($paramsToSign);
-            $strToSign = '';
-            foreach ($paramsToSign as $k => $v) {
-                $strToSign .= "{$k}={$v}&";
-            }
-            $strToSign = rtrim($strToSign, '&') . $apiSecret;
-            $signature = sha1($strToSign);
-
-            $response = Http::attach('file', $content, $media->filename ?? 'image.jpg')
-                ->post("https://api.cloudinary.com/v1_1/{$cloudName}/image/upload", [
-                    'api_key' => $apiKey,
-                    'timestamp' => $timestamp,
-                    'signature' => $signature,
-                    'auto_tagging' => '0.6',
-                    'categorization' => 'aws_rek_tagging',
-                    'quality_analysis' => 'true',
-                ]);
-
-            if ($response->failed()) {
-                if ($response->status() === 429) {
-                    throw new QuotaExceededException("Cloudinary Quota Exceeded.", driverName: 'cloudinary');
-                }
-                throw new AnalyzerException("Cloudinary API Error: " . $response->body());
-            }
-
+            $response = $this->callCloudinaryApi($content, $media->filename ?? 'image.jpg', $cloudName, $apiKey, $apiSecret);
             $data = $response->json();
             
             $tags = $data['tags'] ?? [];
@@ -123,45 +113,12 @@ class CloudinaryAnalyzer implements MediaAnalyzerInterface
             $category = $this->deriveCategory($filteredTags);
 
             // --- Sensitivity check via moderation keywords ---
-            $isSensitive = false;
-            $safetyVerdict = 'approved';
-            $goreScore = 0.0;
-            $sensitivityReasons = [];
-
-            $hardRejectKeywords = ['weapon', 'execution', 'injury', 'blood', 'gore', 'violence'];
-            $pendingKeywords = ['adult', 'suggestive', 'racy'];
-
-            foreach ($filteredTags as $tag) {
-                $lowerTag = strtolower($tag);
-
-                foreach ($hardRejectKeywords as $keyword) {
-                    if (str_contains($lowerTag, $keyword)) {
-                        $safetyVerdict = 'rejected';
-                        $goreScore = max($goreScore, 0.9);
-                        if (!in_array($keyword, $sensitivityReasons)) {
-                            $sensitivityReasons[] = $keyword;
-                        }
-                    }
-                }
-
-                foreach ($pendingKeywords as $keyword) {
-                    if (str_contains($lowerTag, $keyword)) {
-                        if ($safetyVerdict !== 'rejected') {
-                            $safetyVerdict = 'pending_review';
-                        }
-                        if (!in_array($keyword, $sensitivityReasons)) {
-                            $sensitivityReasons[] = $keyword;
-                        }
-                    }
-                }
-            }
-
-            $isSensitive = ($safetyVerdict === 'rejected' || $safetyVerdict === 'pending_review');
+            $safetyResult = $this->evaluateSafety($filteredTags);
 
             // Inject standardized safety metrics into raw results
-            $data['_safety_verdict'] = $safetyVerdict;
-            $data['_sensitivity_reasons'] = $sensitivityReasons;
-            $data['_gore_score'] = $goreScore;
+            $data['_safety_verdict'] = $safetyResult['verdict'];
+            $data['_sensitivity_reasons'] = $safetyResult['reasons'];
+            $data['_gore_score'] = $safetyResult['gore_score'];
 
             // --- AI Caption ---
             $caption = $this->generateCaption($data, $filteredTags);
@@ -170,19 +127,27 @@ class CloudinaryAnalyzer implements MediaAnalyzerInterface
                 driverName: $this->getName(),
                 rawResults: $data,
                 tags: $filteredTags,
-                isSensitive: $isSensitive,
+                isSensitive: $safetyResult['is_sensitive'],
                 qualityGrade: $qualityGrade,
                 category: $category,
                 caption: $caption,
             );
 
         } catch (QuotaExceededException $e) {
-            throw $e;
+            // Mark this specific key as exhausted for 30 days
+            $this->keyRotator->markExhausted($apiKey);
+
+            // Recursively retry with the next available key
+            return $this->analyze($media, $mediaType);
         } catch (\Exception $e) {
             Log::error("Cloudinary Analysis Failed: " . $e->getMessage());
             throw new AnalyzerException(message: $e->getMessage(), driverName: 'cloudinary', code: (int)$e->getCode(), previous: $e);
         }
     }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  ANALYZE FILE (Pre-Upload — UploadedFile-based)
+    // ─────────────────────────────────────────────────────────────────────────
 
     public function analyzeFile(\Illuminate\Http\UploadedFile $file, string $mediaType = 'image'): AnalysisResult
     {
@@ -190,96 +155,43 @@ class CloudinaryAnalyzer implements MediaAnalyzerInterface
             throw new AnalyzerException("CloudinaryAnalyzer only supports images currently.");
         }
 
+        // 1. Get available credentials via key rotation
+        $credentials = $this->keyRotator->getAvailableCredentials();
+
+        if (!$credentials) {
+            throw new QuotaExceededException(
+                "All Cloudinary accounts are exhausted. No available quota remaining.",
+                driverName: 'cloudinary',
+                retryAfterSeconds: 86400
+            );
+        }
+
+        $cloudName = $credentials['cloud_name'];
+        $apiKey    = $credentials['api_key'];
+        $apiSecret = $credentials['api_secret'];
+
         try {
-            $cloudName = config('services.cloudinary.cloud_name');
-            $apiKey = config('services.cloudinary.api_key');
-            $apiSecret = config('services.cloudinary.api_secret');
-
-            if (!$cloudName || !$apiKey) {
-                throw new AnalyzerException("Cloudinary credentials not configured.");
-            }
-
             $content = file_get_contents($file->getRealPath());
             if ($content === false) {
                 throw new AnalyzerException("Failed to read uploaded file content.");
             }
 
-            $timestamp = time();
-            $paramsToSign = [
-                'auto_tagging' => '0.6',
-                'categorization' => 'aws_rek_tagging',
-                'quality_analysis' => 'true',
-                'timestamp' => $timestamp,
-            ];
-            
-            ksort($paramsToSign);
-            $strToSign = '';
-            foreach ($paramsToSign as $k => $v) {
-                $strToSign .= "{$k}={$v}&";
-            }
-            $strToSign = rtrim($strToSign, '&') . $apiSecret;
-            $signature = sha1($strToSign);
-
-            $response = Http::attach('file', $content, $file->getClientOriginalName() ?? 'image.jpg')
-                ->post("https://api.cloudinary.com/v1_1/{$cloudName}/image/upload", [
-                    'api_key' => $apiKey,
-                    'timestamp' => $timestamp,
-                    'signature' => $signature,
-                    'auto_tagging' => '0.6',
-                    'categorization' => 'aws_rek_tagging',
-                    'quality_analysis' => 'true',
-                ]);
-
-            if ($response->failed()) {
-                throw new AnalyzerException("Cloudinary API Error (File): " . $response->body());
-            }
-
+            $response = $this->callCloudinaryApi($content, $file->getClientOriginalName() ?? 'image.jpg', $cloudName, $apiKey, $apiSecret);
             $data = $response->json();
+
             $tags = [];
-            $categories = $response['info']['categorization']['aws_rek_tagging']['data'] ?? [];
+            $categories = $data['info']['categorization']['aws_rek_tagging']['data'] ?? [];
             foreach ($categories as $cat) {
                 $tags[] = $cat['tag'];
             }
 
-            // --- Sensitivity check via moderation keywords ---
-            $isSensitive = false;
-            $safetyVerdict = 'approved';
-            $goreScore = 0.0;
-            $sensitivityReasons = [];
+            // --- Sensitivity check ---
+            $safetyResult = $this->evaluateSafety($tags);
 
-            $hardRejectKeywords = ['weapon', 'execution', 'injury', 'blood', 'gore', 'violence'];
-            $pendingKeywords = ['adult', 'suggestive', 'racy'];
-
-            foreach ($tags as $tag) {
-                $lowerTag = strtolower($tag);
-
-                foreach ($hardRejectKeywords as $keyword) {
-                    if (str_contains($lowerTag, $keyword)) {
-                        $safetyVerdict = 'rejected';
-                        $goreScore = max($goreScore, 0.9);
-                        if (!in_array($keyword, $sensitivityReasons)) {
-                            $sensitivityReasons[] = $keyword;
-                        }
-                    }
-                }
-
-                foreach ($pendingKeywords as $keyword) {
-                    if (str_contains($lowerTag, $keyword)) {
-                        if ($safetyVerdict !== 'rejected') {
-                            $safetyVerdict = 'pending_review';
-                        }
-                        if (!in_array($keyword, $sensitivityReasons)) {
-                            $sensitivityReasons[] = $keyword;
-                        }
-                    }
-                }
-            }
-
-            $isSensitive = ($safetyVerdict === 'rejected' || $safetyVerdict === 'pending_review');
-
+            // --- Quality Grade ---
             $qualityGrade = 'high_quality';
-            if (isset($response['quality_analysis']['focus'])) {
-                $focus = $response['quality_analysis']['focus'];
+            if (isset($data['quality_analysis']['focus'])) {
+                $focus = $data['quality_analysis']['focus'];
                 if ($focus < 0.3) {
                     $qualityGrade = 'low_quality';
                 } elseif ($focus < 0.6) {
@@ -300,9 +212,9 @@ class CloudinaryAnalyzer implements MediaAnalyzerInterface
             }
 
             // Inject standardized safety metrics into raw results
-            $response['_safety_verdict'] = $safetyVerdict;
-            $response['_sensitivity_reasons'] = $sensitivityReasons;
-            $response['_gore_score'] = $goreScore;
+            $data['_safety_verdict'] = $safetyResult['verdict'];
+            $data['_sensitivity_reasons'] = $safetyResult['reasons'];
+            $data['_gore_score'] = $safetyResult['gore_score'];
 
             // --- AI Caption ---
             $caption = $this->generateCaption($data, $tags);
@@ -311,18 +223,139 @@ class CloudinaryAnalyzer implements MediaAnalyzerInterface
                 driverName: $this->getName(),
                 rawResults: $data,
                 tags: $tags,
-                isSensitive: $isSensitive,
+                isSensitive: $safetyResult['is_sensitive'],
                 qualityGrade: $qualityGrade,
                 category: $category,
                 caption: $caption,
             );
 
         } catch (QuotaExceededException $e) {
-            throw $e;
+            // Mark this specific key as exhausted for 30 days
+            $this->keyRotator->markExhausted($apiKey);
+
+            // Recursively retry with the next available key
+            return $this->analyzeFile($file, $mediaType);
         } catch (\Exception $e) {
             Log::error("Cloudinary Analysis Exception (File): " . $e->getMessage());
             throw new AnalyzerException(message: $e->getMessage(), driverName: 'cloudinary', code: (int)$e->getCode(), previous: $e);
         }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  ANALYZE TAGS (Alias for compatibility with MediaAnalyzerManager)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public function analyzeTags(Model $media, string $mediaType = 'image'): AnalysisResult
+    {
+        return $this->analyze($media, $mediaType);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    //  PRIVATE / PROTECTED HELPERS
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Execute the actual Cloudinary upload/analysis API call.
+     * Centralized to avoid code duplication between analyze() and analyzeFile().
+     *
+     * @param  string $content   Raw file content (binary).
+     * @param  string $filename  Original filename for the attachment.
+     * @param  string $cloudName Cloudinary cloud name.
+     * @param  string $apiKey    Cloudinary API key.
+     * @param  string $apiSecret Cloudinary API secret.
+     * @return \Illuminate\Http\Client\Response
+     *
+     * @throws QuotaExceededException When Cloudinary returns HTTP 429.
+     * @throws AnalyzerException      When Cloudinary returns any other error.
+     */
+    protected function callCloudinaryApi(string $content, string $filename, string $cloudName, string $apiKey, string $apiSecret): \Illuminate\Http\Client\Response
+    {
+        $timestamp = time();
+        $paramsToSign = [
+            'auto_tagging'     => '0.6',
+            'categorization'   => 'aws_rek_tagging',
+            'quality_analysis' => 'true',
+            'timestamp'        => $timestamp,
+        ];
+        
+        ksort($paramsToSign);
+        $strToSign = '';
+        foreach ($paramsToSign as $k => $v) {
+            $strToSign .= "{$k}={$v}&";
+        }
+        $strToSign = rtrim($strToSign, '&') . $apiSecret;
+        $signature = sha1($strToSign);
+
+        $response = Http::attach('file', $content, $filename)
+            ->post("https://api.cloudinary.com/v1_1/{$cloudName}/image/upload", [
+                'api_key'          => $apiKey,
+                'timestamp'        => $timestamp,
+                'signature'        => $signature,
+                'auto_tagging'     => '0.6',
+                'categorization'   => 'aws_rek_tagging',
+                'quality_analysis' => 'true',
+            ]);
+
+        if ($response->failed()) {
+            if ($response->status() === 429 || str_contains($response->body(), 'Rate limit') || str_contains($response->body(), 'quota')) {
+                throw new QuotaExceededException("Cloudinary Quota Exceeded.", driverName: 'cloudinary');
+            }
+            throw new AnalyzerException("Cloudinary API Error: " . $response->body());
+        }
+
+        return $response;
+    }
+
+    /**
+     * Evaluate tag-based content safety (moderation keywords).
+     * Centralized to avoid duplication between analyze() and analyzeFile().
+     *
+     * @param  array  $tags
+     * @return array{is_sensitive: bool, verdict: string, gore_score: float, reasons: array}
+     */
+    protected function evaluateSafety(array $tags): array
+    {
+        $isSensitive = false;
+        $safetyVerdict = 'approved';
+        $goreScore = 0.0;
+        $sensitivityReasons = [];
+
+        $hardRejectKeywords = ['weapon', 'execution', 'injury', 'blood', 'gore', 'violence'];
+        $pendingKeywords = ['adult', 'suggestive', 'racy'];
+
+        foreach ($tags as $tag) {
+            $lowerTag = strtolower($tag);
+
+            foreach ($hardRejectKeywords as $keyword) {
+                if (str_contains($lowerTag, $keyword)) {
+                    $safetyVerdict = 'rejected';
+                    $goreScore = max($goreScore, 0.9);
+                    if (!in_array($keyword, $sensitivityReasons)) {
+                        $sensitivityReasons[] = $keyword;
+                    }
+                }
+            }
+
+            foreach ($pendingKeywords as $keyword) {
+                if (str_contains($lowerTag, $keyword)) {
+                    if ($safetyVerdict !== 'rejected') {
+                        $safetyVerdict = 'pending_review';
+                    }
+                    if (!in_array($keyword, $sensitivityReasons)) {
+                        $sensitivityReasons[] = $keyword;
+                    }
+                }
+            }
+        }
+
+        $isSensitive = ($safetyVerdict === 'rejected' || $safetyVerdict === 'pending_review');
+
+        return [
+            'is_sensitive' => $isSensitive,
+            'verdict'      => $safetyVerdict,
+            'gore_score'   => $goreScore,
+            'reasons'      => $sensitivityReasons,
+        ];
     }
 
     /**
@@ -343,11 +376,6 @@ class CloudinaryAnalyzer implements MediaAnalyzerInterface
         }
 
         return 'other';
-    }
-
-    public function analyzeTags(Model $media, string $mediaType = 'image'): AnalysisResult
-    {
-        return $this->analyze($media, $mediaType);
     }
 
     /**
