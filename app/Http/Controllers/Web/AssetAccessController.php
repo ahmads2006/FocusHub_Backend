@@ -34,8 +34,9 @@ class AssetAccessController extends Controller
      *
      * This controller uses SecureShield v3.0 as the exclusive protection engine.
      */
-    public function serveOriginal(Request $request, Image $image)
+    public function serveOriginal(Request $request, $image)
     {
+        $image = Image::withoutGlobalScopes()->findOrFail($image);
         \Illuminate\Support\Facades\Log::info("AssetAccess: serveOriginal called for image {$image->id}. Signature valid: " . ($request->hasValidSignature() ? 'YES' : 'NO'));
         
         // 1. Verify the signature
@@ -211,8 +212,9 @@ class AssetAccessController extends Controller
      * Serve a preview image inline (for use in <img> src tags).
      * Uses Content-Disposition: inline so the browser renders it directly.
      */
-    public function servePreview(Request $request, Image $image)
+    public function servePreview(Request $request, $image)
     {
+        $image = Image::withoutGlobalScopes()->findOrFail($image);
         if (!$request->hasValidSignature()) {
             abort(403, 'Unauthorized access or expired link.');
         }

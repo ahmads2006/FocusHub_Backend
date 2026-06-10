@@ -48,7 +48,8 @@ $filesToDeploy = @(
     "app/Http/Controllers/Api/SystemHealthController.php",
     "app/Http/Controllers/Api/AdminController.php",
     "routes/api.php",
-    "config/services.php"
+    "config/services.php",
+    "app/Http/Controllers/Web/AssetAccessController.php"
 )
 
 foreach ($file in $filesToDeploy) {
