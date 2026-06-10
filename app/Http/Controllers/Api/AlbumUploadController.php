@@ -22,7 +22,7 @@ class AlbumUploadController extends Controller
     public function uploadBatch(Request $request)
     {
         $request->validate([
-            'album_id'    => 'nullable',
+            'album_id'    => 'nullable|uuid|exists:albums,id',
             'album_name'  => 'nullable|string|max:255',
             'title'       => 'nullable|string|max:255',
             'description' => 'nullable|string',
@@ -74,7 +74,16 @@ class AlbumUploadController extends Controller
         try {
             // 1. Determine the Album
             if ($request->album_id) {
-                $album = Album::with('settings')->where('user_id', $user->id)->find($request->album_id);
+                $album = Album::with('settings')->find($request->album_id);
+
+                if (!$album) {
+                    return response()->json([
+                        'message'    => 'The selected album was not found.',
+                        'error_code' => 'album_not_found',
+                    ], 422);
+                }
+
+                $this->authorize('uploadPhoto', $album);
             }
 
             if (!$album && $request->album_name) {
@@ -166,6 +175,8 @@ class AlbumUploadController extends Controller
 
         } catch (\Illuminate\Validation\ValidationException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
+        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            return response()->json(['message' => $e->getMessage()], 403);
         } catch (\Exception $e) {
             Log::error('Batch upload failed: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
             return response()->json(['message' => $e->getMessage()], 500);
