@@ -32,7 +32,7 @@ class GalleryController extends Controller
         $perPage     = min($request->query('per_page', 50), 100);
 
         $query = Image::publicGallery()
-            ->with(['settings', 'user.profile', 'storage', 'meta', 'album', 'tags'])
+            ->with(['settings', 'user.profile', 'storage', 'meta', 'album', 'tags', 'moderation'])
             ->withCount(['likes', 'bookmarks']);
 
         // ── Search Filter ──
@@ -98,13 +98,13 @@ class GalleryController extends Controller
                 $models = Image::whereIn('id', $slicedIds)
                     ->publicGallery()
                     ->where(function($q) use ($user) {
-                        $q->where('moderation_status', 'approved')
+                        $q->whereIn('moderation_status', ['approved', 'pending_review'])
                           ->orWhere(function($sq) use ($user) {
                               $sq->where('user_id', $user->id)
                                  ->where('moderation_status', '!=', 'rejected');
                           });
                     })
-                    ->with(['settings', 'user.profile', 'storage', 'meta', 'album'])
+                    ->with(['settings', 'user.profile', 'storage', 'meta', 'album', 'moderation'])
                     ->withCount(['likes', 'bookmarks'])
                     ->orderByRaw("FIELD(id, {$placeholders})", $slicedIds)
                     ->get();
@@ -122,11 +122,11 @@ class GalleryController extends Controller
             // Apply moderation filter to public images
             if ($user) {
                 $query->where(function($q) use ($user) {
-                    $q->where('moderation_status', 'approved')
+                    $q->whereIn('moderation_status', ['approved', 'pending_review'])
                       ->orWhere('user_id', $user->id);
                 });
             } else {
-                $query->where('moderation_status', 'approved');
+                $query->whereIn('moderation_status', ['approved', 'pending_review']);
             }
 
             // Load optimized relations
@@ -135,7 +135,8 @@ class GalleryController extends Controller
                 'storage:id,image_id,path,imagekit_file_id,imagekit_file_path',
                 'meta:id,image_id,technical_specs',
                 'settings',
-                'tags'
+                'tags',
+                'moderation'
             ]);
 
             $images = $query->latest()->paginate($perPage);
