@@ -30,8 +30,9 @@ class AppealController extends Controller
     /**
      * Submit an appeal for a rejected image.
      */
-    public function store(Request $request, Image $image): JsonResponse
+    public function store(Request $request, $image): JsonResponse
     {
+        $image = Image::withoutGlobalScopes()->findOrFail($image);
         if ($image->user_id !== Auth::id()) {
             return response()->json([
                 'success' => false,

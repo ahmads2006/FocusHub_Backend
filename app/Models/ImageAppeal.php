@@ -24,7 +24,7 @@ class ImageAppeal extends Model
 
     public function image()
     {
-        return $this->belongsTo(Image::class);
+        return $this->belongsTo(Image::class)->withoutGlobalScopes();
     }
 
     public function user()

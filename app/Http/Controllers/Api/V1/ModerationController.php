@@ -69,10 +69,11 @@ class ModerationController extends Controller
     /**
      * Approve an image (admin).
      */
-    public function approve(Image $image): JsonResponse
+    public function approve($image): JsonResponse
     {
+        $image = Image::withoutGlobalScopes()->findOrFail($image);
         $image->loadMissing(['moderation', 'storage']);
-
+        
         // If image was sensitive, restore from secure_uploads
         if ($image->is_sensitive && $image->storage?->original_path) {
             try {
@@ -117,8 +118,9 @@ class ModerationController extends Controller
     /**
      * Reject an image (admin).
      */
-    public function reject(Image $image): JsonResponse
+    public function reject($image): JsonResponse
     {
+        $image = Image::withoutGlobalScopes()->findOrFail($image);
         $image->moderation()->updateOrCreate(['image_id' => $image->id], [
             'status'     => Image::STATUS_REJECTED,
             'is_visible' => false,

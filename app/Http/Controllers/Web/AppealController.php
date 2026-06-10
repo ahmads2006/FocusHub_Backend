@@ -22,8 +22,9 @@ class AppealController extends Controller
     /**
      * Show the form for creating a new appeal for a specific image.
      */
-    public function create(Image $image)
+    public function create($image)
     {
+        $image = Image::withoutGlobalScopes()->findOrFail($image);
         // Must be the owner to appeal
         if ($image->user_id !== Auth::id()) {
             abort(403, 'غير مصرح لك بتقديم طلب مراجعة لهذه الصورة.');
@@ -50,8 +51,9 @@ class AppealController extends Controller
     /**
      * Store a newly created appeal in storage.
      */
-    public function store(Request $request, Image $image)
+    public function store(Request $request, $image)
     {
+        $image = Image::withoutGlobalScopes()->findOrFail($image);
         if ($image->user_id !== Auth::id()) {
             abort(403);
         }

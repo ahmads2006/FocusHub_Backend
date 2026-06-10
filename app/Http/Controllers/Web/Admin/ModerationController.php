@@ -29,8 +29,9 @@ class ModerationController extends Controller
         return view('admin.moderation.index', compact('pendingImages', 'reports'));
     }
 
-    public function approve(Request $request, Image $image)
+    public function approve(Request $request, $image)
     {
+        $image = Image::withoutGlobalScopes()->findOrFail($image);
         $image->loadMissing(['moderation', 'storage']);
 
         // If image was sensitive (yellow), restore the clean original from secure_uploads
@@ -73,8 +74,9 @@ class ModerationController extends Controller
         return back()->with('success', __('تم اعتماد الصورة بنجاح. تم استعادة النسخة الأصلية النقية.'));
     }
 
-    public function reject(Image $image)
+    public function reject($image)
     {
+        $image = Image::withoutGlobalScopes()->findOrFail($image);
         $image->moderation()->updateOrCreate(['image_id' => $image->id], [
             'status'     => Image::STATUS_REJECTED,
             'is_visible' => false,
