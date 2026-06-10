@@ -14,6 +14,7 @@ return [
     'notification_deleted' => 'Notification deleted.',
     'image_approved' => 'Image approved successfully.',
     'image_rejected' => 'Image rejected and blocked.',
+    'image_marked_sensitive' => 'Sensitive content acknowledged. Image moved to the Medium section.',
     'report_status_updated' => 'Report status updated.',
     'report_already_processed' => 'This report has already been processed.',
     'report_dismissed_reporter' => 'Thank you for helping keep our community safe. After reviewing your report, we found the content does not violate our policies, so the report was declined. We appreciate your vigilance—please continue to report any concerns.',

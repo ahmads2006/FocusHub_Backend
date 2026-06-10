@@ -26,7 +26,7 @@ class ShadowPrivacyScope implements Scope
         $user = auth()->user();
 
         // status values for approved content
-        $safeStatuses = ['approved', 'pending_review'];
+        $safeStatuses = ['approved', 'pending_review', 'under_review'];
 
         $builder->where(function ($query) use ($user, $userColumn, $hiddenCondition, $table, $safeStatuses) {
             // Logic for Images table (normalized status)

@@ -27,7 +27,16 @@ class ModerationController extends Controller
         $pendingImages = Image::withoutGlobalScopes()
             ->where('privacy', 'public')
             ->whereHas('moderation', function ($query) {
-                $query->whereIn('status', [Image::STATUS_PENDING_REVIEW, Image::STATUS_UNDER_REVIEW]);
+                $query->where('status', Image::STATUS_PENDING_REVIEW);
+            })
+            ->with(['user', 'moderation', 'storage'])
+            ->latest()
+            ->paginate(20);
+
+        $mediumImages = Image::withoutGlobalScopes()
+            ->where('privacy', 'public')
+            ->whereHas('moderation', function ($query) {
+                $query->where('status', Image::STATUS_UNDER_REVIEW);
             })
             ->with(['user', 'moderation', 'storage'])
             ->latest()
@@ -59,6 +68,7 @@ class ModerationController extends Controller
             'success' => true,
             'data'    => [
                 'pending_images' => $pendingImages,
+                'medium_images'  => $mediumImages,
                 'safe_images'    => $safeImages,
                 'banned_images'  => $bannedImages,
                 'reports'        => $reports,
@@ -112,6 +122,28 @@ class ModerationController extends Controller
         return response()->json([
             'success' => true,
             'message' => __('messages.image_approved'),
+        ]);
+    }
+
+    /**
+     * Acknowledge sensitive content (admin) — stays yellow in gallery, moves to "medium" queue.
+     */
+    public function markSensitive($image): JsonResponse
+    {
+        $image = Image::withoutGlobalScopes()->findOrFail($image);
+
+        $image->moderation()->updateOrCreate(['image_id' => $image->id], [
+            'status'       => Image::STATUS_UNDER_REVIEW,
+            'is_sensitive' => true,
+            'is_visible'   => true,
+        ]);
+
+        $image->withoutGlobalScopes()->touch();
+        Log::info("Admin marked image as acknowledged-sensitive: {$image->id}");
+
+        return response()->json([
+            'success' => true,
+            'message' => __('messages.image_marked_sensitive'),
         ]);
     }
 

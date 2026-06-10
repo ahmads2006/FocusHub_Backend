@@ -32,6 +32,7 @@ $filesToDeploy = @(
     "app/Console/Commands/BackfillImageDimensions.php",
     "app/Http/Controllers/Api/V1/ModerationController.php",
     "app/Http/Controllers/Web/Admin/ModerationController.php",
+    "app/Models/Scopes/ShadowPrivacyScope.php",
     "app/Http/Controllers/Web/AppealController.php",
     "app/Http/Controllers/Api/V1/AppealController.php",
     "app/Models/ImageAppeal.php",
@@ -49,7 +50,10 @@ $filesToDeploy = @(
     "app/Http/Controllers/Api/AdminController.php",
     "routes/api.php",
     "config/services.php",
-    "app/Http/Controllers/Web/AssetAccessController.php"
+    "app/Http/Controllers/Web/AssetAccessController.php",
+    "app/Http/Controllers/Api/V1/GalleryController.php",
+    "app/Http/Resources/PhotoResource.php",
+    "database/migrations/2026_06_10_120000_show_pending_review_images_in_gallery.php"
 )
 
 foreach ($file in $filesToDeploy) {
@@ -69,7 +73,7 @@ docker exec `$APP_CONTAINER php artisan optimize:clear
 docker exec `$APP_CONTAINER php artisan config:clear
 docker exec `$APP_CONTAINER php artisan route:clear
 docker exec `$APP_CONTAINER php artisan view:clear
-docker exec `$APP_CONTAINER php artisan gallery:backfill-dimensions --limit=500
+docker exec `$APP_CONTAINER php artisan migrate --force
 "@
 
 ssh -i $KEY_PATH root@$IP $remoteCmd

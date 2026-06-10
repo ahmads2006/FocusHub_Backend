@@ -98,7 +98,7 @@ class GalleryController extends Controller
                 $models = Image::whereIn('id', $slicedIds)
                     ->publicGallery()
                     ->where(function($q) use ($user) {
-                        $q->whereIn('moderation_status', ['approved', 'pending_review'])
+                        $q->whereIn('moderation_status', ['approved', 'pending_review', 'under_review'])
                           ->orWhere(function($sq) use ($user) {
                               $sq->where('user_id', $user->id)
                                  ->where('moderation_status', '!=', 'rejected');
@@ -122,11 +122,11 @@ class GalleryController extends Controller
             // Apply moderation filter to public images
             if ($user) {
                 $query->where(function($q) use ($user) {
-                    $q->whereIn('moderation_status', ['approved', 'pending_review'])
+                    $q->whereIn('moderation_status', ['approved', 'pending_review', 'under_review'])
                       ->orWhere('user_id', $user->id);
                 });
             } else {
-                $query->whereIn('moderation_status', ['approved', 'pending_review']);
+                $query->whereIn('moderation_status', ['approved', 'pending_review', 'under_review']);
             }
 
             // Load optimized relations

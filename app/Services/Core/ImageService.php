@@ -59,6 +59,7 @@ class ImageService
         
         $image = \Illuminate\Support\Facades\DB::transaction(function () use ($userId, $data, $file, $moderationResult) {
             $resolvedStatus = $moderationResult['status'] ?? 'approved';
+            $shouldBeVisible = (bool) ($moderationResult['is_visible'] ?? ($resolvedStatus !== 'rejected'));
 
             $image = Image::create([
                 'user_id'   => $userId,
@@ -69,7 +70,7 @@ class ImageService
                 'file_type' => $file->getClientOriginalExtension(),
                 'size'      => $file->getSize(),
                 'privacy'   => $data['privacy'] ?? 'public',
-                'is_visible' => false,
+                'is_visible' => $shouldBeVisible,
                 'moderation_status' => $resolvedStatus,
             ]);
 
@@ -77,7 +78,7 @@ class ImageService
                 'status' => $resolvedStatus,
                 'is_sensitive' => $moderationResult['is_sensitive'] ?? false,
                 'sensitivity_reason' => $moderationResult['reason'] ?? null,
-                'is_visible' => false,
+                'is_visible' => $shouldBeVisible,
                 'ai_metadata' => $moderationResult['metadata'] ?? [],
             ]);
 
@@ -128,9 +129,9 @@ class ImageService
                     'technical_specs' => $specs,
                 ]);
 
-                // Yellow (pending_review) images stay hidden until admin review
+                // Yellow (pending_review): visible in gallery with frontend sensitive overlay
                 $resolvedStatus = $moderationResult['status'] ?? 'approved';
-                $shouldBeVisible = ($resolvedStatus === 'approved');
+                $shouldBeVisible = (bool) ($moderationResult['is_visible'] ?? ($resolvedStatus !== 'rejected'));
 
                 $image->update(['is_visible' => $shouldBeVisible]);
                 $image->moderation()->update(['is_visible' => $shouldBeVisible]);

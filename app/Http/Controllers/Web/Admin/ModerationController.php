@@ -15,7 +15,7 @@ class ModerationController extends Controller
     {
         $pendingImages = Image::withoutGlobalScopes()
             ->whereHas('moderation', function ($query) {
-                $query->whereIn('status', [Image::STATUS_PENDING_REVIEW, Image::STATUS_UNDER_REVIEW]);
+                $query->where('status', Image::STATUS_PENDING_REVIEW);
             })
             ->with(['user', 'moderation', 'storage'])
             ->latest()
@@ -72,6 +72,22 @@ class ModerationController extends Controller
         Log::info("Admin approved image: {$image->id}");
 
         return back()->with('success', __('تم اعتماد الصورة بنجاح. تم استعادة النسخة الأصلية النقية.'));
+    }
+
+    public function markSensitive($image)
+    {
+        $image = Image::withoutGlobalScopes()->findOrFail($image);
+
+        $image->moderation()->updateOrCreate(['image_id' => $image->id], [
+            'status'       => Image::STATUS_UNDER_REVIEW,
+            'is_sensitive' => true,
+            'is_visible'   => true,
+        ]);
+
+        $image->withoutGlobalScopes()->touch();
+        Log::info("Admin marked image as acknowledged-sensitive: {$image->id}");
+
+        return back()->with('success', __('messages.image_marked_sensitive'));
     }
 
     public function reject($image)

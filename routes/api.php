@@ -385,7 +385,8 @@ Route::prefix('v1')->group(function () {
                     'uploadActivity'     => $uploadActivity,
                     'moderationStats'    => [
                         'safe'    => \App\Models\Image::withoutGlobalScopes()->whereHas('moderation', fn($q) => $q->where('status', 'approved'))->count(),
-                        'pending' => \App\Models\Image::withoutGlobalScopes()->whereHas('moderation', fn($q) => $q->whereIn('status', ['pending_review', 'under_review']))->count(),
+                        'pending' => \App\Models\Image::withoutGlobalScopes()->whereHas('moderation', fn($q) => $q->where('status', 'pending_review'))->count(),
+                        'medium'  => \App\Models\Image::withoutGlobalScopes()->whereHas('moderation', fn($q) => $q->where('status', 'under_review'))->count(),
                         'banned'  => \App\Models\Image::withoutGlobalScopes()->whereHas('moderation', fn($q) => $q->where('status', 'rejected'))->count(),
                     ]
                 ]);
@@ -399,6 +400,7 @@ Route::prefix('v1')->group(function () {
         // Moderation
         Route::get('/moderation', [App\Http\Controllers\Api\V1\ModerationController::class, 'index']);
         Route::post('/moderation/{image}/approve', [App\Http\Controllers\Api\V1\ModerationController::class, 'approve']);
+        Route::post('/moderation/{image}/sensitive', [App\Http\Controllers\Api\V1\ModerationController::class, 'markSensitive']);
         Route::post('/moderation/{image}/reject', [App\Http\Controllers\Api\V1\ModerationController::class, 'reject']);
         Route::post('/reports/{report}/resolve/{action}', [App\Http\Controllers\Api\V1\ModerationController::class, 'resolveReport']);
 

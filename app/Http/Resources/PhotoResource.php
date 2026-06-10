@@ -45,7 +45,10 @@ class PhotoResource extends JsonResource
             'privacy' => $this->privacy,
             'status' => $this->status,
             'moderation_status' => $this->moderation?->status ?? 'approved',
-            'is_sensitive' => (bool) ($this->moderation?->is_sensitive ?? false),
+            'is_sensitive' => (bool) (
+                $this->moderation?->is_sensitive
+                || in_array($this->moderation?->status, ['pending_review', 'under_review'], true)
+            ),
             'sensitivity_reason' => $this->moderation?->sensitivity_reason,
 
             // Signed/secure URLs used by frontend modal and download flows.
