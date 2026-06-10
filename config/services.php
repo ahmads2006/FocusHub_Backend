@@ -60,6 +60,12 @@ return [
         'webhook_secret' => env('IMAGEKIT_WEBHOOK_SECRET'),
     ],
 
+    'imagga' => [
+        'key' => env('IMAGGA_API_KEY'),
+        'secret' => env('IMAGGA_API_SECRET'),
+        'endpoint' => env('IMAGGA_API_ENDPOINT', 'https://api.imagga.com/v2'),
+    ],
+
     'content_safety' => [
         'enabled' => env('CONTENT_SAFETY_ENABLE', true),
         'strict_mode' => env('AI_SAFETY_STRICT_MODE', true),

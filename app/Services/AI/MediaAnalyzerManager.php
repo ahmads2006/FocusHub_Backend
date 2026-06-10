@@ -7,6 +7,7 @@ use App\Services\AI\Drivers\ImageKitAnalyzer;
 use App\Services\AI\Drivers\SightengineAnalyzer;
 use App\Services\AI\Drivers\GoogleVisionAnalyzer;
 use App\Services\AI\Drivers\CloudinaryAnalyzer;
+use App\Services\AI\Drivers\ImaggaAnalyzer;
 use App\Services\AI\Exceptions\AllAnalyzersFailedException;
 use App\Services\AI\Exceptions\QuotaExceededException;
 use App\Services\AI\Exceptions\AnalyzerException;
@@ -21,7 +22,7 @@ class MediaAnalyzerManager extends Manager implements MediaAnalyzerInterface
     /**
      * The order of failover.
      */
-    protected array $failoverOrder = ['sightengine', 'cloudinary', 'google_vision', 'imagekit'];
+    protected array $failoverOrder = ['sightengine', 'cloudinary', 'google_vision', 'imagga', 'imagekit'];
 
     public function getDefaultDriver()
     {
@@ -156,8 +157,8 @@ class MediaAnalyzerManager extends Manager implements MediaAnalyzerInterface
         $errors = [];
         $lastFailedDriver = null;
 
-        // Tagging-only drivers (Google Vision first, Cloudinary as fallback)
-        $taggingDrivers = ['google_vision', 'cloudinary'];
+        // Tagging-only drivers (Google Vision first, Cloudinary as fallback, Imagga as tertiary fallback)
+        $taggingDrivers = ['google_vision', 'cloudinary', 'imagga'];
 
         foreach ($taggingDrivers as $driverName) {
             if (Cache::has("ai_quota_depleted:{$driverName}")) {
@@ -225,5 +226,10 @@ class MediaAnalyzerManager extends Manager implements MediaAnalyzerInterface
     public function createCloudinaryDriver(): CloudinaryAnalyzer
     {
         return new CloudinaryAnalyzer();
+    }
+
+    public function createImaggaDriver(): ImaggaAnalyzer
+    {
+        return new ImaggaAnalyzer();
     }
 }
