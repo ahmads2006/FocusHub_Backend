@@ -40,7 +40,7 @@ class Image extends Model
         static::created(function (Image $image) {
             ImageStorage::create(['image_id' => $image->id]);
             ImageMeta::create(['image_id' => $image->id]);
-            ImageModeration::create(['image_id' => $image->id, 'status' => self::STATUS_APPROVED]);
+            ImageModeration::create(['image_id' => $image->id, 'status' => $image->moderation_status ?? self::STATUS_APPROVED]);
             ImageSettings::create(['image_id' => $image->id]);
 
             // Update user storage quota (v23.0 Drive System)

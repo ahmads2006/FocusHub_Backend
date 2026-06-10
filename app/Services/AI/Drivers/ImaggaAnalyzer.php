@@ -48,41 +48,28 @@ class ImaggaAnalyzer implements MediaAnalyzerInterface
 
         try {
             $url = $media->getRawOriginal('url') ?? $media->url;
-            $isPubliclyAccessible = $url && (str_starts_with($url, 'https://') || (str_starts_with($url, 'http://') && !str_contains($url, 'localhost') && !str_contains($url, '127.0.0.1')));
+            $path = $media->storage->path ?? $media->path;
 
-            if ($isPubliclyAccessible) {
-                // Fetch tags using the image URL
-                Log::info("{$this->getName()} Analyzer: Tagging via URL: {$url}");
-                $response = Http::withBasicAuth($key, $secret)
-                    ->connectTimeout(10)
-                    ->timeout(20)
-                    ->get("{$endpoint}/tags", [
-                        'image_url' => $url
-                    ]);
+            if ($path && \Illuminate\Support\Facades\Storage::disk('public')->exists($path)) {
+                $content = \Illuminate\Support\Facades\Storage::disk('public')->get($path);
+            } elseif ($path && \Illuminate\Support\Facades\Storage::disk('s3')->exists($path)) {
+                $content = \Illuminate\Support\Facades\Storage::disk('s3')->get($path);
             } else {
-                // Local / private file — upload the content directly
-                $path = $media->storage->path ?? $media->path;
-                if ($path && \Illuminate\Support\Facades\Storage::disk('public')->exists($path)) {
-                    $content = \Illuminate\Support\Facades\Storage::disk('public')->get($path);
-                } elseif ($path && \Illuminate\Support\Facades\Storage::disk('s3')->exists($path)) {
-                    $content = \Illuminate\Support\Facades\Storage::disk('s3')->get($path);
-                } else {
-                    Log::warning("{$this->getName()} Analyzer: File not found locally. Falling back to fetch URL: {$url}");
-                    $content = @file_get_contents($url);
-                    if ($content === false) {
-                        throw new AnalyzerException("Failed to read media content from URL/Path: {$url}");
-                    }
+                Log::warning("{$this->getName()} Analyzer: File not found locally. Falling back to fetch URL: {$url}");
+                $content = @file_get_contents($url);
+                if ($content === false) {
+                    throw new AnalyzerException("Failed to read media content from URL/Path: {$url}");
                 }
-
-                $filename = $media->filename ?? 'image.jpg';
-                Log::info("{$this->getName()} Analyzer: Tagging via direct upload: {$filename}");
-                
-                $response = Http::withBasicAuth($key, $secret)
-                    ->connectTimeout(10)
-                    ->timeout(30)
-                    ->attach('image', $content, $filename)
-                    ->post("{$endpoint}/tags");
             }
+
+            $filename = $media->filename ?? 'image.jpg';
+            Log::info("{$this->getName()} Analyzer: Tagging via direct upload: {$filename}");
+            
+            $response = Http::withBasicAuth($key, $secret)
+                ->connectTimeout(10)
+                ->timeout(30)
+                ->attach('image', $content, $filename)
+                ->post("{$endpoint}/tags");
 
             if ($response->failed()) {
                 if ($response->status() === 429 || str_contains($response->body(), 'limit') || str_contains($response->body(), 'quota')) {

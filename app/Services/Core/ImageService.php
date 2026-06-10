@@ -58,6 +58,8 @@ class ImageService
         }
         
         $image = \Illuminate\Support\Facades\DB::transaction(function () use ($userId, $data, $file, $moderationResult) {
+            $resolvedStatus = $moderationResult['status'] ?? 'approved';
+
             $image = Image::create([
                 'user_id'   => $userId,
                 'album_id'  => $data['album_id'] ?? null,
@@ -68,11 +70,13 @@ class ImageService
                 'size'      => $file->getSize(),
                 'privacy'   => $data['privacy'] ?? 'public',
                 'is_visible' => false,
-                'moderation_status' => 'approved',
+                'moderation_status' => $resolvedStatus,
             ]);
 
             $image->moderation()->updateOrCreate(['image_id' => $image->id], [
-                'status' => 'approved', 
+                'status' => $resolvedStatus,
+                'is_sensitive' => $moderationResult['is_sensitive'] ?? false,
+                'sensitivity_reason' => $moderationResult['reason'] ?? null,
                 'is_visible' => false,
                 'ai_metadata' => $moderationResult['metadata'] ?? [],
             ]);
@@ -124,8 +128,12 @@ class ImageService
                     'technical_specs' => $specs,
                 ]);
 
-                $image->update(['is_visible' => true]);
-                $image->moderation()->update(['is_visible' => true]);
+                // Yellow (pending_review) images stay hidden until admin review
+                $resolvedStatus = $moderationResult['status'] ?? 'approved';
+                $shouldBeVisible = ($resolvedStatus === 'approved');
+
+                $image->update(['is_visible' => $shouldBeVisible]);
+                $image->moderation()->update(['is_visible' => $shouldBeVisible]);
             });
 
             // 5. Cleanup

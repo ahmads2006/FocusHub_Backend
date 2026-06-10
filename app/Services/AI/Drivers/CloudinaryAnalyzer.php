@@ -297,10 +297,14 @@ class CloudinaryAnalyzer implements MediaAnalyzerInterface
             ]);
 
         if ($response->failed()) {
-            if ($response->status() === 429 || str_contains($response->body(), 'Rate limit') || str_contains($response->body(), 'quota')) {
+            $body = $response->body();
+            if ($response->status() === 429 
+                || stripos($body, 'rate limit') !== false 
+                || stripos($body, 'quota') !== false 
+                || stripos($body, 'limit of 50') !== false) {
                 throw new QuotaExceededException("Cloudinary Quota Exceeded.", driverName: 'cloudinary');
             }
-            throw new AnalyzerException("Cloudinary API Error: " . $response->body());
+            throw new AnalyzerException("Cloudinary API Error: " . $body);
         }
 
         return $response;
