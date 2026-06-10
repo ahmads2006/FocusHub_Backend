@@ -408,6 +408,8 @@ class ImageService
     public function delete(Image $image): void
     {
         try {
+            $image->loadMissing('storage');
+
             // 1. Delete from ImageKit if legacy file exists
             if (!empty($image->imagekit_file_id)) {
                 try {
@@ -435,7 +437,17 @@ class ImageService
                 Log::warning("Local file deletion/check failed for {$image->path}: " . $e->getMessage());
             }
 
-            // 4. Delete from database
+            // 4. Delete secure / original local copy if present
+            try {
+                $originalPath = $image->storage?->original_path;
+                if ($originalPath && Storage::disk('local')->exists($originalPath)) {
+                    Storage::disk('local')->delete($originalPath);
+                }
+            } catch (\Exception $e) {
+                Log::warning("Original file deletion failed for image {$image->id}: " . $e->getMessage());
+            }
+
+            // 5. Delete from database
             $image->delete();
 
         } catch (\Exception $e) {

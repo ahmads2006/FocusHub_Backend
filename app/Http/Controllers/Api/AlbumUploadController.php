@@ -27,6 +27,7 @@ class AlbumUploadController extends Controller
             'title'       => 'nullable|string|max:255',
             'description' => 'nullable|string',
             'privacy'     => 'nullable|in:public,private',
+            'is_cover'    => 'nullable',
         ]);
 
         // Try to find files in any possible key
@@ -151,6 +152,10 @@ class AlbumUploadController extends Controller
 
                 $image = $this->imageService->processAndUpload($file, $data, $user->id);
                 $uploadedImages[] = $image;
+
+                if ($request->has('is_cover') && filter_var($request->is_cover, FILTER_VALIDATE_BOOLEAN) && $album) {
+                    $album->update(['cover_image' => $image->url]);
+                }
             }
 
             return response()->json([

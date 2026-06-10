@@ -94,6 +94,11 @@ class ImagePolicy
              return \Illuminate\Auth\Access\Response::deny('Download is restricted for this image by the owner.');
         }
 
+        // Super Admin can download if the owner allowed downloading
+        if ($user && $user->role === 'super_admin') {
+            return \Illuminate\Auth\Access\Response::allow();
+        }
+
         // If the request has an active shared link session, it MUST dictate the permission.
         $hasImageSharedLink = session()->has("shared_link_access_{$image->id}");
         $hasAlbumSharedLink = $image->album_id && session()->has("shared_link_access_album_{$image->album_id}");

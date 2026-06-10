@@ -29,7 +29,13 @@ $filesToDeploy = @(
     "app/Http/Resources/PhotoResource.php",
     "app/Models/Image.php",
     "app/Services/Core/ImageService.php",
-    "app/Console/Commands/BackfillImageDimensions.php"
+    "app/Console/Commands/BackfillImageDimensions.php",
+    "app/Http/Controllers/Api/V1/ModerationController.php",
+    "lang/ar/messages.php",
+    "lang/en/messages.php",
+    "app/Providers/AppServiceProvider.php",
+    "app/Policies/ImagePolicy.php",
+    "app/Http/Controllers/Api/AlbumUploadController.php"
 )
 
 foreach ($file in $filesToDeploy) {

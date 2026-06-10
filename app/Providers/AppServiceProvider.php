@@ -66,8 +66,8 @@ class AppServiceProvider extends ServiceProvider
         }
 
         // Define the gate for the super admin
-        Gate::before(function (User $user) {
-            if ($user->role === 'super_admin') {
+        Gate::before(function (User $user, $ability) {
+            if ($user->role === 'super_admin' && $ability !== 'download') {
                 return true;
             }
             return null;

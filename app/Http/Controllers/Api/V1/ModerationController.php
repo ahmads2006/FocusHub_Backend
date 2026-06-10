@@ -5,17 +5,20 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Models\Image;
 use App\Models\ImageReport;
+use App\Notifications\ImageStatusNotification;
+use App\Notifications\ReportStatusNotification;
+use App\Services\Core\ImageService;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
-use App\Notifications\ImageStatusNotification;
-use App\Notifications\ReportStatusNotification;
-
 class ModerationController extends Controller
 {
+    public function __construct(
+        protected ImageService $imageService
+    ) {}
+
     /**
      * List pending images and open reports (admin).
      */
@@ -137,28 +140,107 @@ class ModerationController extends Controller
     }
 
     /**
-     * Resolve a report (admin).
+     * Resolve a community report (admin).
+     * - resolve: delete image + storage, notify owner & reporter
+     * - dismiss: politely notify reporter only
      */
     public function resolveReport(ImageReport $report, string $action): JsonResponse
     {
-        if ($action === 'dismiss') {
-            $report->update(['status' => 'dismissed']);
-            $msg = __('تمت مراجعة بلاغك بخصوص الصورة ":id" وتقرر رفضه لأنه لا يخالف المعايير.', ['id' => $report->image_id]);
-            $notificationAction = 'dismissed';
-        } else {
-            $report->update(['status' => 'resolved']);
-            $msg = __('تم قبول بلاغك بخصوص الصورة ":id". شكراً لمساهمتك في الحفاظ على أمان المجتمع.', ['id' => $report->image_id]);
-            $notificationAction = 'resolved';
+        if (!in_array($action, ['resolve', 'dismiss'], true)) {
+            return response()->json([
+                'success' => false,
+                'message' => __('Invalid action.'),
+            ], 422);
         }
 
-        // Notify the reporter
-        if ($report->user) {
-            $report->user->notify(new ReportStatusNotification($report, $notificationAction, $msg));
+        if ($report->status !== 'open') {
+            return response()->json([
+                'success' => false,
+                'message' => __('messages.report_already_processed'),
+            ], 422);
         }
 
-        return response()->json([
-            'success' => true,
-            'message' => __('messages.report_status_updated'),
-        ]);
+        $report->loadMissing(['user', 'image.user', 'image.storage']);
+
+        try {
+            if ($action === 'dismiss') {
+                return DB::transaction(function () use ($report) {
+                    $report->update(['status' => 'dismissed']);
+
+                    if ($report->user) {
+                        $report->user->notify(new ReportStatusNotification(
+                            $report,
+                            'dismissed',
+                            __('messages.report_dismissed_reporter')
+                        ));
+                    }
+
+                    Log::info("Admin dismissed report #{$report->id} for image {$report->image_id}");
+
+                    return response()->json([
+                        'success' => true,
+                        'message' => __('messages.report_dismissed_admin'),
+                    ]);
+                });
+            }
+
+            return DB::transaction(function () use ($report) {
+                $image = Image::withoutGlobalScopes()
+                    ->with(['user', 'storage'])
+                    ->find($report->image_id);
+
+                $imageId = $report->image_id;
+                $owner = $image?->user;
+                $reporter = $report->user;
+                $imageTitle = $image?->title ?: $imageId;
+
+                // 1. Send notifications FIRST while the database records and relations are fully intact
+                if ($image && $owner) {
+                    $owner->notify(new ImageStatusNotification(
+                        $image,
+                        Image::STATUS_REJECTED,
+                        __('messages.report_resolved_owner', ['title' => $imageTitle])
+                    ));
+                }
+
+                if ($reporter) {
+                    $reporter->notify(new ReportStatusNotification(
+                        $report,
+                        'resolved',
+                        __('messages.report_resolved_reporter')
+                    ));
+                }
+
+                // 2. Delete the image (this will delete the image and cascade delete reports referencing it)
+                if ($image) {
+                    $this->imageService->delete($image);
+                    Log::info("Admin accepted report #{$report->id} — deleted image {$imageId}");
+                } else {
+                    Log::warning("Admin accepted report #{$report->id} — image {$imageId} already missing");
+                }
+
+                // 3. Update status and refresh report only if it still exists in the database
+                // (It won't exist if the image was successfully deleted due to onDelete('cascade') constraint)
+                if (ImageReport::where('id', $report->id)->exists()) {
+                    ImageReport::where('image_id', $imageId)
+                        ->where('status', 'open')
+                        ->update(['status' => 'resolved']);
+                    
+                    $report->refresh();
+                }
+
+                return response()->json([
+                    'success' => true,
+                    'message' => __('messages.report_image_removed_admin'),
+                ]);
+            });
+        } catch (\Throwable $e) {
+            Log::error("Failed to resolve report #{$report->id}: " . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => __('Failed to process report. Please try again.'),
+            ], 500);
+        }
     }
 }
