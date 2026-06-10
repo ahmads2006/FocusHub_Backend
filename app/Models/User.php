@@ -18,6 +18,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use App\Mail\VerificationCodeMail;
+use App\Mail\WelcomeMail;
 use Illuminate\Support\Facades\Mail;
 
 class User extends Authenticatable implements HasMedia, MustVerifyEmail
@@ -362,7 +363,24 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
         // Update the timestamp to reset expiration
         $verification->touch();
 
-        Mail::to($this->email)->queue(new VerificationCodeMail($code, $this->name));
+        Mail::to($this->email)->send(new VerificationCodeMail($code, $this->name));
+    }
+
+    /**
+     * Send the welcome email once per account (first authenticated site visit).
+     */
+    public function sendWelcomeEmailIfNeeded(): bool
+    {
+        $verification = $this->verification()->firstOrCreate([]);
+
+        if ($verification->welcome_email_sent_at) {
+            return false;
+        }
+
+        Mail::to($this->email)->send(new WelcomeMail($this->name));
+        $verification->update(['welcome_email_sent_at' => now()]);
+
+        return true;
     }
 
     public function getActivitylogOptions(): LogOptions

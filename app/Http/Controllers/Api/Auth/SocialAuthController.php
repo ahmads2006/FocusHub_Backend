@@ -9,8 +9,6 @@ use Laravel\Socialite\Facades\Socialite;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
-use App\Mail\WelcomeMail;
 
 class SocialAuthController extends Controller
 {
@@ -59,9 +57,8 @@ class SocialAuthController extends Controller
                     'email_verified_at' => now(),
                 ]);
 
-                // Send Welcome Email
                 try {
-                    Mail::to($user->email)->queue(new WelcomeMail($user->name));
+                    $user->sendWelcomeEmailIfNeeded();
                 } catch (\Exception $e) {
                     Log::warning("Welcome Email failed for social user {$user->email}: " . $e->getMessage());
                 }

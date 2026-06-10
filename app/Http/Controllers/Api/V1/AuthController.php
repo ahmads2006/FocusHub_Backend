@@ -41,15 +41,7 @@ class AuthController extends Controller
 
         event(new Registered($user));
 
-        // Send verification code via email
-        $user->sendVerificationEmail();
-
-        // Send Welcome Email
-        try {
-            \Illuminate\Support\Facades\Mail::to($user->email)->queue(new \App\Mail\WelcomeMail($user->name));
-        } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::warning("Welcome Email failed for user {$user->email}: " . $e->getMessage());
-        }
+        // Verification code is issued when the user opens /verify (avoids duplicate sends).
 
         // Create Sanctum token
         $token = $user->createToken('api-token', ['2fa-unverified'])->plainTextToken;
@@ -110,9 +102,8 @@ class AuthController extends Controller
             }
         }
 
-        // If not verified at all or needs 2FA, send verification code
+        // If not verified at all or needs 2FA, code is sent when /verify loads.
         if (!$user->is_verified || $needsVerification) {
-            $user->sendVerificationEmail();
             $expiresAt = $request->boolean('remember') ? now()->addDays(30) : now()->addHours(24);
             $token = $user->createToken('api-token', ['2fa-unverified'], $expiresAt)->plainTextToken;
 
@@ -229,9 +220,21 @@ class AuthController extends Controller
     public function resendVerificationCode(Request $request): JsonResponse
     {
         $user = $request->user();
+        $force = $request->boolean('force', true);
 
-        // We allow resend even if is_verified is true, because they might be verifying a new device (2FA).
-        // The check.verified middleware ensures only users needing verification or 2FA hit this anyway.
+        $verification = $user->verification;
+        if (
+            !$force
+            && $verification
+            && $verification->verification_code
+            && $verification->updated_at->gt(now()->subMinutes(2))
+        ) {
+            return response()->json([
+                'success' => true,
+                'already_sent' => true,
+                'message' => __('messages.verification_sent'),
+            ]);
+        }
 
         $user->sendVerificationEmail();
 
@@ -239,6 +242,29 @@ class AuthController extends Controller
             'success' => true,
             'message' => __('messages.code_resent'),
         ]);
+    }
+
+    /**
+     * Send welcome email once per user (triggered on first site visit).
+     */
+    public function sendWelcomeEmail(Request $request): JsonResponse
+    {
+        try {
+            $sent = $request->user()->sendWelcomeEmailIfNeeded();
+
+            return response()->json([
+                'success' => true,
+                'sent' => $sent,
+                'message' => $sent ? __('messages.welcome_email_sent') : __('messages.welcome_email_already_sent'),
+            ]);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::warning('Welcome email failed: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => __('messages.welcome_email_failed'),
+            ], 500);
+        }
     }
 
     /**

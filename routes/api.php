@@ -107,6 +107,8 @@ Route::prefix('v1')->group(function () {
             Route::post('/verify-code', [App\Http\Controllers\Api\V1\AuthController::class, 'verifyCode']);
             Route::post('/verify-code/resend', [App\Http\Controllers\Api\V1\AuthController::class, 'resendVerificationCode'])
                 ->middleware('throttle:sensitive');
+            Route::post('/welcome-email', [App\Http\Controllers\Api\V1\AuthController::class, 'sendWelcomeEmail'])
+                ->middleware('throttle:sensitive');
             Route::get('/me', [App\Http\Controllers\Api\V1\AuthController::class, 'me']);
         });
     });

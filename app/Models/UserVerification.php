@@ -17,11 +17,13 @@ class UserVerification extends Model
         'last_login_ip',
         'device_token',
         'device_trusted_until',
+        'welcome_email_sent_at',
     ];
 
     protected $casts = [
         'is_verified' => 'boolean',
         'device_trusted_until' => 'datetime',
+        'welcome_email_sent_at' => 'datetime',
     ];
 
     public function user(): BelongsTo
