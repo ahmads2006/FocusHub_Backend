@@ -25,8 +25,9 @@ class ProcessMongoOutbox implements ShouldQueue
     {
         Log::channel('mongodb')->info('ProcessMongoOutbox started');
 
-        // Target up to 100 pending messages per run to prevent timeout/memory issues
-        $pending = MongoDBOutbox::where('status', 'pending')
+        // Target up to 100 pending or retrying messages per run
+        $pending = MongoDBOutbox::whereIn('status', ['pending', 'retrying'])
+                    ->where('attempts', '<', 5)
                     ->orderBy('created_at', 'asc')
                     ->take(100)
                     ->get();
@@ -48,12 +49,15 @@ class ProcessMongoOutbox implements ShouldQueue
                 $task->delete();
 
             } catch (\Exception $e) {
+                $newAttempts = $task->attempts + 1;
+                $status = $newAttempts >= 5 ? 'failed' : 'retrying';
+
                 $task->update([
-                    'status' => 'failed',
-                    'attempts' => $task->attempts + 1,
+                    'status' => $status,
+                    'attempts' => $newAttempts,
                     'last_error' => $e->getMessage(),
                 ]);
-                Log::channel('mongodb')->error('Outbox failed', ['id' => $task->id, 'err' => $e->getMessage()]);
+                Log::channel('mongodb')->error('Outbox failed', ['id' => $task->id, 'err' => $e->getMessage(), 'status' => $status]);
             }
         }
     }

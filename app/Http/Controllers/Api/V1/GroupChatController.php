@@ -27,36 +27,76 @@ class GroupChatController extends Controller
 
         $groups = Conversation::where('type', 'group')
             ->whereHas('participants', fn($q) => $q->where('users.id', $userId))
-            ->with(['participants' => fn($q) => $q->select('users.id', 'users.name')])
+            ->with([
+                'participants' => fn($q) => $q->with('profile'),
+                'latestMessage' => fn($q) => $q->with(['sender', 'image'])
+            ])
             ->orderByDesc('last_message_at')
-            ->get()
-            ->map(function (Conversation $conv) use ($userId) {
-                $lastMessage = $conv->messages()->latest()->first();
+            ->get();
 
-                return [
-                    'id'           => $conv->id,
-                    'name'         => $conv->name,
-                    'album_id'     => $conv->album_id,
-                    'type'         => 'group',
-                    'participants' => $conv->participants->map(fn($p) => [
-                        'id'     => $p->id,
-                        'name'   => $p->name,
-                        'avatar' => $p->avatar,
-                        'role'   => $p->pivot->role,
-                    ]),
-                    'last_message' => $lastMessage ? [
-                        'body'       => $lastMessage->image_id ? '📷 Shared an image' : $lastMessage->body,
-                        'created_at' => $lastMessage->created_at->diffForHumans(),
-                        'sender'     => $lastMessage->sender?->name,
-                        'is_mine'    => $lastMessage->sender_id === $userId,
-                    ] : null,
-                    'unread_count' => $conv->unreadCountFor($userId),
-                ];
-            });
+        $groupConversationIds = $groups->pluck('id')->toArray();
+
+        $unreadCounts = [];
+        if (!empty($groupConversationIds)) {
+            $unreadCounts = Message::query()
+                ->select('conversation_id', DB::raw('count(*) as count'))
+                ->whereIn('conversation_id', $groupConversationIds)
+                ->where('sender_id', '!=', $userId)
+                ->where(function($q) use ($groups, $userId) {
+                    $first = true;
+                    foreach ($groups as $conv) {
+                        $participant = $conv->participants->firstWhere('id', $userId);
+                        $lastReadAt = $participant?->pivot?->last_read_at;
+                        if ($first) {
+                            $q->where(function($inner) use ($conv, $lastReadAt) {
+                                $inner->where('conversation_id', $conv->id);
+                                if ($lastReadAt) {
+                                    $inner->where('created_at', '>', $lastReadAt);
+                                }
+                            });
+                            $first = false;
+                        } else {
+                            $q->orWhere(function($inner) use ($conv, $lastReadAt) {
+                                $inner->where('conversation_id', $conv->id);
+                                if ($lastReadAt) {
+                                    $inner->where('created_at', '>', $lastReadAt);
+                                }
+                            });
+                        }
+                    }
+                })
+                ->groupBy('conversation_id')
+                ->pluck('count', 'conversation_id')
+                ->toArray();
+        }
+
+        $formattedGroups = $groups->map(function (Conversation $conv) use ($userId, $unreadCounts) {
+            $lastMessage = $conv->latestMessage;
+
+            return [
+                'id'           => $conv->id,
+                'name'         => $conv->name,
+                'album_id'     => $conv->album_id,
+                'type'         => 'group',
+                'participants' => $conv->participants->map(fn($p) => [
+                    'id'     => $p->id,
+                    'name'   => $p->profile?->name ?? $p->name,
+                    'avatar' => $p->avatar,
+                    'role'   => $p->pivot->role,
+                ]),
+                'last_message' => $lastMessage ? [
+                    'body'       => $lastMessage->image_id ? '📷 Shared an image' : $lastMessage->body,
+                    'created_at' => $lastMessage->created_at->diffForHumans(),
+                    'sender'     => $lastMessage->sender?->name,
+                    'is_mine'    => $lastMessage->sender_id === $userId,
+                ] : null,
+                'unread_count' => $unreadCounts[$conv->id] ?? 0,
+            ];
+        });
 
         return response()->json([
             'success' => true,
-            'data'    => $groups,
+            'data'    => $formattedGroups,
         ]);
     }
 

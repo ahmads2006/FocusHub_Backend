@@ -20,7 +20,12 @@ $filesToDeploy = @(
     "app/Http/Controllers/Web/DownloadController.php",
     "app/Http/Controllers/Api/ImageController.php",
     "app/Http/Controllers/Web/ProfileController.php",
-    "app/Http/Controllers/Api/V1/ProfileController.php"
+    "app/Http/Controllers/Api/V1/ProfileController.php",
+    "app/Http/Controllers/Api/V1/MongoChatController.php",
+    "app/Http/Controllers/Api/V1/GroupChatController.php",
+    "app/Services/MongoDBService.php",
+    "app/Jobs/ProcessMongoOutbox.php",
+    "app/Models/Conversation.php"
 )
 
 if (Test-Path "deploy.tar.gz") { Remove-Item "deploy.tar.gz" }

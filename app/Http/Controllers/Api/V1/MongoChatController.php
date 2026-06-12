@@ -41,30 +41,98 @@ class MongoChatController extends Controller
             ->orWhere('connected_user_id', $userId)
             ->get();
 
+        $partnerIds = [];
+        foreach ($connections as $conn) {
+            $partnerIds[] = ($conn->user_id == $userId) ? $conn->connected_user_id : $conn->user_id;
+        }
+        $partnerIds = array_unique($partnerIds);
+
+        $partners = User::with('profile')->whereIn('id', $partnerIds)->get()->keyBy('id');
+
+        $latestMessagesMap = [];
+        $unreadCountsMap = [];
+
+        if (!empty($partnerIds)) {
+            // Aggregate latest messages for each partner
+            $latestMessagesCursor = MongoMessage::raw(function($collection) use ($userId, $partnerIds) {
+                return $collection->aggregate([
+                    [
+                        '$match' => [
+                            'conversation_id' => null,
+                            '$or' => [
+                                [
+                                    'sender_id' => $userId,
+                                    'receiver_id' => ['$in' => $partnerIds],
+                                ],
+                                [
+                                    'sender_id' => ['$in' => $partnerIds],
+                                    'receiver_id' => $userId,
+                                ],
+                            ],
+                        ]
+                    ],
+                    [
+                        '$sort' => [
+                            'created_at' => -1
+                        ]
+                    ],
+                    [
+                        '$group' => [
+                            '_id' => [
+                                '$cond' => [
+                                    ['$eq' => ['$sender_id', $userId]],
+                                    '$receiver_id',
+                                    '$sender_id'
+                                ]
+                            ],
+                            'latest_message' => ['$first' => '$$ROOT']
+                        ]
+                    ]
+                ]);
+            });
+
+            foreach ($latestMessagesCursor as $doc) {
+                $partnerId = $doc['_id'];
+                $latestMessagesMap[$partnerId] = new MongoMessage((array) $doc['latest_message']);
+            }
+
+            // Aggregate unread message counts for each partner
+            $unreadCountsCursor = MongoMessage::raw(function($collection) use ($userId, $partnerIds) {
+                return $collection->aggregate([
+                    [
+                        '$match' => [
+                            'conversation_id' => null,
+                            'receiver_id' => $userId,
+                            'sender_id' => ['$in' => $partnerIds],
+                            'is_read' => false,
+                        ]
+                    ],
+                    [
+                        '$group' => [
+                            '_id' => '$sender_id',
+                            'count' => ['$sum' => 1]
+                        ]
+                    ]
+                ]);
+            });
+
+            foreach ($unreadCountsCursor as $doc) {
+                $unreadCountsMap[$doc['_id']] = $doc['count'];
+            }
+        }
+
         $conversations = [];
         foreach ($connections as $conn) {
             $partnerId = ($conn->user_id == $userId) ? $conn->connected_user_id : $conn->user_id;
-            $partner = User::with('profile')->find($partnerId);
+            $partner = $partners->get($partnerId);
             if (!$partner) continue;
 
-            // Get latest message from MongoDB
-            $latestMessage = MongoMessage::where(function($q) use ($userId, $partnerId) {
-                $q->where('sender_id', $userId)->where('receiver_id', $partnerId);
-            })->orWhere(function($q) use ($userId, $partnerId) {
-                $q->where('sender_id', $partnerId)->where('receiver_id', $userId);
-            })
-            ->whereNull('conversation_id')
-            ->orderBy('created_at', 'desc')
-            ->first();
+            $latestMessage = $latestMessagesMap[$partnerId] ?? null;
 
             // Skip if no message and it's not a pending request where I am the receiver
             if (!$latestMessage && $conn->status === 'accepted') continue;
 
-            $unreadCount = MongoMessage::where('sender_id', $partnerId)
-                ->where('receiver_id', $userId)
-                ->whereNull('conversation_id')
-                ->where('is_read', false)
-                ->count();
+            $unreadCount = $unreadCountsMap[$partnerId] ?? 0;
 
             $conversations[] = [
                 'type'    => 'direct',
@@ -96,40 +164,78 @@ class MongoChatController extends Controller
             ];
         }
 
-
-
         // ── 2. Group conversations ────────────────────────────
         $groupConversations = \App\Models\Conversation::where('type', 'group')
             ->whereHas('participants', fn($q) => $q->where('users.id', $userId))
-            ->with(['participants' => fn($q) => $q->with('profile')])
+            ->with([
+                'participants' => fn($q) => $q->with('profile'),
+                'latestMessage' => fn($q) => $q->with(['sender', 'image'])
+            ])
             ->orderByDesc('last_message_at')
-            ->get()
-            ->map(function (\App\Models\Conversation $conv) use ($userId) {
-                $lastMessage = $conv->messages()->latest()->first();
+            ->get();
 
-                return [
-                    'type'         => 'group',
-                    'id'           => $conv->id,
-                    'name'         => $conv->name,
-                    'album_id'     => $conv->album_id,
-                    'participants' => $conv->participants->map(fn($p) => [
-                        'id'     => $p->id,
-                        'name'   => $p->profile?->name ?? $p->name,
-                        'avatar' => $p->avatar,
-                    ]),
-                    'last_message' => $lastMessage ? [
-                        'body'       => $lastMessage->image_id ? '📷 Shared an image' : $lastMessage->body,
-                        'created_at' => $lastMessage->created_at->diffForHumans(),
-                        'sender'     => $lastMessage->sender?->name,
-                        'is_mine'    => $lastMessage->sender_id === $userId,
-                    ] : null,
-                    'last_message_at' => $lastMessage?->created_at?->toISOString() ?? $conv->created_at->toISOString(),
-                    'unread_count' => $conv->unreadCountFor($userId),
-                ];
-            })->toArray();
+        $groupConversationIds = $groupConversations->pluck('id')->toArray();
+
+        $groupUnreadCounts = [];
+        if (!empty($groupConversationIds)) {
+            $groupUnreadCounts = Message::query()
+                ->select('conversation_id', DB::raw('count(*) as count'))
+                ->whereIn('conversation_id', $groupConversationIds)
+                ->where('sender_id', '!=', $userId)
+                ->where(function($q) use ($groupConversations, $userId) {
+                    $first = true;
+                    foreach ($groupConversations as $conv) {
+                        $participant = $conv->participants->firstWhere('id', $userId);
+                        $lastReadAt = $participant?->pivot?->last_read_at;
+                        if ($first) {
+                            $q->where(function($inner) use ($conv, $lastReadAt) {
+                                $inner->where('conversation_id', $conv->id);
+                                if ($lastReadAt) {
+                                    $inner->where('created_at', '>', $lastReadAt);
+                                }
+                            });
+                            $first = false;
+                        } else {
+                            $q->orWhere(function($inner) use ($conv, $lastReadAt) {
+                                $inner->where('conversation_id', $conv->id);
+                                if ($lastReadAt) {
+                                    $inner->where('created_at', '>', $lastReadAt);
+                                }
+                            });
+                        }
+                    }
+                })
+                ->groupBy('conversation_id')
+                ->pluck('count', 'conversation_id')
+                ->toArray();
+        }
+
+        $groupConversationsFormatted = $groupConversations->map(function (\App\Models\Conversation $conv) use ($userId, $groupUnreadCounts) {
+            $lastMessage = $conv->latestMessage;
+
+            return [
+                'type'         => 'group',
+                'id'           => $conv->id,
+                'name'         => $conv->name,
+                'album_id'     => $conv->album_id,
+                'participants' => $conv->participants->map(fn($p) => [
+                    'id'     => $p->id,
+                    'name'   => $p->profile?->name ?? $p->name,
+                    'avatar' => $p->avatar,
+                ]),
+                'last_message' => $lastMessage ? [
+                    'body'       => $lastMessage->image_id ? '📷 Shared an image' : $lastMessage->body,
+                    'created_at' => $lastMessage->created_at->diffForHumans(),
+                    'sender'     => $lastMessage->sender?->name,
+                    'is_mine'    => $lastMessage->sender_id === $userId,
+                ] : null,
+                'last_message_at' => $lastMessage?->created_at?->toISOString() ?? $conv->created_at->toISOString(),
+                'unread_count' => $groupUnreadCounts[$conv->id] ?? 0,
+            ];
+        })->toArray();
 
         // ── 3. Merge & sort by last_message_at ────────────────
-        $unified = collect(array_merge($conversations, $groupConversations))
+        $unified = collect(array_merge($conversations, $groupConversationsFormatted))
             ->sortByDesc('last_message_at')
             ->values()
             ->all();
@@ -252,6 +358,7 @@ class MongoChatController extends Controller
             'created_at'  => now()->toISOString(),
             'updated_at'  => now()->toISOString(),
         ];
+        $payload['_id'] = $payload['id'];
 
         // Denormalize image data slightly for MongoDB performance
         if ($image) {
@@ -259,8 +366,8 @@ class MongoChatController extends Controller
             $payload['thumb_url'] = app(AssetDeliveryService::class)->getUrl($image, 'thumbnail');
         }
 
-        // Insert into outbox (MySQL) which will be processed by worker to insert into MongoDB
-        $this->mongoService->outboxInsert('chat_messages', $payload);
+        // Insert directly into MongoDB with automatic fallback to MySQL outbox if down
+        $this->mongoService->directInsert('chat_messages', $payload);
 
         // Treat payload as loaded for frontend response immediately
         $messageModel = new MongoMessage($payload);
