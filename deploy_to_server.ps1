@@ -29,6 +29,7 @@ $filesToDeploy = @(
     "app/Models/Album.php",
     "app/Http/Controllers/Api/V1/SharedLinkController.php",
     "app/Http/Controllers/Api/V1/AlbumController.php",
+    "app/Http/Controllers/Api/V1/PerformanceMetricsController.php",
     "app/Services/AI/RecommendationEngine.php",
     "app/Http/Controllers/Api/AlbumUploadController.php",
     "app/Jobs/ExtractArchiveJob.php",

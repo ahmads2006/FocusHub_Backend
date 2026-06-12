@@ -41,7 +41,7 @@ class PerformanceMetricsController extends Controller
             'pass_inp' => $payload['pass']['INP'] ?? null,
             'pass_cls' => $payload['pass']['CLS'] ?? null,
             'user_agent' => substr((string) $request->userAgent(), 0, 65535),
-            'session_id' => $request->cookie(config('session.cookie')),
+            'session_id' => ($cookie = $request->cookie(config('session.cookie'))) && is_string($cookie) ? hash('sha256', $cookie) : null,
             'meta' => [
                 'budget' => $payload['budget'] ?? null,
             ],
@@ -75,7 +75,7 @@ class PerformanceMetricsController extends Controller
             'prefetch_failed' => $payload['metrics']['failed'] ?? 0,
             'prefetch_skipped' => $payload['metrics']['skipped'] ?? 0,
             'user_agent' => substr((string) $request->userAgent(), 0, 65535),
-            'session_id' => $request->cookie(config('session.cookie')),
+            'session_id' => ($cookie = $request->cookie(config('session.cookie'))) && is_string($cookie) ? hash('sha256', $cookie) : null,
         ]);
 
         return response()->json(['ok' => true], 202);
