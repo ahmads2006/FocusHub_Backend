@@ -330,6 +330,7 @@ Route::prefix('v1')->group(function () {
         Route::prefix('settings')->group(function () {
             Route::get('/watermark', [App\Http\Controllers\Api\V1\SettingsController::class, 'getWatermark']);
             Route::post('/watermark', [App\Http\Controllers\Api\V1\SettingsController::class, 'updateWatermark']);
+            Route::post('/watermark/verify', [App\Http\Controllers\Api\V1\WatermarkController::class, 'verify']);
         });
     });
 

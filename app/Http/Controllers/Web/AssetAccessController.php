@@ -96,8 +96,12 @@ class AssetAccessController extends Controller
             $imageKitService = app(\App\Services\Core\ImageKitService::class);
             
             // ─── CASCADE: Per-Image → User Global → User Name → Default ───
-            $image->load('settings');
+            $image->loadMissing(['settings', 'meta']);
             $userSettings = \App\Models\UserSetting::where('user_id', $image->user_id)->first();
+            
+            $frame = \App\Helpers\MediaHelper::resolveGalleryFrame($image->meta);
+            $imgWidth = (int) ($frame['width'] ?? 0);
+            $imgHeight = (int) ($frame['height'] ?? 0);
             
             $watermarkType = $image->settings?->watermark_type ?? $userSettings?->watermark_mode ?? 'text';
             
@@ -154,7 +158,17 @@ class AssetAccessController extends Controller
             $alphaHex = str_pad(dechex(round($opacity / 100 * 255)), 2, '0', STR_PAD_LEFT);
             $colorWithAlpha = $color . $alphaHex;
             
-            $watermarkedUrl = $imageKitService->getWatermarkedUrl($imagekitPath, $watermarkText, true, 30, $ikFontSize, $colorWithAlpha, $watermarkType);
+            $watermarkedUrl = $imageKitService->getWatermarkedUrl(
+                $imagekitPath, 
+                $watermarkText, 
+                true, 
+                30, 
+                $ikFontSize, 
+                $colorWithAlpha, 
+                $watermarkType,
+                $imgWidth,
+                $imgHeight
+            );
 
             \Illuminate\Support\Facades\Log::info("AssetAccess: Redirecting to ImageKit watermarked URL for image {$image->id} with text='{$watermarkText}'");
             return redirect($watermarkedUrl);

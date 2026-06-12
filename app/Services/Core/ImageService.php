@@ -113,6 +113,11 @@ class ImageService
             $isGif = $file->getMimeType() === 'image/gif';
             $cleanFile = $this->sanitizeFromPath($file->getRealPath(), $isGif);
 
+            // Steganography: Embed digital signature (only for static images, not GIFs)
+            if (!$isGif) {
+                app(\App\Services\Security\SteganographyService::class)->embed($image, $cleanFile);
+            }
+
             // 3. Final Storage
             $year = date('Y'); $month = date('m');
             $dynamicPath = "photos/{$year}/{$month}/{$image->user_id}";

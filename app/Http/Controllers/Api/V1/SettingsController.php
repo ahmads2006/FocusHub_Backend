@@ -59,7 +59,7 @@ class SettingsController extends Controller
     {
         $request->validate([
             'watermark.text'     => 'nullable|string|max:200',
-            'watermark.type'     => 'nullable|in:text,logo',
+            'watermark.type'     => 'nullable|in:text,logo,sig,glass',
             'watermark.opacity'  => 'nullable|integer|min:0|max:100',
             'watermark.color'    => 'nullable|string|max:20',
             'watermark_logo'     => 'nullable|image|mimes:jpeg,png,jpg,webp,svg|max:2048',

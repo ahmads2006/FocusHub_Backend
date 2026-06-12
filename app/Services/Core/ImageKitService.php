@@ -65,7 +65,7 @@ class ImageKitService
      * Apply a dynamic watermark (SecureShield) via ImageKit overlay.
      * Returns a signed URL by default for maximum security to prevent manual tampering.
      */
-    public function getWatermarkedUrl(string $path, string $textOrLogo, bool $signed = true, int $expireMinutes = 10, int $fontSize = 600, string $color = 'FFFFFF', string $type = 'text'): string
+    public function getWatermarkedUrl(string $path, string $textOrLogo, bool $signed = true, int $expireMinutes = 10, int $fontSize = 600, string $color = 'FFFFFF', string $type = 'text', int $imgWidth = 0, int $imgHeight = 0): string
     {
         // ─── Parse color and opacity from the input ───
         // Input $color may be 6-char (FFFFFF) or 8-char with alpha (FFFFFFB3)
@@ -82,15 +82,26 @@ class ImageKitService
         }
         $opacityPercent = max(1, min(100, $opacityPercent));
 
+        // ─── Smart Dynamic Sizing & Positioning based on Image Dimensions ───
+        // Fallback to standard 1920x1080 if dimensions are unknown/missing
+        $width = $imgWidth > 0 ? $imgWidth : 1920;
+        $height = $imgHeight > 0 ? $imgHeight : 1080;
+
+        // Dynamic Font Size: ~2.0% of the image's width (ensuring readability)
+        $ikFontSize = max(20, (int)($width * 0.020));
+
+        // Dynamic Padding/Margin from edges: ~3.0% of the image's width (avoiding edge-hugging)
+        $padding = max(20, (int)($width * 0.030));
+
         if ($type === 'logo') {
             // ─── IMAGE OVERLAY ───
             // Replace slashes with @@ for ImageKit image overlay paths
             $logoPath = str_replace('/', '@@', ltrim($textOrLogo, '/'));
-            // Calculate a scale factor based on fontSize (e.g., fontSize 40 = 10% of image width)
-            $scaleFactor = max(0.02, min(0.5, round($fontSize / 400, 3)));
+            // Proportional logo scale factor: 12% of image width
+            $scaleFactor = 0.12;
 
-            // For image overlays: use proportional width (bw_mul_...) and fixed margins
-            $rawTransformation = "l-image,i-{$logoPath},w-bw_mul_{$scaleFactor},o-{$opacityPercent},lfo-bottom_left,lx-15,ly-15,l-end";
+            // Anchor bottom_right, with dynamic margins (lx & ly)
+            $rawTransformation = "l-image,i-{$logoPath},w-bw_mul_{$scaleFactor},o-{$opacityPercent},lfo-bottom_right,lx-{$padding},ly-{$padding},l-end";
         } else {
             // ─── TEXT OVERLAY ───
             // ImageKit requires URL-safe base64 for the ie- parameter
@@ -100,14 +111,23 @@ class ImageKitService
             $alphaHex = str_pad(dechex(round($opacityPercent / 100 * 255)), 2, '0', STR_PAD_LEFT);
             $colorWithAlpha = $hexColor . $alphaHex;
 
-            // ImageKit requires absolute font size for text overlay
-            $ikFontSize = max(20, (int)$fontSize);
+            $fontFamilyStr = "";
+            $bgStr = "";
 
-            // Use absolute font size and fixed padding
-            $rawTransformation = "l-text,ie-{$base64Text},fs-{$ikFontSize},co-{$colorWithAlpha},lfo-bottom_left,pa-15,l-end";
+            if ($type === 'sig') {
+                // Signature cursive font
+                $fontFamilyStr = ",ff-Caveat";
+            } elseif ($type === 'glass') {
+                // Glassmorphic rounded background badge
+                // bg-00000044 = semi-transparent black background, rad-10 = rounded corners
+                $bgStr = ",bg-00000044,rad-10,pa-15";
+            }
+
+            // Anchor bottom_right, with dynamic font size, styles, and dynamic margins (lx & ly)
+            $rawTransformation = "l-text,ie-{$base64Text},fs-{$ikFontSize},co-{$colorWithAlpha}{$fontFamilyStr}{$bgStr},lfo-bottom_right,lx-{$padding},ly-{$padding},l-end";
         }
 
-        Log::info("ImageKit Watermark Transform: type={$type}, raw={$rawTransformation}");
+        Log::info("ImageKit Watermark Transform: type={$type}, raw={$rawTransformation}, resolution={$width}x{$height}");
 
         return $this->imagekit->url([
             'path' => $path,

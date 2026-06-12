@@ -301,11 +301,14 @@ class SecureShieldService
         for ($tx = $stepX/2; $tx < $width; $tx += $stepX) {
             for ($ty = $stepY/2; $ty < $height; $ty += $stepY) {
                 // Apply a smaller glass neon overlay at each tile
-                $this->applyGlassNeonOverlay($img, ['x' => (int)$tx, 'y' => (int)$ty], array_merge($settings, [
-                    'watermark_text' => $text,
-                    'logo_path' => null, // No logo in grid mode for cleaner look
-                    'dynamic_blending' => false // Speed optimization for grid
-                ]));
+                $position = ['x' => (int)$tx, 'y' => (int)$ty];
+                $this->applyGlassNeonOverlay(
+                    $img, 
+                    $text, 
+                    null, 
+                    array_merge($settings, ['dynamic_blending' => false]), 
+                    $position
+                );
             }
         }
     }
