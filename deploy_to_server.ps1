@@ -14,6 +14,11 @@ function upload_file {
     if (-not (Test-Path $fullPath)) {
         throw "Local file not found: $fullPath"
     }
+    # Ensure remote parent directory exists
+    $remoteDir = Split-Path -Parent $remote -Resolve:$false
+    $remoteDir = $remoteDir -replace '\\', '/'
+    ssh -i $KEY_PATH root@$IP "mkdir -p $remoteDir"
+
     Write-Host "Uploading $local"
     scp -i $KEY_PATH "$fullPath" "root@${IP}:${remote}"
     if ($LASTEXITCODE -ne 0) {
@@ -23,41 +28,16 @@ function upload_file {
 
 Write-Host "Deploying updated backend files..."
 
-# Gallery per-image dimensions (backend)
+# Watermark and Steganography backend files
 $filesToDeploy = @(
-    "app/Helpers/MediaHelper.php",
-    "app/Http/Resources/PhotoResource.php",
-    "app/Models/Image.php",
-    "app/Services/Core/ImageService.php",
-    "app/Console/Commands/BackfillImageDimensions.php",
-    "app/Console/Commands/BackfillModerationLabels.php",
-    "app/Console/Commands/AnalyzeExistingImages.php",
-    "app/Jobs/AnalyzeImageLabelsJob.php",
-    "app/Http/Controllers/Api/V1/ModerationController.php",
-    "app/Http/Controllers/Web/Admin/ModerationController.php",
-    "app/Models/Scopes/ShadowPrivacyScope.php",
-    "app/Http/Controllers/Web/AppealController.php",
-    "app/Http/Controllers/Api/V1/AppealController.php",
-    "app/Models/ImageAppeal.php",
-    "lang/ar/messages.php",
-    "lang/en/messages.php",
-    "app/Providers/AppServiceProvider.php",
-    "app/Policies/ImagePolicy.php",
-    "app/Http/Controllers/Api/AlbumUploadController.php",
-    "app/Services/AI/CloudinaryKeyRotator.php",
-    "app/Services/AI/MediaAnalyzerManager.php",
-    "app/Services/AI/ContentSafetyService.php",
-    "app/Services/AI/Drivers/CloudinaryAnalyzer.php",
-    "app/Services/AI/Drivers/ImaggaAnalyzer.php",
-    "app/Console/Commands/CloudinaryKeyStatus.php",
-    "app/Http/Controllers/Api/SystemHealthController.php",
-    "app/Http/Controllers/Api/AdminController.php",
-    "routes/api.php",
-    "config/services.php",
+    "app/Http/Controllers/Api/V1/SettingsController.php",
+    "app/Http/Controllers/Api/V1/WatermarkController.php",
     "app/Http/Controllers/Web/AssetAccessController.php",
-    "app/Http/Controllers/Api/V1/GalleryController.php",
-    "app/Http/Resources/PhotoResource.php",
-    "database/migrations/2026_06_10_120000_show_pending_review_images_in_gallery.php"
+    "app/Services/Core/ImageKitService.php",
+    "app/Services/Core/ImageService.php",
+    "app/Services/Security/SecureShieldService.php",
+    "app/Services/Security/SteganographyService.php",
+    "routes/api.php"
 )
 
 foreach ($file in $filesToDeploy) {
@@ -78,7 +58,6 @@ docker exec `$APP_CONTAINER php artisan config:clear
 docker exec `$APP_CONTAINER php artisan route:clear
 docker exec `$APP_CONTAINER php artisan view:clear
 docker exec `$APP_CONTAINER php artisan migrate --force
-docker exec `$APP_CONTAINER php artisan images:backfill-moderation-labels --limit=200
 "@
 
 ssh -i $KEY_PATH root@$IP $remoteCmd
