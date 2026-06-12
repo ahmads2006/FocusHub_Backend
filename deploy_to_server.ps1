@@ -29,7 +29,11 @@ $filesToDeploy = @(
     "app/Models/Album.php",
     "app/Http/Controllers/Api/V1/SharedLinkController.php",
     "app/Http/Controllers/Api/V1/AlbumController.php",
-    "app/Services/AI/RecommendationEngine.php"
+    "app/Services/AI/RecommendationEngine.php",
+    "app/Http/Controllers/Api/AlbumUploadController.php",
+    "app/Jobs/ExtractArchiveJob.php",
+    "app/Jobs/ModerateImageJob.php",
+    "app/Jobs/ProcessImageJob.php"
 )
 
 if (Test-Path "deploy.tar.gz") { Remove-Item "deploy.tar.gz" }
