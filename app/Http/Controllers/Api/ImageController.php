@@ -20,7 +20,9 @@ class ImageController extends Controller
 
     public function index(Request $request)
     {
-        $query = Image::query()->withCount(['likes', 'bookmarks']);
+        $query = Image::query()
+            ->with(['settings', 'user.profile', 'storage', 'meta', 'tags', 'moderation'])
+            ->withCount(['likes', 'bookmarks']);
 
         if ($request->has('album_id')) {
             $album = \App\Models\Album::findOrFail($request->album_id);
@@ -38,6 +40,27 @@ class ImageController extends Controller
         }
 
         $images = $query->latest()->paginate(20);
+
+        $likedImageIds = [];
+        $bookmarkedImageIds = [];
+        if (Auth::check()) {
+            $likedImageIds = \App\Models\Like::where('user_id', Auth::id())
+                ->whereIn('image_id', $images->pluck('id'))
+                ->pluck('image_id')->toArray();
+
+            $bookmarkedImageIds = \App\Models\Bookmark::where('user_id', Auth::id())
+                ->whereIn('image_id', $images->pluck('id'))
+                ->pluck('image_id')->toArray();
+        }
+
+        $images->getCollection()->transform(function ($image) use ($likedImageIds, $bookmarkedImageIds) {
+            $image->is_liked = in_array($image->id, $likedImageIds);
+            $image->is_saved = in_array($image->id, $bookmarkedImageIds);
+            $image->likes_count = $image->likes_count ?? 0;
+            $image->bookmarks_count = $image->bookmarks_count ?? 0;
+            return $image;
+        });
+
         return PhotoResource::collection($images);
     }
 
@@ -167,9 +190,36 @@ class ImageController extends Controller
                 ->get();
         }
 
-        // Add display URLs to related images
+        // Add display URLs and load optimized relations for related images
+        $related->load(['settings', 'storage', 'user.profile', 'meta', 'tags', 'moderation'])
+            ->loadCount(['likes', 'bookmarks']);
+
         $related->each(function($img) {
             $img->append(['url', 'original_url']);
+        });
+
+        // Hydrate is_liked / is_saved states for related and main image to prevent N+1
+        $likedImageIds = [];
+        $bookmarkedImageIds = [];
+        if (Auth::check()) {
+            $imageIdsToCheck = $related->pluck('id')->concat([$image->id])->toArray();
+            
+            $likedImageIds = \App\Models\Like::where('user_id', Auth::id())
+                ->whereIn('image_id', $imageIdsToCheck)
+                ->pluck('image_id')->toArray();
+
+            $bookmarkedImageIds = \App\Models\Bookmark::where('user_id', Auth::id())
+                ->whereIn('image_id', $imageIdsToCheck)
+                ->pluck('image_id')->toArray();
+        }
+
+        $image->is_liked = in_array($image->id, $likedImageIds);
+        $image->is_saved = in_array($image->id, $bookmarkedImageIds);
+
+        $related->transform(function ($img) use ($likedImageIds, $bookmarkedImageIds) {
+            $img->is_liked = in_array($img->id, $likedImageIds);
+            $img->is_saved = in_array($img->id, $bookmarkedImageIds);
+            return $img;
         });
 
         return response()->json([

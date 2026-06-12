@@ -151,6 +151,15 @@ class Album extends Model
         return $this->hasOne(AlbumSettings::class);
     }
 
+    public function coverPhoto(): HasOne
+    {
+        return $this->hasOne(Image::class)->ofMany([
+            'id' => 'min'
+        ], function ($query) {
+            $query->where('privacy', 'public')
+                  ->whereHas('moderation', fn($q) => $q->where('status', 'approved'));
+        });
+    }
 
     public function photos(): HasMany
     {

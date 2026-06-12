@@ -345,7 +345,7 @@ class RecommendationEngine
                          ->where('moderation_status', '!=', 'rejected');
                   });
             })
-            ->with(['settings', 'user', 'labelData', 'storage', 'album', 'album.collaborators'])
+            ->with(['settings', 'user', 'labelData', 'storage', 'album', 'album.collaborators', 'moderation'])
             ->withCount(['likes', 'bookmarks'])
             ->orderByRaw("FIELD(id, {$placeholders})", $slicedIds)
             ->get();
@@ -361,7 +361,7 @@ class RecommendationEngine
         return Cache::remember($cacheKey, 60, function () use ($limit, $includeOwnImages) {
             $query = Image::publicGallery()
                 ->where('moderation_status', 'approved') // Added: Only show approved images for performance & safety
-                ->with(['storage', 'settings', 'user'])
+                ->with(['storage', 'settings', 'user', 'moderation'])
                 ->withCount('likes');
 
             if (!$includeOwnImages && auth()->check()) {

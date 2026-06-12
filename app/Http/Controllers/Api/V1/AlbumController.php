@@ -30,7 +30,7 @@ class AlbumController extends Controller
             ->where('title', '!=', 'Quick Uploads')
             ->with(['settings', 'images' => function($q) {
                 $q->latest()->limit(5);
-            }])
+            }, 'images.storage', 'images.settings'])
             ->withCount(['images', 'collaborators'])
             ->latest()
             ->get();
@@ -39,7 +39,7 @@ class AlbumController extends Controller
             ->where('title', '!=', 'Quick Uploads')
             ->with(['settings', 'owner', 'images' => function($q) {
                 $q->latest()->limit(5);
-            }])
+            }, 'images.storage', 'images.settings'])
             ->withCount('images')
             ->latest()
             ->get();
@@ -116,7 +116,7 @@ class AlbumController extends Controller
             ], 403);
         }
 
-        $album->load(['images.user', 'images.storage', 'images.settings', 'collaborators']);
+        $album->load(['images.user', 'images.storage', 'images.settings', 'images.moderation', 'collaborators']);
         $album->accepted_collaborators_count = $album->collaborators()->wherePivot('status', 'accepted')->count() + 1;
 
         return response()->json([
@@ -892,7 +892,7 @@ class AlbumController extends Controller
         $images = $album->images()
             ->where('privacy', 'public')
             ->whereHas('moderation', fn($q) => $q->where('status', \App\Models\Image::STATUS_APPROVED))
-            ->with(['user', 'storage', 'settings'])
+            ->with(['user', 'storage', 'settings', 'moderation'])
             ->withCount(['likes', 'bookmarks'])
             ->latest()
             ->get();

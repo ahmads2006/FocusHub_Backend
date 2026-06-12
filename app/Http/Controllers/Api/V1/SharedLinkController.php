@@ -126,9 +126,29 @@ class SharedLinkController extends Controller
         if ($shareable instanceof Album) {
             $images = Image::withoutGlobalScopes()
                 ->where('album_id', $shareable->id)
-                ->with(['storage', 'settings', 'user', 'meta', 'tags'])
+                ->with(['storage', 'settings', 'user', 'meta', 'tags', 'moderation'])
                 ->withCount(['likes', 'bookmarks'])
                 ->get();
+            
+            $likedImageIds = [];
+            $bookmarkedImageIds = [];
+            if (Auth::check()) {
+                $likedImageIds = \App\Models\Like::where('user_id', Auth::id())
+                    ->whereIn('image_id', $images->pluck('id'))
+                    ->pluck('image_id')->toArray();
+
+                $bookmarkedImageIds = \App\Models\Bookmark::where('user_id', Auth::id())
+                    ->whereIn('image_id', $images->pluck('id'))
+                    ->pluck('image_id')->toArray();
+            }
+
+            $images->transform(function ($image) use ($likedImageIds, $bookmarkedImageIds) {
+                $image->is_liked = in_array($image->id, $likedImageIds);
+                $image->is_saved = in_array($image->id, $bookmarkedImageIds);
+                $image->likes_count = $image->likes_count ?? 0;
+                $image->bookmarks_count = $image->bookmarks_count ?? 0;
+                return $image;
+            });
             
             return response()->json([
                 'success' => true,
@@ -149,9 +169,17 @@ class SharedLinkController extends Controller
 
         if ($shareable instanceof Image) {
             $shareable = Image::withoutGlobalScopes()
-                ->with(['storage', 'settings', 'user', 'meta', 'tags'])
+                ->with(['storage', 'settings', 'user', 'meta', 'tags', 'moderation'])
                 ->withCount(['likes', 'bookmarks'])
                 ->findOrFail($shareable->id);
+
+            if (Auth::check()) {
+                $shareable->is_liked = \App\Models\Like::where('user_id', Auth::id())->where('image_id', $shareable->id)->exists();
+                $shareable->is_saved = \App\Models\Bookmark::where('user_id', Auth::id())->where('image_id', $shareable->id)->exists();
+            } else {
+                $shareable->is_liked = false;
+                $shareable->is_saved = false;
+            }
 
             return response()->json([
                 'success' => true,
@@ -371,7 +399,7 @@ class SharedLinkController extends Controller
             return response()->json(['success' => false, 'message' => __('messages.unauthorized')], 403);
         }
 
-        $image->load(['meta', 'user', 'tags', 'settings'])->loadCount(['likes', 'bookmarks']);
+        $image->load(['meta', 'user', 'tags', 'settings', 'storage', 'moderation'])->loadCount(['likes', 'bookmarks']);
 
         // Fetch other images in the same album as related photos
         $related = collect();
@@ -379,7 +407,7 @@ class SharedLinkController extends Controller
             $related = Image::withoutGlobalScopes()
                 ->where('album_id', $image->album_id)
                 ->where('id', '!=', $image->id)
-                ->with(['tags', 'settings'])
+                ->with(['tags', 'settings', 'storage', 'moderation', 'user'])
                 ->latest()
                 ->take(12)
                 ->get();
@@ -390,7 +418,7 @@ class SharedLinkController extends Controller
             $tagNames = $image->tags->pluck('name')->toArray();
             $moreQuery = Image::where('id', '!=', $image->id)
                 ->where('privacy', 'public')
-                ->with(['tags', 'settings'])
+                ->with(['tags', 'settings', 'storage', 'moderation', 'user'])
                 ->withCount('analytics');
 
             if (!empty($tagNames)) {
@@ -400,6 +428,30 @@ class SharedLinkController extends Controller
             $more = $moreQuery->take(12 - $related->count())->get();
             $related = $related->concat($more);
         }
+
+        // Hydrate is_liked / is_saved states for related and main image to prevent N+1 queries
+        $likedImageIds = [];
+        $bookmarkedImageIds = [];
+        if (Auth::check()) {
+            $imageIdsToCheck = $related->pluck('id')->concat([$image->id])->toArray();
+            
+            $likedImageIds = \App\Models\Like::where('user_id', Auth::id())
+                ->whereIn('image_id', $imageIdsToCheck)
+                ->pluck('image_id')->toArray();
+
+            $bookmarkedImageIds = \App\Models\Bookmark::where('user_id', Auth::id())
+                ->whereIn('image_id', $imageIdsToCheck)
+                ->pluck('image_id')->toArray();
+        }
+
+        $image->is_liked = in_array($image->id, $likedImageIds);
+        $image->is_saved = in_array($image->id, $bookmarkedImageIds);
+
+        $related->transform(function ($img) use ($likedImageIds, $bookmarkedImageIds) {
+            $img->is_liked = in_array($img->id, $likedImageIds);
+            $img->is_saved = in_array($img->id, $bookmarkedImageIds);
+            return $img;
+        });
 
         // Ensure URLs are set
         $related->each(function($img) {

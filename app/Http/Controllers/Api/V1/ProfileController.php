@@ -358,20 +358,17 @@ class ProfileController extends Controller
             if ($tab === 'albums') {
                 $albums = \App\Models\Album::where('user_id', $user->id)
                     ->public()
-                    ->with(['user', 'settings'])
+                    ->with(['user', 'settings', 'coverPhoto.storage'])
                     ->withCount('photos')
                     ->latest()
                     ->paginate($request->get('per_page', 50));
 
                 $albums->getCollection()->each(function ($album) {
-                    $firstPhoto = $album->photos()
-                        ->where('privacy', 'public')
-                        ->whereHas('moderation', fn($q) => $q->where('status', \App\Models\Image::STATUS_APPROVED))
-                        ->first();
+                    $firstPhoto = $album->coverPhoto;
                     $album->cover_url = $album->cover_image ?: ($firstPhoto ? $firstPhoto->url : null);
                 });
             } else {
-                $query = $user->images()->with(['labelData', 'storage', 'settings'])->withCount(['likes', 'bookmarks']);
+                $query = $user->images()->with(['labelData', 'storage', 'settings', 'moderation'])->withCount(['likes', 'bookmarks']);
 
                 if ($tab === 'private' && $isOwner) {
                     $query->where('privacy', 'private');
@@ -385,7 +382,7 @@ class ProfileController extends Controller
                               ->orWhere('images.user_id', $user->id);
                         })
                         ->whereHas('moderation', fn($q) => $q->where('status', \App\Models\Image::STATUS_APPROVED))
-                        ->with(['user', 'labelData', 'storage', 'settings', 'aiMetadata'])
+                        ->with(['user', 'labelData', 'storage', 'settings', 'aiMetadata', 'moderation'])
                         ->withCount(['likes', 'bookmarks'])
                         ->latest('bookmarks.created_at')
                         ->paginate($request->get('per_page', 50));
@@ -396,7 +393,7 @@ class ProfileController extends Controller
                               ->orWhere('images.user_id', $user->id);
                         })
                         ->whereHas('moderation', fn($q) => $q->where('status', \App\Models\Image::STATUS_APPROVED))
-                        ->with(['user', 'labelData', 'storage', 'settings', 'aiMetadata'])
+                        ->with(['user', 'labelData', 'storage', 'settings', 'aiMetadata', 'moderation'])
                         ->withCount(['likes', 'bookmarks'])
                         ->latest()
                         ->paginate($request->get('per_page', 50));
