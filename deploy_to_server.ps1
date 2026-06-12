@@ -25,7 +25,11 @@ $filesToDeploy = @(
     "app/Http/Controllers/Api/V1/GroupChatController.php",
     "app/Services/MongoDBService.php",
     "app/Jobs/ProcessMongoOutbox.php",
-    "app/Models/Conversation.php"
+    "app/Models/Conversation.php",
+    "app/Models/Album.php",
+    "app/Http/Controllers/Api/V1/SharedLinkController.php",
+    "app/Http/Controllers/Api/V1/AlbumController.php",
+    "app/Services/AI/RecommendationEngine.php"
 )
 
 if (Test-Path "deploy.tar.gz") { Remove-Item "deploy.tar.gz" }
