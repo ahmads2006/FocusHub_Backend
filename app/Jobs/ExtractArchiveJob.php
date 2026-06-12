@@ -19,16 +19,18 @@ class ExtractArchiveJob implements ShouldQueue
     protected $jobId;
     protected $albumId;
     protected $userId;
+    protected $metadata;
 
     /**
      * Create a new job instance.
      */
-    public function __construct(string $filePath, string $jobId, string $albumId, string $userId)
+    public function __construct(string $filePath, string $jobId, string $albumId, string $userId, array $metadata = [])
     {
         $this->filePath = $filePath;
         $this->jobId = $jobId;
         $this->albumId = $albumId;
         $this->userId = $userId;
+        $this->metadata = $metadata;
     }
 
     /**
@@ -123,7 +125,14 @@ class ExtractArchiveJob implements ShouldQueue
 
             // Dispatch Moderation job for each
             foreach ($imagePaths as $imagePath) {
-                ModerateImageJob::dispatch($imagePath, $this->jobId, $this->albumId, $this->userId);
+                $filename = basename($imagePath);
+                $nameWithoutExt = pathinfo($filename, PATHINFO_FILENAME);
+
+                $imgMetadata = array_merge($this->metadata ?? [], [
+                    'title' => $nameWithoutExt
+                ]);
+
+                ModerateImageJob::dispatch($imagePath, $this->jobId, $this->albumId, $this->userId, $imgMetadata);
             }
 
             // Delete the zip file it self since it's extracted

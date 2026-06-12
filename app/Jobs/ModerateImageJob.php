@@ -20,16 +20,18 @@ class ModerateImageJob implements ShouldQueue
     protected $jobId;
     protected $albumId;
     protected $userId;
+    protected $metadata;
 
     /**
      * Create a new job instance.
      */
-    public function __construct(string $imagePath, string $jobId, string $albumId, string $userId)
+    public function __construct(string $imagePath, string $jobId, string $albumId, string $userId, array $metadata = [])
     {
         $this->imagePath = $imagePath;
         $this->jobId = $jobId;
         $this->albumId = $albumId;
         $this->userId = $userId;
+        $this->metadata = $metadata;
     }
 
     /**
@@ -62,7 +64,7 @@ class ModerateImageJob implements ShouldQueue
             $driver = $result['driver'] ?? 'unknown';
 
             // ✅ FIX: Always dispatch ProcessImageJob for ALL statuses (approved, pending_review, rejected).
-            ProcessImageJob::dispatch($this->imagePath, $this->jobId, $this->albumId, $this->userId, $status, $isSensitive, $reason, $driver);
+            ProcessImageJob::dispatch($this->imagePath, $this->jobId, $this->albumId, $this->userId, $status, $isSensitive, $reason, $driver, $this->metadata);
 
         } catch (Exception $e) {
             \Illuminate\Support\Facades\Log::error("ModerateImageJob failed: " . $e->getMessage());

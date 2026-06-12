@@ -152,7 +152,7 @@ class ImageService
             // 7. Fallback tagging job only when moderation metadata had no tags
             $image->refresh();
             if (empty($image->labels)) {
-                \App\Jobs\AnalyzeImageLabelsJob::dispatchSync($image->id);
+                \App\Jobs\AnalyzeImageLabelsJob::dispatch($image->id);
             }
 
         } catch (\Exception $e) {

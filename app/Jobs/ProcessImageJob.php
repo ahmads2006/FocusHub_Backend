@@ -26,11 +26,12 @@ class ProcessImageJob implements ShouldQueue
     protected $reason;
     protected $isSensitive;
     protected $driver;
+    protected $metadata;
 
     /**
      * Create a new job instance.
      */
-    public function __construct(string $imagePath, string $jobId, string $albumId, string $userId, string $status, bool $isSensitive, ?string $reason = null, string $driver = 'unknown')
+    public function __construct(string $imagePath, string $jobId, string $albumId, string $userId, string $status, bool $isSensitive, ?string $reason = null, string $driver = 'unknown', array $metadata = [])
     {
         $this->imagePath = $imagePath;
         $this->jobId = $jobId;
@@ -40,6 +41,7 @@ class ProcessImageJob implements ShouldQueue
         $this->isSensitive = $isSensitive;
         $this->reason = $reason;
         $this->driver = $driver;
+        $this->metadata = $metadata;
     }
 
     /**
@@ -92,7 +94,8 @@ class ProcessImageJob implements ShouldQueue
             $imageDb = Image::create([
                 'album_id' => $this->albumId,
                 'user_id' => $this->userId,
-                'title' => pathinfo($filename, PATHINFO_FILENAME),
+                'title' => $this->metadata['title'] ?? pathinfo($filename, PATHINFO_FILENAME),
+                'description' => $this->metadata['description'] ?? null,
                 'filename' => $filename,
                 'file_type' => strtolower(pathinfo($filename, PATHINFO_EXTENSION)),
                 'size' => filesize($absolutePath),
@@ -111,6 +114,21 @@ class ProcessImageJob implements ShouldQueue
                 'is_visible' => ($this->status !== 'rejected'),
                 'sensitivity_reason' => $this->reason,
             ]);
+
+            // Save settings/permissions
+            $settingsDataToSave = [
+                'allow_download'        => isset($this->metadata['allow_download']) ? filter_var($this->metadata['allow_download'], FILTER_VALIDATE_BOOLEAN) : true,
+                'watermark_on_download' => isset($this->metadata['watermark_on_download']) ? filter_var($this->metadata['watermark_on_download'], FILTER_VALIDATE_BOOLEAN) : false,
+            ];
+            
+            $wmFields = ['watermark_font_size', 'watermark_opacity', 'watermark_color', 'watermark_type', 'watermark_text'];
+            foreach ($wmFields as $f) {
+                if (array_key_exists($f, $this->metadata ?? [])) {
+                    $settingsDataToSave[$f] = $this->metadata[$f];
+                }
+            }
+            
+            $imageDb->settings()->updateOrCreate(['image_id' => $imageDb->id], $settingsDataToSave);
 
             // STAGE 3: Store safety result in Redis Pipeline Cache
             $safetyCacheKey = "opticvault:safety:{$imageDb->id}";
@@ -205,6 +223,16 @@ class ProcessImageJob implements ShouldQueue
         if ($done >= ($data['total_items'] ?? 0)) {
             $data['status'] = 'completed';
             Storage::disk('local')->deleteDirectory('quarantine/extracted_' . $this->jobId);
+
+            // Log activity completion
+            $user = \App\Models\User::find($this->userId);
+            $album = \App\Models\Album::find($this->albumId);
+            if ($user && $album) {
+                activity()
+                    ->performedOn($album)
+                    ->causedBy($user)
+                    ->log("Uploaded {$data['processed_items']} images to album");
+            }
         }
         try {
             Redis::set($redisKey, json_encode($data), 'EX', 86400);
