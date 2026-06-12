@@ -137,7 +137,7 @@ class ProfileController extends Controller
             'dynamic_watermark'    => ['boolean'],
             'auto_orient_default'  => ['boolean'],
             'is_public_profile'    => ['boolean'],
-            'watermark_mode'       => ['nullable', 'string', 'in:text,logo'],
+            'watermark_mode'       => ['nullable', 'string', 'in:text,logo,sig,glass'],
             'watermark_text'       => ['nullable', 'string', 'max:50'],
             'watermark_logo'       => ['nullable', 'image', 'max:1024'],
             'watermark_text_color' => ['nullable', 'string', 'regex:/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/'],

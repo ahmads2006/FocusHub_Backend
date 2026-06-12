@@ -95,82 +95,21 @@ class AssetAccessController extends Controller
         if ($imagekitPath) {
             $imageKitService = app(\App\Services\Core\ImageKitService::class);
             
-            // ─── CASCADE: Per-Image → User Global → User Name → Default ───
-            $image->loadMissing(['settings', 'meta']);
-            $userSettings = \App\Models\UserSetting::where('user_id', $image->user_id)->first();
-            
-            $frame = \App\Helpers\MediaHelper::resolveGalleryFrame($image->meta);
-            $imgWidth = (int) ($frame['width'] ?? 0);
-            $imgHeight = (int) ($frame['height'] ?? 0);
-            
-            $watermarkType = $image->settings?->watermark_type ?? $userSettings?->watermark_mode ?? 'text';
-            
-            // ─── LOGO VALIDATION: Fall back to text if logo path is invalid ───
-            $watermarkText = null;
-            if ($watermarkType === 'logo') {
-                $logoPath = $userSettings?->watermark_logo;
-                $isValidLogo = !empty($logoPath) 
-                    && $logoPath !== 'default_logo.png'
-                    && !str_starts_with($logoPath, 'blob:')
-                    && !str_starts_with($logoPath, 'http://localhost')
-                    && !str_starts_with($logoPath, 'data:');
-                
-                if ($isValidLogo) {
-                    $watermarkText = $logoPath;
-                } else {
-                    \Illuminate\Support\Facades\Log::error("AssetAccess: Download blocked - invalid logo path '{$logoPath}'.");
-                    abort(400, 'لا يمكن تنزيل الصورة مسارها غير صالح. يرجى إعادة رفع اللوغو في الإعدادات.');
-                }
-            }
-            
-            if ($watermarkType === 'text') {
-                // Text
-                $rawText = $image->settings?->watermark_text;
-                if (empty($rawText) || trim($rawText) === '') {
-                    $rawText = $userSettings?->watermark_text;
-                }
-                if (empty($rawText) || trim($rawText) === '') {
-                    $rawText = $image->user->name ?? 'OpalShot';
-                }
-                $watermarkText = '© ' . trim(str_replace('©', '', $rawText));
-            }
-            
-            // Font size, opacity, color
-            $fontSize = (int) ($image->settings?->watermark_font_size ?? 80);
-            $ikFontSize = max(20, $fontSize);
-            
-            $rawOpacity = $image->settings?->watermark_opacity;
-            if ($rawOpacity === null) {
-                $userOpacity = $userSettings?->watermark_opacity;
-                $opacity = ($userOpacity !== null) ? (int) ($userOpacity * 100) : 70;
-            } else {
-                $opacity = (int) $rawOpacity;
-            }
-            
-            $rawColor = $image->settings?->watermark_color;
-            if (empty($rawColor)) {
-                $userColor = $userSettings?->watermark_text_color;
-                $color = $userColor ? ltrim($userColor, '#') : 'FFFFFF';
-            } else {
-                $color = ltrim($rawColor, '#');
-            }
-            
-            $alphaHex = str_pad(dechex(round($opacity / 100 * 255)), 2, '0', STR_PAD_LEFT);
-            $colorWithAlpha = $color . $alphaHex;
+            $wm = $this->resolveWatermarkSettings($image);
             
             $watermarkedUrl = $imageKitService->getWatermarkedUrl(
                 $imagekitPath, 
-                $watermarkText, 
+                $wm['text'], 
                 true, 
                 30, 
-                $ikFontSize, 
-                $colorWithAlpha, 
-                $watermarkType,
-                $imgWidth,
-                $imgHeight
+                $wm['fontSize'], 
+                $wm['colorWithAlpha'], 
+                $wm['type'],
+                $wm['width'],
+                $wm['height']
             );
 
-            \Illuminate\Support\Facades\Log::info("AssetAccess: Redirecting to ImageKit watermarked URL for image {$image->id} with text='{$watermarkText}'");
+            \Illuminate\Support\Facades\Log::info("AssetAccess: Redirecting to ImageKit watermarked URL for image {$image->id} with text='{$wm['text']}'");
             return redirect($watermarkedUrl);
         }
 
@@ -187,22 +126,10 @@ class AssetAccessController extends Controller
 
         // 4d. Last resort: generate on-the-fly via SecureShield (local/S3 images only)
         try {
-            // Resolve watermark text using the same cascade as ImageKit path
-            if (!isset($watermarkText)) {
-                $image->load('settings');
-                $userSettings = $userSettings ?? \App\Models\UserSetting::where('user_id', $image->user_id)->first();
-                $rawText = $image->settings?->watermark_text;
-                if (empty($rawText) || trim($rawText) === '') {
-                    $rawText = $userSettings?->watermark_text;
-                }
-                if (empty($rawText) || trim($rawText) === '') {
-                    $rawText = $image->user->name ?? 'OpalShot';
-                }
-                $watermarkText = '© ' . trim(str_replace('©', '', $rawText));
-            }
+            $wm = $this->resolveWatermarkSettings($image);
 
             $settings = [
-                'watermark_text'    => $watermarkText,
+                'watermark_text'    => $wm['text'],
                 'mode'              => 'signature',
                 'smart_positioning' => true,
                 'dynamic_blending'  => true,
@@ -249,6 +176,19 @@ class AssetAccessController extends Controller
             abort(403, 'This image has been rejected due to content policy violations.');
         }
 
+        // 3. Determine if watermark should be applied to the preview
+        $isOwner = Auth::check() && Auth::id() === $image->user_id;
+        $sessionLinkWatermark = session("shared_link_watermark_{$image->id}");
+        
+        if ($sessionLinkWatermark !== null) {
+            $shouldWatermark = (bool) $sessionLinkWatermark;
+        } elseif ($isOwner) {
+            $shouldWatermark = false;
+        } else {
+            $image->loadMissing('user');
+            $shouldWatermark = (bool) ($image->user->dynamic_watermark ?? false) || (bool) ($image->settings?->watermark_on_download ?? false);
+        }
+
         $imagekitPath = $image->imagekit_file_path ?? null;
 
         // Generate Signed preview URL for safe/owner views if it's in the cloud
@@ -290,19 +230,115 @@ class AssetAccessController extends Controller
                     break;
             }
 
-            $transformations = [['format' => 'webp', 'quality' => 'auto']];
-            if ($width) {
-                $transformations[0]['width'] = (string)$width;
-            }
-            if ($height) {
-                $transformations[0]['height'] = (string)$height;
-                $transformations[0]['crop'] = 'at_max';
-            }
+            if ($shouldWatermark) {
+                $wm = $this->resolveWatermarkSettings($image);
+                
+                // Use context-based width/height for dynamic watermark sizing
+                $previewWidth = $width ?? 800;
+                $previewHeight = $height ?? 600;
+                
+                $url = $imageKitService->getWatermarkedUrl(
+                    $imagekitPath, 
+                    $wm['text'], 
+                    true, 
+                    10, // expire in 10 mins for preview redirect
+                    $wm['fontSize'], 
+                    $wm['colorWithAlpha'], 
+                    $wm['type'],
+                    $previewWidth,
+                    $previewHeight
+                );
+                return redirect($url);
+            } else {
+                $transformations = [['format' => 'webp', 'quality' => 'auto']];
+                if ($width) {
+                    $transformations[0]['width'] = (string)$width;
+                }
+                if ($height) {
+                    $transformations[0]['height'] = (string)$height;
+                    $transformations[0]['crop'] = 'at_max';
+                }
 
-            // Expiry is set to 1 minute — enough for browser redirect to load image, short enough to prevent sharing
-            $url = $imageKitService->generateSignedUrl($imagekitPath, $transformations, 1);
-            return redirect($url);
+                $url = $imageKitService->generateSignedUrl($imagekitPath, $transformations, 10);
+                return redirect($url);
+            }
         }
+
+        return $this->streamImageFile($image, 'inline');
+    }
+
+    /**
+     * Resolve and format the appropriate watermark settings for an image.
+     */
+    protected function resolveWatermarkSettings(Image $image): array
+    {
+        $image->loadMissing(['settings', 'meta', 'user']);
+        $userSettings = \App\Models\UserSetting::where('user_id', $image->user_id)->first();
+        
+        $frame = \App\Helpers\MediaHelper::resolveGalleryFrame($image->meta);
+        $imgWidth = (int) ($frame['width'] ?? 0);
+        $imgHeight = (int) ($frame['height'] ?? 0);
+        
+        $watermarkType = $image->settings?->watermark_type ?? $userSettings?->watermark_mode ?? 'text';
+        
+        $watermarkText = null;
+        if ($watermarkType === 'logo') {
+            $logoPath = $userSettings?->watermark_logo;
+            $isValidLogo = !empty($logoPath) 
+                && $logoPath !== 'default_logo.png'
+                && !str_starts_with($logoPath, 'blob:')
+                && !str_starts_with($logoPath, 'http://localhost')
+                && !str_starts_with($logoPath, 'data:');
+            
+            if ($isValidLogo) {
+                $watermarkText = $logoPath;
+            } else {
+                // Fallback to text if logo is invalid
+                $watermarkType = 'text';
+            }
+        }
+        
+        if (in_array($watermarkType, ['text', 'sig', 'glass'])) {
+            $rawText = $image->settings?->watermark_text;
+            if (empty($rawText) || trim($rawText) === '') {
+                $rawText = $userSettings?->watermark_text;
+            }
+            if (empty($rawText) || trim($rawText) === '') {
+                $rawText = $image->user->name ?? 'OpalShot';
+            }
+            $watermarkText = '© ' . trim(str_replace('©', '', $rawText));
+        }
+        
+        $fontSize = (int) ($image->settings?->watermark_font_size ?? 80);
+        $ikFontSize = max(20, $fontSize);
+        
+        $rawOpacity = $image->settings?->watermark_opacity;
+        if ($rawOpacity === null) {
+            $userOpacity = $userSettings?->watermark_opacity;
+            $opacity = ($userOpacity !== null) ? (int) ($userOpacity * 100) : 70;
+        } else {
+            $opacity = (int) $rawOpacity;
+        }
+        
+        $rawColor = $image->settings?->watermark_color;
+        if (empty($rawColor)) {
+            $userColor = $userSettings?->watermark_text_color;
+            $color = $userColor ? ltrim($userColor, '#') : 'FFFFFF';
+        } else {
+            $color = ltrim($rawColor, '#');
+        }
+        
+        $alphaHex = str_pad(dechex(round($opacity / 100 * 255)), 2, '0', STR_PAD_LEFT);
+        $colorWithAlpha = $color . $alphaHex;
+        
+        return [
+            'type' => $watermarkType,
+            'text' => $watermarkText,
+            'fontSize' => $ikFontSize,
+            'colorWithAlpha' => $colorWithAlpha,
+            'width' => $imgWidth,
+            'height' => $imgHeight,
+        ];
 
         return $this->streamImageFile($image, 'inline');
     }

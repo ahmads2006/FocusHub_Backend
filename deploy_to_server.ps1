@@ -7,28 +7,7 @@ $BASE = $SCRIPT_DIR
 $PROJECT_ROOT = Split-Path $SCRIPT_DIR -Parent
 $KEY_PATH = Join-Path -Path $PROJECT_ROOT -ChildPath $KEY
 
-function upload_file {
-    param($local, $remote)
-    $localPath = $local -replace '/', '\'
-    $fullPath = Join-Path -Path $BASE -ChildPath $localPath
-    if (-not (Test-Path $fullPath)) {
-        throw "Local file not found: $fullPath"
-    }
-    # Ensure remote parent directory exists
-    $remoteDir = Split-Path -Parent $remote -Resolve:$false
-    $remoteDir = $remoteDir -replace '\\', '/'
-    ssh -i $KEY_PATH root@$IP "mkdir -p $remoteDir"
-
-    Write-Host "Uploading $local"
-    scp -i $KEY_PATH "$fullPath" "root@${IP}:${remote}"
-    if ($LASTEXITCODE -ne 0) {
-        throw "SCP failed for $local"
-    }
-}
-
-Write-Host "Deploying updated backend files..."
-
-# Watermark and Steganography backend files
+Write-Host "Archiving updated backend files..."
 $filesToDeploy = @(
     "app/Http/Controllers/Api/V1/SettingsController.php",
     "app/Http/Controllers/Api/V1/WatermarkController.php",
@@ -37,12 +16,33 @@ $filesToDeploy = @(
     "app/Services/Core/ImageService.php",
     "app/Services/Security/SecureShieldService.php",
     "app/Services/Security/SteganographyService.php",
-    "routes/api.php"
+    "routes/api.php",
+    "app/Http/Controllers/Web/DownloadController.php",
+    "app/Http/Controllers/Api/ImageController.php",
+    "app/Http/Controllers/Web/ProfileController.php",
+    "app/Http/Controllers/Api/V1/ProfileController.php"
 )
 
-foreach ($file in $filesToDeploy) {
-    upload_file $file "$REMOTE_PATH/$file"
+if (Test-Path "deploy.tar.gz") { Remove-Item "deploy.tar.gz" }
+& tar -czf deploy.tar.gz $filesToDeploy
+if ($LASTEXITCODE -ne 0) {
+    throw "Failed to create tar.gz archive"
 }
+
+Write-Host "Uploading archive to server..."
+scp -i $KEY_PATH deploy.tar.gz root@${IP}:${REMOTE_PATH}/
+if ($LASTEXITCODE -ne 0) {
+    throw "SCP failed to upload archive"
+}
+
+Write-Host "Extracting archive on remote server..."
+ssh -i $KEY_PATH root@$IP "cd $REMOTE_PATH && tar -xzf deploy.tar.gz && rm deploy.tar.gz"
+if ($LASTEXITCODE -ne 0) {
+    throw "Failed to extract archive on remote server"
+}
+
+# Clean up local archive
+Remove-Item "deploy.tar.gz"
 
 Write-Host "Refreshing Laravel cache inside app container..."
 $remoteCmd = @"

@@ -100,8 +100,9 @@ class ImageKitService
             // Proportional logo scale factor: 12% of image width
             $scaleFactor = 0.12;
 
-            // Anchor bottom_right, with dynamic margins (lx & ly)
-            $rawTransformation = "l-image,i-{$logoPath},w-bw_mul_{$scaleFactor},o-{$opacityPercent},lfo-bottom_right,lx-{$padding},ly-{$padding},l-end";
+            // Anchor bottom_right, using negative coordinates for padding (lx-N{$padding}, ly-N{$padding})
+            // ImageKit ignores lfo when lx/ly are specified, so we omit lfo and use N prefix for negative offsets.
+            $rawTransformation = "l-image,i-{$logoPath},w-bw_mul_{$scaleFactor},o-{$opacityPercent},lx-N{$padding},ly-N{$padding},l-end";
         } else {
             // ─── TEXT OVERLAY ───
             // ImageKit requires URL-safe base64 for the ie- parameter
@@ -123,8 +124,9 @@ class ImageKitService
                 $bgStr = ",bg-00000044,rad-10,pa-15";
             }
 
-            // Anchor bottom_right, with dynamic font size, styles, and dynamic margins (lx & ly)
-            $rawTransformation = "l-text,ie-{$base64Text},fs-{$ikFontSize},co-{$colorWithAlpha}{$fontFamilyStr}{$bgStr},lfo-bottom_right,lx-{$padding},ly-{$padding},l-end";
+            // Anchor bottom_right, using negative coordinates for padding (lx-N{$padding}, ly-N{$padding})
+            // ImageKit ignores lfo when lx/ly are specified, so we omit lfo and use N prefix for negative offsets.
+            $rawTransformation = "l-text,ie-{$base64Text},fs-{$ikFontSize},co-{$colorWithAlpha}{$fontFamilyStr}{$bgStr},lx-N{$padding},ly-N{$padding},l-end";
         }
 
         Log::info("ImageKit Watermark Transform: type={$type}, raw={$rawTransformation}, resolution={$width}x{$height}");

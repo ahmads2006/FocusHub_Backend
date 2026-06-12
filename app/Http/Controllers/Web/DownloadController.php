@@ -71,7 +71,7 @@ class DownloadController extends Controller
             }
         }
         
-        if ($watermarkType === 'text') {
+        if (in_array($watermarkType, ['text', 'sig', 'glass'])) {
             // 2. Watermark Text: per-image → user global → user name → 'OpalShot'
             $rawText = $image->settings?->watermark_text;
             if (empty($rawText) || trim($rawText) === '') {

@@ -195,7 +195,7 @@ class ImageController extends Controller
             'watermark_font_size' => 'nullable|integer|min:20|max:800',
             'watermark_opacity' => 'nullable|integer|min:10|max:100',
             'watermark_color' => 'nullable|string|max:8',
-            'watermark_type' => 'nullable|string|in:text,logo',
+            'watermark_type' => 'nullable|string|in:text,logo,sig,glass',
             'watermark_text' => 'nullable|string|max:255',
         ]);
 
