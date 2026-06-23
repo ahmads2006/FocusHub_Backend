@@ -34,6 +34,9 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->api(prepend: [
             \Illuminate\Session\Middleware\StartSession::class,
             \App\Http\Middleware\SetLocale::class,
+        ], append: [
+            \App\Http\Middleware\CheckSiteOffline::class,
+            \App\Http\Middleware\CheckFeatureStatus::class,
         ]);
 
         $middleware->alias([

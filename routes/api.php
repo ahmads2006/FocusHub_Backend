@@ -84,6 +84,9 @@ Route::prefix('v1')->group(function () {
     Route::get('/health', [App\Http\Controllers\Api\SystemHealthController::class, 'index'])
         ->middleware(['auth:sanctum', 'role:super-admin']);
 
+    // Global system status (Public)
+    Route::get('/system-settings/status', [App\Http\Controllers\Api\SystemSettingController::class, 'getStatus']);
+
     // ══════════════════════════════════════════
     // 1. 🔐 AUTHENTICATION (Public)
     // ══════════════════════════════════════════
@@ -427,6 +430,10 @@ Route::prefix('v1')->group(function () {
 
         // Cloudinary Key Rotation Control
         Route::post('/cloudinary/reset', [AdminController::class, 'resetCloudinaryKeys']);
+
+        // System Settings control
+        Route::get('/system-settings', [App\Http\Controllers\Api\SystemSettingController::class, 'index']);
+        Route::post('/system-settings', [App\Http\Controllers\Api\SystemSettingController::class, 'update']);
     });
 
     // 🔗 SHARED LINKS (Public with Token)
