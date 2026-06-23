@@ -34,7 +34,14 @@ $filesToDeploy = @(
     "app/Http/Controllers/Api/AlbumUploadController.php",
     "app/Jobs/ExtractArchiveJob.php",
     "app/Jobs/ModerateImageJob.php",
-    "app/Jobs/ProcessImageJob.php"
+    "app/Jobs/ProcessImageJob.php",
+    "database/migrations/2026_06_23_180000_create_system_settings_table.php",
+    "app/Models/SystemSetting.php",
+    "database/seeders/DatabaseSeeder.php",
+    "app/Http/Middleware/CheckSiteOffline.php",
+    "app/Http/Middleware/CheckFeatureStatus.php",
+    "bootstrap/app.php",
+    "app/Http/Controllers/Api/SystemSettingController.php"
 )
 
 if (Test-Path "deploy.tar.gz") { Remove-Item "deploy.tar.gz" }
