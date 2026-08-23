@@ -27,7 +27,7 @@ class CleanMongoOrphans extends Command
         $totalOrphans = 0;
 
         if ($isDryRun) {
-            $this->warn('🔍 DRY RUN MODE — لن يتم حذف أي شيء.');
+            $this->warn(' DRY RUN MODE — لن يتم حذف أي شيء.');
         }
 
         $this->info('Starting MongoDB orphan cleanup...');
@@ -65,12 +65,12 @@ class CleanMongoOrphans extends Command
                     $count = count($orphanIds);
 
                     if ($count === 0) {
-                        $this->line("  ├─ {$foreignKey}: ✅ No orphans found ({$count}/" . count($referencedIds) . " valid).");
+                        $this->line("  ├─ {$foreignKey}: No orphans found ({$count}/" . count($referencedIds) . " valid).");
                         continue;
                     }
 
                     $orphanCount += $count;
-                    $this->warn("  ├─ {$foreignKey}: ⚠️  Found {$count} orphaned documents.");
+                    $this->warn("  ├─ {$foreignKey}:   Found {$count} orphaned documents.");
 
                     if (!$isDryRun) {
                         $deleted = $mongoCollection
@@ -97,10 +97,10 @@ class CleanMongoOrphans extends Command
 
         $this->newLine();
         if ($totalOrphans === 0) {
-            $this->info('🎉 All MongoDB collections are clean. No orphans found.');
+            $this->info(' All MongoDB collections are clean. No orphans found.');
         } else {
             $action = $isDryRun ? 'found (not deleted — dry-run)' : 'cleaned';
-            $this->warn("📊 Total orphaned documents {$action}: {$totalOrphans}");
+            $this->warn(" Total orphaned documents {$action}: {$totalOrphans}");
         }
 
         return self::SUCCESS;
