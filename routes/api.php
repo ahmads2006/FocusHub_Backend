@@ -249,19 +249,19 @@ Route::prefix('v1')->group(function () {
             Route::get('/{user}/status', [App\Http\Controllers\Api\V1\ConnectionController::class, 'status']);
         });
 
-        // ─── 💬 Chat ────────────────────────────
+        // ─── 💬 Chat (Powered by Firebase Firestore) ────────────────────
         Route::prefix('chat')->group(function () {
-            Route::get('/conversations', [App\Http\Controllers\Api\V1\MongoChatController::class, 'conversations']);
-            Route::get('/messages/{partner}', [App\Http\Controllers\Api\V1\MongoChatController::class, 'messages']);
-            Route::post('/send', [App\Http\Controllers\Api\V1\MongoChatController::class, 'store']);
-            Route::get('/poll/{partner}', [App\Http\Controllers\Api\V1\MongoChatController::class, 'poll']);
-            Route::get('/unread-count', [App\Http\Controllers\Api\V1\MongoChatController::class, 'unreadCount']);
-            Route::get('/my-images', [App\Http\Controllers\Api\V1\MongoChatController::class, 'myImages']);
-            Route::get('/connections', [App\Http\Controllers\Api\V1\MongoChatController::class, 'connections']);
-            Route::patch('/messages/{id}', [App\Http\Controllers\Api\V1\MongoChatController::class, 'update']);
-            Route::delete('/messages/{id}', [App\Http\Controllers\Api\V1\MongoChatController::class, 'destroy']);
-            Route::post('/conversations/{partner}/accept', [App\Http\Controllers\Api\V1\MongoChatController::class, 'acceptConversation']);
-            Route::post('/conversations/{partner}/decline', [App\Http\Controllers\Api\V1\MongoChatController::class, 'declineConversation']);
+            Route::get('/conversations', [App\Http\Controllers\Api\V1\FirebaseChatController::class, 'conversations']);
+            Route::get('/messages/{partner}', [App\Http\Controllers\Api\V1\FirebaseChatController::class, 'messages']);
+            Route::post('/send', [App\Http\Controllers\Api\V1\FirebaseChatController::class, 'store']);
+            Route::get('/poll/{partner}', [App\Http\Controllers\Api\V1\FirebaseChatController::class, 'poll']);
+            Route::get('/unread-count', [App\Http\Controllers\Api\V1\FirebaseChatController::class, 'unreadCount']);
+            Route::get('/my-images', [App\Http\Controllers\Api\V1\FirebaseChatController::class, 'myImages']);
+            Route::get('/connections', [App\Http\Controllers\Api\V1\FirebaseChatController::class, 'connections']);
+            Route::patch('/messages/{id}', [App\Http\Controllers\Api\V1\FirebaseChatController::class, 'update']);
+            Route::delete('/messages/{id}', [App\Http\Controllers\Api\V1\FirebaseChatController::class, 'destroy']);
+            Route::post('/conversations/{partner}/accept', [App\Http\Controllers\Api\V1\FirebaseChatController::class, 'acceptConversation']);
+            Route::post('/conversations/{partner}/decline', [App\Http\Controllers\Api\V1\FirebaseChatController::class, 'declineConversation']);
 
             // ─── 👥 Group Chat ──────────────────────
             Route::prefix('groups')->group(function () {

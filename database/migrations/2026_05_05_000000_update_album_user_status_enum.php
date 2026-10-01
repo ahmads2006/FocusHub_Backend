@@ -12,8 +12,12 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // MySQL requires raw SQL to update ENUM values reliably
-        DB::statement("ALTER TABLE album_user MODIFY COLUMN status ENUM('invited', 'accepted', 'pending') DEFAULT 'invited'");
+        if (DB::getDriverName() === 'pgsql') {
+            DB::statement("ALTER TABLE album_user DROP CONSTRAINT IF EXISTS album_user_status_check");
+            DB::statement("ALTER TABLE album_user ADD CONSTRAINT album_user_status_check CHECK (status IN ('invited', 'accepted', 'pending'))");
+        } else {
+            DB::statement("ALTER TABLE album_user MODIFY COLUMN status ENUM('invited', 'accepted', 'pending') DEFAULT 'invited'");
+        }
     }
 
     /**
@@ -21,6 +25,11 @@ return new class extends Migration
      */
     public function down(): void
     {
-        DB::statement("ALTER TABLE album_user MODIFY COLUMN status ENUM('invited', 'accepted') DEFAULT 'invited'");
+        if (DB::getDriverName() === 'pgsql') {
+            DB::statement("ALTER TABLE album_user DROP CONSTRAINT IF EXISTS album_user_status_check");
+            DB::statement("ALTER TABLE album_user ADD CONSTRAINT album_user_status_check CHECK (status IN ('invited', 'accepted'))");
+        } else {
+            DB::statement("ALTER TABLE album_user MODIFY COLUMN status ENUM('invited', 'accepted') DEFAULT 'invited'");
+        }
     }
 };

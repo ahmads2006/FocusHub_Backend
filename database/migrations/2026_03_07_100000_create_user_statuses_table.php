@@ -48,7 +48,12 @@ return new class extends Migration
         });
 
         // إضافة editor إلى enum role
-        DB::statement("ALTER TABLE users MODIFY COLUMN role ENUM('super_admin', 'user', 'photographer', 'editor') DEFAULT 'user'");
+        if (DB::getDriverName() === 'pgsql') {
+            DB::statement("ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check");
+            DB::statement("ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('super_admin', 'user', 'photographer', 'editor'))");
+        } else {
+            DB::statement("ALTER TABLE users MODIFY COLUMN role ENUM('super_admin', 'user', 'photographer', 'editor') DEFAULT 'user'");
+        }
     }
 
     public function down(): void
@@ -67,7 +72,12 @@ return new class extends Migration
             ]);
         }
 
-        DB::statement("ALTER TABLE users MODIFY COLUMN role ENUM('super_admin', 'user', 'photographer') DEFAULT 'user'");
+        if (DB::getDriverName() === 'pgsql') {
+            DB::statement("ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check");
+            DB::statement("ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('super_admin', 'user', 'photographer'))");
+        } else {
+            DB::statement("ALTER TABLE users MODIFY COLUMN role ENUM('super_admin', 'user', 'photographer') DEFAULT 'user'");
+        }
         Schema::dropIfExists('user_statuses');
     }
 };

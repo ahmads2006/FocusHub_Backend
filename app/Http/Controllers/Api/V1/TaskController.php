@@ -16,7 +16,7 @@ class TaskController extends Controller
     public function index(Request $request)
     {
         $query = Task::where('user_id', Auth::id())
-            ->orderByRaw("FIELD(priority, 'high', 'normal')")
+            ->orderByRaw("CASE priority WHEN 'high' THEN 1 WHEN 'normal' THEN 2 ELSE 3 END")
             ->orderBy('created_at', 'desc');
 
         // Optional status filter

@@ -44,3 +44,6 @@ storage/app/private/quarantine/*
 # OS Files
 .DS_Store
 Thumbs.db
+
+# Firebase Credentials
+/storage/app/firebase/*

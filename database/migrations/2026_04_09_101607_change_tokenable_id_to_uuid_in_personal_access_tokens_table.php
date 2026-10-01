@@ -11,9 +11,13 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('personal_access_tokens', function (Blueprint $table) {
-            $table->uuid('tokenable_id')->change();
-        });
+        if (\Illuminate\Support\Facades\DB::getDriverName() === 'pgsql') {
+            \Illuminate\Support\Facades\DB::statement('ALTER TABLE personal_access_tokens ALTER COLUMN tokenable_id TYPE uuid USING (tokenable_id::text::uuid)');
+        } else {
+            Schema::table('personal_access_tokens', function (Blueprint $table) {
+                $table->uuid('tokenable_id')->change();
+            });
+        }
     }
 
     /**

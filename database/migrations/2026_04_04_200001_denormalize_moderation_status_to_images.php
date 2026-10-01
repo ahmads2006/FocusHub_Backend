@@ -19,12 +19,22 @@ return new class extends Migration
         });
 
         // Sync existing data from image_moderation table
-        DB::statement("
-            UPDATE images i
-            JOIN image_moderation im ON im.image_id = i.id
-            SET i.is_visible = im.is_visible,
-                i.moderation_status = im.status
-        ");
+        if (DB::getDriverName() === 'pgsql') {
+            DB::statement("
+                UPDATE images i
+                SET is_visible = im.is_visible,
+                    moderation_status = im.status
+                FROM image_moderation im
+                WHERE im.image_id = i.id
+            ");
+        } else {
+            DB::statement("
+                UPDATE images i
+                JOIN image_moderation im ON im.image_id = i.id
+                SET i.is_visible = im.is_visible,
+                    i.moderation_status = im.status
+            ");
+        }
     }
 
     public function down(): void

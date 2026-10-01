@@ -38,27 +38,39 @@ class GalleryController extends Controller
         // ── Search Filter ──
         if ($searchQuery) {
             $search = trim($searchQuery);
-            $query->where(function ($q) use ($search) {
+            $isPgsql = DB::getDriverName() === 'pgsql';
+            $query->where(function ($q) use ($search, $isPgsql) {
                 $q->where('title', 'LIKE', "%{$search}%")
-                    ->orWhere('description', 'LIKE', "%{$search}%")
-                    ->orWhereRaw("JSON_SEARCH(labels, 'one', ?, NULL, '$[*]') IS NOT NULL", ["%{$search}%"])
-                    ->orWhereHas('aiMetadata', function ($ai) use ($search) {
-                        $ai->where('category', 'LIKE', "%{$search}%")
-                            ->orWhere('caption', 'LIKE', "%{$search}%")
-                            ->orWhereRaw("JSON_SEARCH(extracted_tags, 'one', ?, NULL, '$[*]') IS NOT NULL", ["%{$search}%"]);
-                    })
-                    ->orWhereHas('tags', function ($t) use ($search) {
-                        $t->where('name->en', 'LIKE', "%{$search}%")
-                            ->orWhere('name->ar', 'LIKE', "%{$search}%")
-                            ->orWhere('name', 'LIKE', "%{$search}%");
-                    });
+                    ->orWhere('description', 'LIKE', "%{$search}%");
+
+                if ($isPgsql) {
+                    $q->orWhereRaw("labels::text ILIKE ?", ["%{$search}%"]);
+                } else {
+                    $q->orWhereRaw("JSON_SEARCH(labels, 'one', ?, NULL, '$[*]') IS NOT NULL", ["%{$search}%"]);
+                }
+
+                $q->orWhereHas('aiMetadata', function ($ai) use ($search, $isPgsql) {
+                    $ai->where('category', 'LIKE', "%{$search}%")
+                        ->orWhere('caption', 'LIKE', "%{$search}%");
+
+                    if ($isPgsql) {
+                        $ai->orWhereRaw("extracted_tags::text ILIKE ?", ["%{$search}%"]);
+                    } else {
+                        $ai->orWhereRaw("JSON_SEARCH(extracted_tags, 'one', ?, NULL, '$[*]') IS NOT NULL", ["%{$search}%"]);
+                    }
+                })
+                ->orWhereHas('tags', function ($t) use ($search) {
+                    $t->where('name->en', 'LIKE', "%{$search}%")
+                        ->orWhere('name->ar', 'LIKE', "%{$search}%")
+                        ->orWhere('name', 'LIKE', "%{$search}%");
+                });
             });
         }
 
         // ── Tag Filter ──
         if ($selectedTag && $selectedTag !== 'all') {
             $query->where(function ($q) use ($selectedTag) {
-                $q->whereRaw('JSON_CONTAINS(labels, ?)', [json_encode($selectedTag)])
+                $q->whereJsonContains('labels', $selectedTag)
                   ->orWhereHas('tags', function ($t) use ($selectedTag) {
                       $t->where('name->en', $selectedTag)
                         ->orWhere('name->ar', $selectedTag)
@@ -94,7 +106,12 @@ class GalleryController extends Controller
             $slicedIds  = array_slice($feedIds, ($page - 1) * $perPage, $perPage);
 
             if (!empty($slicedIds)) {
-                $placeholders = implode(',', array_fill(0, count($slicedIds), '?'));
+                $cases = [];
+                foreach ($slicedIds as $idx => $id) {
+                    $cases[] = "WHEN id = ? THEN " . ($idx + 1);
+                }
+                $caseSql = "CASE " . implode(' ', $cases) . " ELSE " . (count($slicedIds) + 1) . " END";
+
                 $models = Image::whereIn('id', $slicedIds)
                     ->publicGallery()
                     ->where(function($q) use ($user) {
@@ -106,7 +123,7 @@ class GalleryController extends Controller
                     })
                     ->with(['settings', 'user.profile', 'storage', 'meta', 'album', 'moderation'])
                     ->withCount(['likes', 'bookmarks'])
-                    ->orderByRaw("FIELD(id, {$placeholders})", $slicedIds)
+                    ->orderByRaw($caseSql, $slicedIds)
                     ->get();
             } else {
                 // Fallback to latest images if no personalized feed

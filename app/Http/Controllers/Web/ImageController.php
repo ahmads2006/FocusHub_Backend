@@ -284,30 +284,42 @@ class ImageController extends Controller
         // --- AI-Powered Smart Search ---
         if ($searchQuery) {
             $search = trim($searchQuery);
-            $query->where(function($q) use ($search) {
+            $isPgsql = DB::getDriverName() === 'pgsql';
+            $query->where(function($q) use ($search, $isPgsql) {
                 // 1. Search in title
                 $q->where('title', 'LIKE', "%{$search}%")
                   // 2. Search in description
-                  ->orWhere('description', 'LIKE', "%{$search}%")
-                  // 3. Search in legacy labels JSON column
-                  ->orWhereRaw("JSON_SEARCH(labels, 'one', ?, NULL, '$[*]') IS NOT NULL", ["%{$search}%"])
-                  // 4. Search in AI metadata (category, caption, extracted_tags)
-                  ->orWhereHas('aiMetadata', function($ai) use ($search) {
-                      $ai->where('category', 'LIKE', "%{$search}%")
-                         ->orWhere('caption', 'LIKE', "%{$search}%")
-                         ->orWhereRaw("JSON_SEARCH(extracted_tags, 'one', ?, NULL, '$[*]') IS NOT NULL", ["%{$search}%"]);
-                  })
-                  // 5. Search in Spatie tags
-                  ->orWhereHas('tags', function($t) use ($search) {
-                      $t->where('name->en', 'LIKE', "%{$search}%")
-                        ->orWhere('name->ar', 'LIKE', "%{$search}%")
-                        ->orWhere('name', 'LIKE', "%{$search}%");
-                  });
+                  ->orWhere('description', 'LIKE', "%{$search}%");
+
+                // 3. Search in legacy labels JSON column
+                if ($isPgsql) {
+                    $q->orWhereRaw("labels::text ILIKE ?", ["%{$search}%"]);
+                } else {
+                    $q->orWhereRaw("JSON_SEARCH(labels, 'one', ?, NULL, '$[*]') IS NOT NULL", ["%{$search}%"]);
+                }
+
+                // 4. Search in AI metadata (category, caption, extracted_tags)
+                $q->orWhereHas('aiMetadata', function($ai) use ($search, $isPgsql) {
+                    $ai->where('category', 'LIKE', "%{$search}%")
+                       ->orWhere('caption', 'LIKE', "%{$search}%");
+
+                    if ($isPgsql) {
+                        $ai->orWhereRaw("extracted_tags::text ILIKE ?", ["%{$search}%"]);
+                    } else {
+                        $ai->orWhereRaw("JSON_SEARCH(extracted_tags, 'one', ?, NULL, '$[*]') IS NOT NULL", ["%{$search}%"]);
+                    }
+                })
+                // 5. Search in Spatie tags
+                ->orWhereHas('tags', function($t) use ($search) {
+                    $t->where('name->en', 'LIKE', "%{$search}%")
+                      ->orWhere('name->ar', 'LIKE', "%{$search}%")
+                      ->orWhere('name', 'LIKE', "%{$search}%");
+                });
             });
 
             $images = $query->latest()->paginate(20);
         } elseif ($selectedTag) {
-            $query->whereRaw('JSON_CONTAINS(labels, ?)', [json_encode($selectedTag)]);
+            $query->whereJsonContains('labels', $selectedTag);
             $images = $query->latest()->paginate(20);
         } else {
             // No tag selected. If user is logged in, use personalized For You engine
@@ -327,12 +339,17 @@ class ImageController extends Controller
 
                 // Hydrate ONLY the 20 models needed for this page
                 if (!empty($slicedIds)) {
-                    $placeholders = implode(',', array_fill(0, count($slicedIds), '?'));
+                    $cases = [];
+                    foreach ($slicedIds as $idx => $id) {
+                        $cases[] = "WHEN id = ? THEN " . ($idx + 1);
+                    }
+                    $caseSql = "CASE " . implode(' ', $cases) . " ELSE " . (count($slicedIds) + 1) . " END";
+
                     $models = Image::whereIn('id', $slicedIds)
                         ->where('privacy', 'public') // Prevents stale cache from exposing newly-private images
                         ->with(['settings', 'user', 'labelData', 'aiMetadata', 'storage'])
                         ->withCount('likes')
-                        ->orderByRaw("FIELD(id, {$placeholders})", $slicedIds)
+                        ->orderByRaw($caseSql, $slicedIds)
                         ->get();
                 } else {
                     $models = collect();

@@ -94,9 +94,9 @@ class PerformanceMetricsController extends Controller
             ->selectRaw('AVG(inp) as avg_inp')
             ->selectRaw('AVG(cls) as avg_cls')
             ->selectRaw('COUNT(*) as total_samples')
-            ->selectRaw('SUM(CASE WHEN pass_lcp = 0 THEN 1 ELSE 0 END) as failed_lcp')
-            ->selectRaw('SUM(CASE WHEN pass_inp = 0 THEN 1 ELSE 0 END) as failed_inp')
-            ->selectRaw('SUM(CASE WHEN pass_cls = 0 THEN 1 ELSE 0 END) as failed_cls')
+            ->selectRaw('SUM(CASE WHEN pass_lcp = false THEN 1 ELSE 0 END) as failed_lcp')
+            ->selectRaw('SUM(CASE WHEN pass_inp = false THEN 1 ELSE 0 END) as failed_inp')
+            ->selectRaw('SUM(CASE WHEN pass_cls = false THEN 1 ELSE 0 END) as failed_cls')
             ->first();
 
         $prefetchSummary = PerformanceMetric::query()
@@ -157,7 +157,7 @@ class PerformanceMetricsController extends Controller
             ->selectRaw('AVG(lcp) as avg_lcp')
             ->selectRaw('AVG(inp) as avg_inp')
             ->selectRaw('AVG(cls) as avg_cls')
-            ->selectRaw('AVG(CASE WHEN pass_lcp = 1 THEN 1 ELSE 0 END) as pass_lcp_rate')
+            ->selectRaw('AVG(CASE WHEN pass_lcp = true THEN 1 ELSE 0 END) as pass_lcp_rate')
             ->orderByDesc('avg_lcp')
             ->limit($limit)
             ->get()

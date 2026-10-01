@@ -22,7 +22,7 @@ class MessageSent implements ShouldBroadcastNow
     private string $receiverId;
     private string $senderId;
 
-    public function __construct(Message|\App\Models\Mongo\ChatMessage $message, ?array $senderData = null)
+    public function __construct(mixed $message, ?array $senderData = null)
     {
         // Resolve sender data NOW while DB connections are available
         if ($senderData) {

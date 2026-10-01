@@ -334,7 +334,11 @@ class RecommendationEngine
             return collect();
 
         // 3. Hydrate only the sliced chunk from DB (Uses Primary Key Index - Ultra Fast)
-        $placeholders = implode(',', array_fill(0, count($slicedIds), '?'));
+        $cases = [];
+        foreach ($slicedIds as $idx => $id) {
+            $cases[] = "WHEN id = ? THEN " . ($idx + 1);
+        }
+        $caseSql = "CASE " . implode(' ', $cases) . " ELSE " . (count($slicedIds) + 1) . " END";
 
         return Image::whereIn('id', $slicedIds)
             ->publicGallery()
@@ -347,7 +351,7 @@ class RecommendationEngine
             })
             ->with(['settings', 'user', 'labelData', 'storage', 'album', 'album.collaborators', 'moderation'])
             ->withCount(['likes', 'bookmarks'])
-            ->orderByRaw("FIELD(id, {$placeholders})", $slicedIds)
+            ->orderByRaw($caseSql, $slicedIds)
             ->get();
     }
 

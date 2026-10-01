@@ -11,10 +11,15 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('notifications', function (Blueprint $table) {
-            $table->uuid('notifiable_id')->change();
-        });
+        if (\Illuminate\Support\Facades\DB::getDriverName() === 'pgsql') {
+            \Illuminate\Support\Facades\DB::statement('ALTER TABLE notifications ALTER COLUMN notifiable_id TYPE uuid USING (notifiable_id::text::uuid)');
+        } else {
+            Schema::table('notifications', function (Blueprint $table) {
+                $table->uuid('notifiable_id')->change();
+            });
+        }
     }
+
 
     /**
      * Reverse the migrations.
