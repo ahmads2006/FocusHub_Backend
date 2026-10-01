@@ -55,50 +55,54 @@ class FirebaseChatController extends Controller
 
         // Fetch user's chat messages from Firestore
         if (!empty($partnerIds)) {
+            $sentMessages = [];
+            $receivedMessages = [];
+
             try {
-                // Fetch recent direct messages involving this user
                 $sentMessages = $this->firestore->runQuery('chat_messages', [
                     ['field' => 'sender_id', 'op' => 'EQUAL', 'value' => $userId],
-                ], [
-                    ['field' => 'created_at', 'direction' => 'DESC'],
-                ], 100);
-
-                $receivedMessages = $this->firestore->runQuery('chat_messages', [
-                    ['field' => 'receiver_id', 'op' => 'EQUAL', 'value' => $userId],
-                ], [
-                    ['field' => 'created_at', 'direction' => 'DESC'],
-                ], 100);
-
-                $allMessages = array_merge($sentMessages, $receivedMessages);
-
-                // Sort descending by created_at
-                usort($allMessages, function ($a, $b) {
-                    return strcmp($b['created_at'] ?? '', $a['created_at'] ?? '');
-                });
-
-                foreach ($allMessages as $msg) {
-                    $sender = (string) ($msg['sender_id'] ?? '');
-                    $receiver = (string) ($msg['receiver_id'] ?? '');
-                    $partnerId = ($sender === $userId) ? $receiver : $sender;
-
-                    if (!in_array($partnerId, $partnerIds)) {
-                        continue;
-                    }
-
-                    // Keep the latest message for this partner
-                    if (!isset($latestMessagesMap[$partnerId])) {
-                        $latestMessagesMap[$partnerId] = new FirebaseMessage($msg);
-                    }
-
-                    // Count unread if I am receiver
-                    if ($receiver === $userId && empty($msg['is_read'])) {
-                        $unreadCountsMap[$partnerId] = ($unreadCountsMap[$partnerId] ?? 0) + 1;
-                    }
-                }
+                ], [], 100);
             } catch (\Throwable $e) {
-                Log::channel('single')->error('Error fetching Firestore conversations', [
+                Log::channel('single')->warning('Error fetching Firestore sent messages', [
                     'error' => $e->getMessage(),
                 ]);
+            }
+
+            try {
+                $receivedMessages = $this->firestore->runQuery('chat_messages', [
+                    ['field' => 'receiver_id', 'op' => 'EQUAL', 'value' => $userId],
+                ], [], 100);
+            } catch (\Throwable $e) {
+                Log::channel('single')->warning('Error fetching Firestore received messages', [
+                    'error' => $e->getMessage(),
+                ]);
+            }
+
+            $allMessages = array_merge($sentMessages, $receivedMessages);
+
+            // Sort descending by created_at
+            usort($allMessages, function ($a, $b) {
+                return strcmp($b['created_at'] ?? '', $a['created_at'] ?? '');
+            });
+
+            foreach ($allMessages as $msg) {
+                $sender = (string) ($msg['sender_id'] ?? '');
+                $receiver = (string) ($msg['receiver_id'] ?? '');
+                $partnerId = ($sender === $userId) ? $receiver : $sender;
+
+                if (!in_array($partnerId, $partnerIds)) {
+                    continue;
+                }
+
+                // Keep the latest message for this partner
+                if (!isset($latestMessagesMap[$partnerId])) {
+                    $latestMessagesMap[$partnerId] = new FirebaseMessage($msg);
+                }
+
+                // Count unread if I am receiver
+                if ($receiver === $userId && empty($msg['is_read'])) {
+                    $unreadCountsMap[$partnerId] = ($unreadCountsMap[$partnerId] ?? 0) + 1;
+                }
             }
         }
 
@@ -109,9 +113,6 @@ class FirebaseChatController extends Controller
             if (!$partner) continue;
 
             $latestMessage = $latestMessagesMap[$partnerId] ?? null;
-
-            if (!$latestMessage && $conn->status === 'accepted') continue;
-
             $unreadCount = $unreadCountsMap[$partnerId] ?? 0;
 
             $conversations[] = [
@@ -128,7 +129,7 @@ class FirebaseChatController extends Controller
                     'created_at' => Carbon::parse($latestMessage->created_at)->diffForHumans(),
                     'is_mine'    => (string) $latestMessage->sender_id === $userId,
                 ] : [
-                    'body'       => 'طلب مراسلة جديد',
+                    'body'       => $conn->status === 'accepted' ? 'محادثة جديدة' : 'طلب مراسلة جديد',
                     'created_at' => Carbon::parse($conn->created_at)->diffForHumans(),
                     'is_mine'    => (string) $conn->user_id === $userId,
                 ],
@@ -214,20 +215,26 @@ class FirebaseChatController extends Controller
 
         try {
             // Fetch messages from Firestore: Sent by user to partner
-            $sent = $this->firestore->runQuery('chat_messages', [
-                ['field' => 'sender_id', 'op' => 'EQUAL', 'value' => $userId],
-                ['field' => 'receiver_id', 'op' => 'EQUAL', 'value' => $partnerId],
-            ], [
-                ['field' => 'created_at', 'direction' => 'DESC'],
-            ], 50);
+            $sent = [];
+            try {
+                $sent = $this->firestore->runQuery('chat_messages', [
+                    ['field' => 'sender_id', 'op' => 'EQUAL', 'value' => $userId],
+                    ['field' => 'receiver_id', 'op' => 'EQUAL', 'value' => $partnerId],
+                ], [], 100);
+            } catch (\Throwable $e) {
+                Log::channel('single')->warning('Error fetching sent messages: ' . $e->getMessage());
+            }
 
             // Received from partner
-            $received = $this->firestore->runQuery('chat_messages', [
-                ['field' => 'sender_id', 'op' => 'EQUAL', 'value' => $partnerId],
-                ['field' => 'receiver_id', 'op' => 'EQUAL', 'value' => $userId],
-            ], [
-                ['field' => 'created_at', 'direction' => 'DESC'],
-            ], 50);
+            $received = [];
+            try {
+                $received = $this->firestore->runQuery('chat_messages', [
+                    ['field' => 'sender_id', 'op' => 'EQUAL', 'value' => $partnerId],
+                    ['field' => 'receiver_id', 'op' => 'EQUAL', 'value' => $userId],
+                ], [], 100);
+            } catch (\Throwable $e) {
+                Log::channel('single')->warning('Error fetching received messages: ' . $e->getMessage());
+            }
 
             $combined = array_merge($sent, $received);
 
@@ -391,9 +398,12 @@ class FirebaseChatController extends Controller
                 $filters[] = ['field' => 'created_at', 'op' => 'GREATER_THAN', 'value' => $afterDate];
             }
 
-            $messages = $this->firestore->runQuery('chat_messages', $filters, [
-                ['field' => 'created_at', 'direction' => 'ASC'],
-            ], 20);
+            $messages = $this->firestore->runQuery('chat_messages', $filters, [], 50);
+
+            // Sort ascending for chronological delivery
+            usort($messages, function ($a, $b) {
+                return strcmp($a['created_at'] ?? '', $b['created_at'] ?? '');
+            });
 
             // Mark as read
             foreach ($messages as $msg) {
