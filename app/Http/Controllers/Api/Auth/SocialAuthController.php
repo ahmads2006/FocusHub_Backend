@@ -57,6 +57,13 @@ class SocialAuthController extends Controller
                     'email_verified_at' => now(),
                 ]);
 
+                // Ensure user verification is explicitly true for social logins
+                if ($user->verification) {
+                    $user->verification->update(['is_verified' => true]);
+                } else {
+                    $user->verification()->create(['is_verified' => true]);
+                }
+
                 try {
                     $user->sendWelcomeEmailIfNeeded();
                 } catch (\Exception $e) {
@@ -68,7 +75,15 @@ class SocialAuthController extends Controller
                     'provider_name' => $provider,
                     'provider_id' => $socialUser->getId(),
                     'provider_avatar' => $socialUser->getAvatar(),
+                    'email_verified_at' => $user->email_verified_at ?? now(),
                 ]);
+
+                // Ensure user verification is explicitly true for social logins
+                if ($user->verification) {
+                    $user->verification->update(['is_verified' => true]);
+                } else {
+                    $user->verification()->create(['is_verified' => true]);
+                }
 
                 // Ensure profile exists (for users created before the profile system or if deleted)
                 if (!$user->profile) {
@@ -83,7 +98,7 @@ class SocialAuthController extends Controller
                 }
             }
 
-            $token = $user->createToken("{$provider}_login_token")->plainTextToken;
+            $token = $user->createToken("{$provider}_login_token", ['*'])->plainTextToken;
             Log::info("Social Login Successful for user: {$user->email} via {$provider}");
 
             $state = $request->query('state');
@@ -93,7 +108,7 @@ class SocialAuthController extends Controller
                 $frontendBase = rtrim($state, '/');
             } else {
                 // Fallback for older setups
-                $frontendBase = config('app.frontend_url', 'https://www.opalshot.studio');
+                $frontendBase = config('app.frontend_url', 'https://opalshot.studio');
             }
                 
             $frontendUrl = $frontendBase . '/auth/callback?token=' . urlencode($token);
@@ -105,7 +120,7 @@ class SocialAuthController extends Controller
             $isLocal = $request->query('state') === 'local';
             $frontendBase = $isLocal 
                 ? 'http://localhost:5173' 
-                : config('app.frontend_url', 'https://www.opalshot.studio');
+                : config('app.frontend_url', 'https://opalshot.studio');
                 
             $errorUrl = $frontendBase . '/login?error=auth_failed';
             return redirect()->away($errorUrl);

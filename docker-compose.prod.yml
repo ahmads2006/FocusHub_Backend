@@ -35,6 +35,7 @@ services:
     - ./resources:/var/www/html/resources
     - ./database:/var/www/html/database
     - ./bootstrap/app.php:/var/www/html/bootstrap/app.php
+    - ./.rr.yaml:/var/www/html/.rr.yaml
   php-scheduler:
     command:
     - php
@@ -68,6 +69,8 @@ services:
     - --queue=default
     - --sleep=3
     - --tries=3
+    - --max-jobs=200
+    - --memory=64
     - --timeout=300
     depends_on:
       redis:
@@ -89,7 +92,7 @@ services:
     - ./database:/var/www/html/database
     - ./bootstrap/app.php:/var/www/html/bootstrap/app.php
   redis:
-    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    command: redis-server --appendonly no --maxmemory 64mb --maxmemory-policy allkeys-lru
     healthcheck:
       retries: 3
       test:

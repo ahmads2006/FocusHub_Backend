@@ -21,5 +21,16 @@ php artisan migrate --force 2>/dev/null || true
 # Create storage symlink if not exists
 php artisan storage:link 2>/dev/null || true
 
-# Execute the main container command (e.g. apache2-foreground)
+# Log which server mode is being used
+if echo "$@" | grep -q "octane:start"; then
+    echo "🚀 [OpalShot] Starting Laravel Octane with RoadRunner..."
+    echo "   Workers: 4 | Max Requests: 500 | Memory Guard: Active"
+    # Stop Apache if running (Octane handles HTTP directly)
+    service apache2 stop 2>/dev/null || true
+else
+    echo "🌐 [OpalShot] Starting with Apache (traditional mode)..."
+fi
+
+# Execute the main container command (Octane or apache2-foreground)
 exec "$@"
+

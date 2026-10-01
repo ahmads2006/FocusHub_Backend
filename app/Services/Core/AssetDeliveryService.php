@@ -81,13 +81,13 @@ class AssetDeliveryService
             return null;
         }
 
-        // Normalize: accept 'spaces' as an alias for the 's3' disk config
-        if ($disk === 'spaces') {
+        // Normalize: accept 'spaces' and 'r2' as an alias for the cloud storage disk
+        if ($disk === 'spaces' || $disk === 'r2') {
             $disk = 's3';
         }
 
         // Default to 's3' if image is known to be in cloud
-        if (!$disk || !in_array($disk, ['s3', 'local', 'public'])) {
+        if (!$disk || !in_array($disk, ['s3', 'r2', 'local', 'public'])) {
             $disk = 's3';
         }
 

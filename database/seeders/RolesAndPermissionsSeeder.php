@@ -31,9 +31,15 @@ class RolesAndPermissionsSeeder extends Seeder
         }
 
         // ─── الأدوار ───────────────────────────────────────────
+        // Create both super_admin and super-admin roles for compatibility
+        // Routes use 'role:super-admin' (with hyphen), so we need both forms
         $superAdmin = Role::firstOrCreate(['name' => 'super_admin', 'guard_name' => $guardName]);
         $superAdmin->givePermissionTo(Permission::all());
 
+        $superAdminHyphen = Role::firstOrCreate(['name' => 'super-admin', 'guard_name' => $guardName]);
+        $superAdminHyphen->givePermissionTo(Permission::all());
+
+        Role::firstOrCreate(['name' => 'admin', 'guard_name' => $guardName]);
         Role::firstOrCreate(['name' => 'photographer', 'guard_name' => $guardName]);
         Role::firstOrCreate(['name' => 'editor', 'guard_name' => $guardName]);
         Role::firstOrCreate(['name' => 'user', 'guard_name' => $guardName]);

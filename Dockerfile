@@ -16,10 +16,11 @@ RUN apt-get update && apt-get install -y \
     fonts-liberation \
     libmagickwand-dev \
     libssl-dev \
-    && pecl install redis mongodb imagick \
-    && docker-php-ext-enable redis mongodb imagick \
+    libpq-dev \
+    && pecl install redis imagick \
+    && docker-php-ext-enable redis imagick \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install pdo pdo_mysql pdo_sqlite gd bcmath zip pcntl exif opcache
+    && docker-php-ext-install pdo pdo_mysql pdo_sqlite pdo_pgsql gd bcmath zip pcntl sockets exif opcache
 
 # نسخ إعدادات OpCache الخاصة بنا
 COPY docker/php/opcache.ini /usr/local/etc/php/conf.d/opcache.ini
@@ -58,10 +59,21 @@ WORKDIR /var/www/html
 COPY . .
 
 # تثبيت حزم Laravel (بدون حزم التطوير)
-RUN composer install --no-dev --optimize-autoloader --no-interaction
+RUN composer install --no-dev --optimize-autoloader --no-interaction --ignore-platform-req=ext-mongodb
 
 # إعطاء الصلاحيات المناسبة لمجلدات التخزين
 RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
+
+# تحميل RoadRunner binary لـ Laravel Octane
+# يتم تحميل الملف التنفيذي مباشرة من المشروع (نُسخ مع COPY . .)
+# أو نحمله إذا لم يكن موجوداً
+RUN if [ -f ./rr ]; then \
+        chmod +x ./rr && mv ./rr /usr/local/bin/rr; \
+    elif [ -f ./vendor/bin/rr ]; then \
+        chmod +x ./vendor/bin/rr && cp ./vendor/bin/rr /usr/local/bin/rr; \
+    else \
+        php ./vendor/bin/rr get-binary -n && chmod +x ./rr && mv ./rr /usr/local/bin/rr; \
+    fi
 
 # نسخ خطوط النظام إلى مجلد التطبيق لضمان عمل SecureShield Watermarking
 RUN mkdir -p /var/www/html/storage/app/fonts && \
@@ -72,6 +84,6 @@ RUN mkdir -p /var/www/html/storage/app/fonts && \
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
-# تشغيل سكريبت التهيئة ثم خادم Apache (منفذ 80)
+# تشغيل سكريبت التهيئة ثم Laravel Octane مع RoadRunner (منفذ 80)
 ENTRYPOINT ["docker-entrypoint.sh"]
-CMD ["apache2-foreground"]
+CMD ["php", "artisan", "octane:start", "--server=roadrunner", "--host=0.0.0.0", "--port=8000", "--max-requests=300", "--workers=2"]

@@ -20,7 +20,7 @@ Route::middleware(['auth:sanctum', 'check.banned', 'throttle:api'])->group(funct
 });
 
 // ─── Admin API (super-admin only) ──────────────────────────────
-Route::prefix('admin')->middleware(['auth:sanctum', 'role:super-admin'])->group(function () {
+Route::prefix('admin')->middleware(['auth:sanctum', 'role:super-admin|super_admin|admin'])->group(function () {
     Route::get('/users', [AdminController::class, 'users']);
     Route::post('/users/{user}/ban', [AdminController::class, 'banUser']);
     Route::post('/users/{user}/unban', [AdminController::class, 'unbanUser']);
@@ -82,7 +82,7 @@ Route::prefix('v1')->group(function () {
 
     // Health Check (Admin Only)
     Route::get('/health', [App\Http\Controllers\Api\SystemHealthController::class, 'index'])
-        ->middleware(['auth:sanctum', 'role:super-admin']);
+        ->middleware(['auth:sanctum', 'role:super-admin|super_admin|admin']);
 
     // Global system status (Public)
     Route::get('/system-settings/status', [App\Http\Controllers\Api\SystemSettingController::class, 'getStatus']);
@@ -340,7 +340,7 @@ Route::prefix('v1')->group(function () {
     // ══════════════════════════════════════════
     // 3. 🛡️ ADMIN API (V1)
     // ══════════════════════════════════════════
-    Route::prefix('admin')->middleware(['auth:sanctum', 'check.banned', 'role:super-admin'])->group(function () {
+    Route::prefix('admin')->middleware(['auth:sanctum', 'check.banned', 'role:super-admin|super_admin|admin'])->group(function () {
         // Performance Monitoring
         Route::get('/performance/summary', [PerformanceMetricsController::class, 'summary']);
         Route::get('/performance/worst-pages', [PerformanceMetricsController::class, 'worstPages']);
